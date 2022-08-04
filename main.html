@@ -1,0 +1,254 @@
+<!-- -*- mode: web; -*- -->
+<!-- todo
+[ ] make DB interface
+[X] associate code with pages
+
+-->
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>Famulam</title>
+        <meta name="description" content="Burk Labs Famulam">
+        <meta name="author" content="Ron Burk">
+        <meta name="ROBOTS" content="NOINDEX, NOFOLLOW">
+        <style>
+         span.BLMullionGrip {
+             content: '....';
+             width: 10px;
+             height: 20px;
+             display: inline-block;
+             overflow: hidden;
+             line-height: 5px;
+             padding: 3px 4px;
+             cursor: ew-resize;
+             vertical-align: middle;
+             margin-top: -.7em;
+             margin-right: .3em;
+             font-size: 12px;
+             font-family: sans-serif;
+             letter-spacing: 2px;
+             color: #cccccc;
+             text-shadow: 1px 0 1px black;
+         }
+         span.BLMullionGrip::after {
+             content: '.. .. .. ..';
+         }
+         .BLMullion {
+             border: dashed 1px #aaaaaa;
+         }
+         .BLPane { display: inline; }
+        </style>
+        <script>
+         function assert(Condition, Message) {
+             if(!Condition){
+                 Message = Message || "Assertion failed.";
+                 if(typeof Error !== "undefined"){
+                     throw new Error(Message);
+                 }
+                 throw Message;
+             }
+         }
+         function VirtualFunctionMissing(){assert(false);}
+
+         var Log = console.log;
+
+         var DB  = function(){
+             var Export   = {};
+             Export.IndexedDB  = window.indexedDB;
+             function Init(){
+                 Log("DB.Init()");
+             }
+             // Get() - bring object into memory, given its ID
+             function Get(ID){
+                 Log("DB.Get()");
+                 return null;
+             }
+             Export.Get  = Get;
+             Export.Init = Init;
+
+             return Export;
+         }();
+
+         var BLPages = function(){
+             var Export    = {};       // the object we return
+             var PageNames = {};       // ["page_name"] = layout_object
+             var PageName  = null;
+
+             Export.Add = function(Name, Layout){
+                 Log("Adding '" + Name + "'");
+                 assert(!(Name in PageNames));
+                 PageNames[Name] = Layout;
+                 assert(Name in PageNames);
+             }
+             Export.Render = function(PageName) {
+                 Log("Export.Render(" + PageName + ")");
+                 Log("PageName in PageNames = " + PageName in PageNames);
+                 assert(PageName in PageNames);
+                 var Layout = PageNames[PageName];
+                 Log("Layout = " + Layout);
+                 var Div    = Layout.Render();
+                 Log("Div = " + Div);
+                 
+                 var Replaced = document.body.replaceChild(Div, document.body.firstChild);
+                 assert(Replaced);
+                 Div.style.display='flex';
+                 
+             };
+             return Export;
+         }();
+
+         var Layout = {
+             'Cache': null,
+             'DragStart': VirtualFunctionMissing,
+             'handleEvent': function(e){
+                 Log("Layout.handleEvent("+e+")");
+             },
+             'Render': VirtualFunctionMissing,
+             'DefaultInnerHTML': VirtualFunctionMissing,
+             'Load': function(){
+                 var Result = this.Cache;
+                 var iChild, Child, Children;
+                 if(!Result){
+                     // top-level div is dummy parent never displayed -- code becomes
+                     // more uniform if can treate all "real" nodes as children
+                     Result = document.createElement("div");
+                     Result.style.display = 'none';   // Page will decide when to show it
+                     Result.innerHTML = this.DefaultInnerHTML();
+                     this.Cache = Result;
+                     Log("this.cache = " + Result);
+                     // set up event handlers
+                     Children = Result.querySelectorAll("div");
+                     for(iChild = 0; iChild < Children.length; ++iChild){
+                         Child = Children[iChild];
+                         if(Child.classList.contains('BLPane'))
+                             Child.addEventListener('dragstart', this);
+                         //                     if(Child.classList.contains(
+                     }
+                     this.Cache = Result.firstElementChild;
+                     Result = this.Cache;
+                 }
+                 return Result;
+             }
+         };
+
+         var LayoutMain = function(){
+             var Result = Object.create(Layout);
+             Result.DefaultInnerHTML = function(){
+                 return "<div class='BLPane'>"
+                      + "<div class='BLPane' style='width:48%;'>Left</div>"
+                      + "<div draggable='true' class='BLMullion' style='width:2%;'><span class='BLMullionGrip'></span></div>"
+                      + "<div class='BLPane' style='width:48%'>R</div>"
+                      + "</div>";
+             }
+             
+             // Render() - 
+             Result.Render = function () {
+                 var Result;
+                 Log("LayoutMain does render.");
+                 Result =  this.Load();
+                 assert(Result && Result.nodeType);
+
+                 Log("Result.Render to return '" + Result + "'");
+                 // need to give children a chance to render
+                 return Result;
+             }
+             return Result;
+         }();
+         // view methods
+         function ViewPage(HtmlElement){
+             
+         }
+
+
+         // main entry point
+         window.onload = function BLOnLoad(){
+             "use strict";
+             return;
+             BLPages.Add("", LayoutMain);
+             BLPages.Render("");
+
+             // die quick if browser does not supply our needs
+             // could maybe cookie-store previous success and skip this function
+             // could maybe also only load this code froms server if needed
+             // but what if user updated browser? must also store browser name string?
+             // Can be done before load of body
+             (function (){
+                 var Message = "";
+                 if(typeof(Event) != 'function')
+                     Message = "Event objects.";
+                 if(!window.indexedDB)
+                     Message = "Indexed DB";
+                 if(!BLOnLoad.hasOwnProperty("name"))
+                     Message = "function.name property";
+                 if(Message != ""){
+                     Message = "This browser lacks support for feature I need: '"
+                             + Message + "'";
+                     throw { name: "Incompatible browser:", message: Message };
+                 }
+             })();
+
+
+             // factory registry to connect HTML elements to JS objects
+             //         const Registry = {
+             //             "BLPage":     { 
+             //         };
+
+
+             function EventDefaultHandler(e){
+                 Log("EventDefaultHandler!");
+             }
+             function InitEventHandlers(){
+                 const EventMap =
+                     [
+                         [ EventDefaultHandler, "keydown", "body" ],
+                     ];
+                 EventMap.forEach(function(EventConnection){
+                     const Elements = document.querySelectorAll(EventConnection[2]);
+                     if(Elements)
+                         Elements.forEach(function(Element){
+                             Element.addEventListener(EventConnection[1], EventConnection[0]);
+                         });
+                 });
+             }
+             
+         }
+        </script>
+    </head>
+    <body><div style="display:none;"></div>
+        <div>foober</div>
+        <div>
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                id="svg8"
+                version="1.1"
+                viewBox="0 0 210 297"
+                height="297mm"
+                width="210mm">
+                <defs
+                    id="defs2" />
+                <g
+                    id="layer1">
+                    <ellipse
+                        ry="9.7324095"
+                        rx="10.411089"
+                        cy="84.898705"
+                        cx="84.979286"
+                        id="path4485"
+                        style="opacity:1;fill:none;fill-opacity:1;fill-rule:evenodd;stroke:#000000;stroke-width:0.26458332;stroke-linecap:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" />
+                    <text
+                        id="text4489"
+                        y="85.522324"
+                        x="81.64286"
+                        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.46944427px;line-height:5.82083321px;font-family:'Courier New';-inkscape-font-specification:'Courier New';font-variant-ligatures:normal;font-variant-position:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-alternates:normal;font-feature-settings:normal;text-indent:0;text-align:start;text-decoration:none;text-decoration-line:none;text-decoration-style:solid;text-decoration-color:#000000;letter-spacing:0px;word-spacing:0px;text-transform:none;writing-mode:lr-tb;direction:ltr;text-orientation:mixed;dominant-baseline:auto;baseline-shift:baseline;text-anchor:start;white-space:normal;shape-padding:0;opacity:1;vector-effect:none;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.0254;stroke-linecap:round;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+                        xml:space="preserve"><tspan
+                                                 style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:4.23333311px;font-family:Arial;-inkscape-font-specification:Arial;stroke-width:0.0254"
+                                                 y="85.522324"
+                                                 x="81.64286"
+                                                 id="tspan4487">You</tspan></text>
+                </g>
+            </svg>
+
+        </div>
+    </body>
+</html>

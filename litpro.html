@@ -1,0 +1,581 @@
+<!-- -*- mode: web; -*- -->
+<!-- todo
+     [ ] make DB interface
+     [X] associate code with pages
+
+   -->
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>LitPro</title>
+        <meta name="description" content="Burk Labs Famulam">
+        <meta name="author" content="Ron Burk">
+        <meta name="ROBOTS" content="NOINDEX, NOFOLLOW">
+        <style>
+         /*         http://cssdeck.com/labs/another-simple-css3-dropdown-menu */
+         body {
+             font-family: 'Lucida Grande', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+             padding: 20px 50px 150px;
+             font-size: 13px;
+/*             text-align: center; */
+             background: #E3CAA1;
+         }
+
+         .Top ul {
+             text-align: left;
+             display: inline;
+             margin: 0;
+             padding: 15px 4px 17px 0;
+             list-style: none;
+/*
+             -webkit-box-shadow: 0 0 5px rgba(0, 0, 0, 0.15);
+             -moz-box-shadow: 0 0 5px rgba(0, 0, 0, 0.15);
+             box-shadow: 0 0 5px rgba(0, 0, 0, 0.15);
+             */
+         }
+         .Top ul li {
+             font: bold 12px/18px sans-serif;
+             display: inline-block;
+             margin-right: -4px;
+             position: relative;
+             padding: 15px 20px;
+             background: #fff;
+             cursor: pointer;
+             -webkit-transition: all 0.2s;
+             -moz-transition: all 0.2s;
+             -ms-transition: all 0.2s;
+             -o-transition: all 0.2s;
+             transition: all 0.2s;
+         }
+         .Top ul li:hover {
+             background: #555;
+             color: #fff;
+         }
+         .Top ul li ul {
+             padding: 0;
+             position: absolute;
+             top: 48px;
+             left: 0;
+             width: 150px;
+             -webkit-box-shadow: none;
+             -moz-box-shadow: none;
+             box-shadow: none;
+             display: none;
+             opacity: 0;
+             visibility: hidden;
+             -webkit-transiton: opacity 0.2s;
+             -moz-transition: opacity 0.2s;
+             -ms-transition: opacity 0.2s;
+             -o-transition: opacity 0.2s;
+             -transition: opacity 0.2s;
+         }
+        .Top ul li ul li { 
+             background: #555; 
+             display: block; 
+             color: #fff;
+             text-shadow: 0 -1px 0 #000;
+         }
+         .Top ul li ul li:hover { background: #666; }
+         .Top ul li:hover ul {
+             display: block;
+             opacity: 1;
+             visibility: visible;
+         }
+
+         /*I love me some border-box*/
+         * {
+             box-sizing: border-box;
+         }
+         /*This just stops me getting horizontal scrolling if anything overflows the width*/
+         body {
+             overflow-x: hidden;
+         }
+         /*Just removing default browser padding/margin*/
+         html,
+         body {
+             padding: 0;
+             margin: 0;
+             /*             color: #ebebeb;*/
+         }
+         /*Flexbox gives us the flexiness we need. The top just stays put as there is no scrolling on the body due to the page never exceeding viewport height*/
+         .Top {
+             display: flex;
+             align-items: center;
+             justify-content: center;
+             background-color: #e0ffe0;
+             font-size: 3rem;
+             position: relative;
+             z-index: 10;
+             height: 100px;
+         }
+         /*This is our main wrapping element, it's made 100vh high to ensure it is always the correct size and then moved into place and padded with negative margin and padding*/
+         .Container {
+             display: flex;
+             overflow: hidden;
+             height: 100vh;
+             margin-top: -100px;
+             padding-top: 100px;
+             position: relative;
+             width: 100%;
+             backface-visibility: hidden;
+             will-change: overflow;
+         }
+         /*All the scrollable sections should overflow and be whatever height they need to be. As they are flex-items (due to being inside a flex container) they could be made to stretch full height at all times if needed.
+            WebKit inertia scrolling is being added here for any present/future devices that are able to make use of it.
+          */
+         .Left,
+         .Middle,
+         .Right {
+             overflow: auto;
+             height: auto;
+             padding: .5rem;
+             -webkit-overflow-scrolling: touch;
+             -ms-overflow-style: none;
+         }
+         /*Entirely optional – just wanted to remove the scrollbar on WebKit browsers as I find them ugly*/
+         .Left::-webkit-scrollbar,
+         .Middle::-webkit-scrollbar,
+         .Right::-webkit-scrollbar {
+             display: none;
+         }
+         /*  Left and Right are set sizes while the Middle is set to flex one so it occupies all remaining space. This could be set as a width too if prefereable, perhaps using calc.*/
+         .Left {
+             width: 12.5rem;
+             background-color: #FFE0FF;
+         }
+
+         .Middle {
+             flex: 1;
+         }
+
+         .Right {
+             width: 12.5rem;
+             background-color: #FFFFC0;
+         }
+
+
+         /* Dropdown Button */
+         .dropbtn {
+             color: white;
+             background-color: #4CAF50;
+             padding: 1px;
+             font-size: 8px;
+             border: none;
+             cursor: pointer;
+         }
+
+         /* Dropdown button on hover & focus */
+         .dropbtn:hover, .dropbtn:focus {
+             background-color: #3e8e41;
+         }
+
+         /* edit starts out hidden */
+         .chunkEdit {
+             display: none;
+         }
+         .chunkDisplay {
+             display: none;
+             transition: background-color 1.5s;
+             min-height: 1em;
+         }
+         .chunkDisplay:empty {
+             height: 1.25em;
+             line-height: 1.25;
+             color: #FFFFFF;
+             }
+         .chunkDisplay:hover{
+             background-color: #ffffD0;
+         }
+         /* The container <div> - needed to position the dropdown content */
+         .chunkToolbar {
+             position: relative;
+             display: inline-block;
+             z-index: 99;
+         }
+
+         /* Dropdown Content (Hidden by Default) */
+         .dropdown-content {
+             display: none;
+             position: absolute;
+             background-color: #f9f9f9;
+             min-width: 160px;
+             box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+             z-index: 1;
+         }
+
+         /* Links inside the dropdown */
+         .dropdown-content a {
+             color: black;
+             /* padding: 6px 8px; */
+             text-decoration: none;
+             display: block;
+         }
+
+         /* Change color of dropdown links on hover */
+         .dropdown-content a:hover {background-color: #f1f1f1}
+
+         /* Show the dropdown menu (use JS to add this class to the .dropdown-content container when the user clicks on the dropdown button) */
+         .show {display:block;} 
+         #editor {
+             border: 1px solid black;
+             margin-bottom: 5px;
+             height: 200px;
+             width: auto;
+         }
+
+         .chunkBody {
+             border: 1px solid black;
+             margin-bottom: 5px;
+             width: 100%;
+             height: 100%;
+         }
+        </style>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.2.6/ace.js" integrity="sha256-xrr4HH5eSY+cFz4SH7ja/LaAi9qcEdjMpeMP49/iOLs=" crossorigin="anonymous"></script>
+        <script type="text/javascript">
+         function assert(Condition, Message) {
+             if(!Condition){
+                 Message = Message || "Assertion failed.";
+                 if(typeof Error !== "undefined"){
+                     throw new Error(Message);
+                 }
+                 throw Message;
+             }
+         }
+         // main entry point
+         window.onload = function BLOnLoad(){
+             // create
+             LP5 = new LP5;
+             var key = 0;
+             var val;
+             var more = true;
+             while(more){
+                 val = Storage.load(key);
+                 if(val == null)
+                     more = false;
+                 else {
+                     LP5.newSection(val);
+                     ++key;
+                 }
+             }
+             if(key == 0)
+                 LP5.newSection(-1);
+         }
+         class Storage {
+             static save(key, str){
+                 return localStorage.setItem(key, str);
+             }
+             static load(key, str){
+                 return localStorage.getItem(key, str);
+             }
+         }
+         class Util {
+             static createElement(tagName, className, id){
+                 let result = document.createElement(tagName);
+                 if(className)
+                     result.className = className;
+                 if(id)
+                     result.id = id;
+                 return result;
+             }
+             static hide(obj){
+                 obj.div.style.display = 'none';
+             }
+             static show(obj){
+                 obj.div.style.display = 'block';
+             }
+             // https://stackoverflow.com/questions/5710798/automatically-generate-html-from-json
+         }
+         class LP5 {
+             constructor(){
+                 this.sections = [];
+                 this.div = document.getElementById('sections');
+                 this.activeEditor = null;
+             }
+             instantiate(className){
+                 
+             }
+             setActiveEditor(chunk){
+                 if(this.activeEditor != chunk){
+                     if(this.activeEditor)
+                         this.activeEditor.edit(false);
+                     this.activeEditor = chunk;
+                     if(chunk)
+                         chunk.edit(true);
+                 }
+             }
+             newSection(pos){
+                 // if caller passed existing section instead of position
+                 if(pos instanceof Section)
+                     pos = this.sections.indexOf(pos);
+                 let newSection = new Section(pos);
+                 // store reference at correct place in master array
+                 if(pos < 0){
+                     this.sections.push(newSection);
+                     this.div.appendChild(newSection.div);
+                 }
+                 else {
+                     this.div.insertBefore(newSection.div, this.sections[pos].div);
+                     this.chunks.splice(pos, 0, newSection);
+                 }
+                 // tell chunk to insert itself at specified position in DOM
+                 //                 newChunk.insert(pos);
+                 assert(newSection.div.parentElement);
+                 return newSection;
+             }
+         }
+         class Section {
+             // if creating new section, pass its position in source
+             // if loading existing section from storage, pass its JSON string
+             constructor(posOrJsonString){
+                 this.div      = Util.createElement('div', 'sectionDiv');
+                 this.empty    = true;
+                 this.docChunk = new Chunk('html');
+                 this.div.appendChild(this.docChunk.div);
+                 this.codeChunk = new Chunk('html');
+                 this.div.appendChild(this.codeChunk.div);
+                 if(Number.isInteger(posOrJsonString)){
+                     this.pos = posOrJsonString;
+                     this.docChunk.setText("(enter comments here)");
+                     this.codeChunk.setText("(enter code here)");
+                 }
+                 else {
+                     let obj = JSON.parse(posOrJsonString);
+                     this.pos = obj.pos;
+                     this.docChunk.setText(obj.docText);
+                     this.codeChunk.setText(obj.codeText);
+                     this.empty = false;
+                 }
+             }
+             save(storage){
+                 let obj = {};
+                 obj.pos = this.pos;
+                 obj.docText = this.docChunk.getText();
+                 obj.codeText = this.codeChunk.getText();
+                 storage.save(JSON.stringify(obj));
+             }
+         }
+         class Chunk {
+             constructor(chunkType){
+                 this.chunkType    = chunkType;
+                 new ChunkEdit(this);
+                 this.div          = Util.createElement('div', 'chunkDiv');
+                 this.editObj      = new ChunkEdit(this);
+                 this.div.appendChild(this.editObj.div);
+                 this.displayObj   = new ChunkDisplay(this);
+                 this.div.appendChild(this.displayObj.div);
+                 this.edit(false);
+             }
+             insert(pos){
+                 console.log("Chunk.insert(" + pos + ")");
+                 if(pos > LP5.chunks.length)
+                     pos = -1;
+                 assert(LP5.div);
+                 console.log(LP5.div);
+                 assert(LP5.div.nodeType);
+                 if(pos < 0)
+                     LP5.div.appendChild(this.div);
+                 else {
+                     let chunk = LP5.chunks[pos];
+                     console.log(chunk);
+                     assert(chunk.div.parentElement);
+                     LP5.div.insertBefore(this.div, chunk.div);
+                 }
+             }
+             setText(text){
+                 this.displayObj.setText(text);
+                 this.editObj.setText(text);
+             }
+             getText(){
+                 return "Chunk.getTExt not written!";
+             }
+             edit(turnOn){
+                 if(turnOn)
+                     var from = this.displayObj, to = this.editObj;
+                 else
+                     var from = this.editObj, to = this.displayObj;
+                 let chunkText = from.getText();
+                 Util.hide(from);
+                 to.setText(chunkText);
+                 Util.show(to);
+                 if(to == this.editObj)
+                     to.focus();
+             }
+         };
+
+         // ChunkEdit -- a chunkEdit div contains a toolbar followed by a body
+         class ChunkEdit{
+             constructor(chunk){
+                 let self = this;
+                 this.chunk      = chunk;
+                 this.div        = Util.createElement('div', 'chunkEdit');
+                 this.toolbarObj = new ChunkToolbar(chunk);
+                 this.div.appendChild(this.toolbarObj.div);
+                 // the body div will be taken over by the actual editor
+                 this.divBody    = Util.createElement('div', 'chunkBody');
+                 this.div.appendChild(this.divBody);
+                 require("ace/edit_session").EditSession.prototype.$useWorker=false;
+
+                 let chunkType = chunk.chunkType;
+                 this.editor = ace.edit(this.divBody);
+                 let editor = this.editor;
+                 let mode = "javascript"
+                 if(chunkType == 'html')
+                     mode = "html";
+                 editor.$blockScrolling = Infinity;
+                 editor.setKeyboardHandler("ace/keyboard/emacs");
+                 editor.commands.addCommand({
+                     name: 'save',
+                     bindKey: {win: "Ctrl-S", "mac": "cmd-S"},
+                     exec: function(self){
+                         consol.log("save!!!!"); self.div.dispatchEvent('save'); }
+                 });
+                 editor.getSession().setMode("ace/mode/" + mode);
+                 editor.setOptions({maxLines:10});
+                 editor.setTheme("ace/theme/monokai");
+                 editor.on('blur', function(event){
+                     console.log(`Blur! ${event.relatedTarget}`);
+                     console.log(`${document.activeElement} ${document.activeElement.parent}`);
+                     if(!self.chunk.div.contains(event.relatedTarget)){
+                         console.log("   true");
+                         editor.setTheme("ace/theme/clouds");
+                         editor.renderer.setShowGutter(false);
+                         editor.setOptions({readOnly:true});
+                         LP5.setActiveEditor(null);
+                     }
+                     else
+                         console.log("   false");
+
+                 });
+                 editor.on('focus', function(event){
+                     console.log(`Focus! ${event.relatedTarget} focus=${document.activeElement}`);
+                     editor.renderer.showCursor();
+                     editor.setOptions({readOnly:false});
+                     editor.setTheme("ace/theme/monokai");
+                     self.chunk.edit(true)
+                     LP5.setActiveEditor(chunk);
+                 });
+             }
+             focus(){ this.editor.focus() }
+             getText(){
+                 return this.editor.getValue();
+             }
+             setText(text){
+                 this.editor.setValue(text, 1);
+                 this.editor.focus();
+             }
+         }
+         // ChunkToolbar: toolbar at top of a chunk
+         class ChunkToolbar{
+             constructor(chunk){
+                 this.chunk = chunk;
+                 this.menu  = null;
+                 this.div = Util.createElement('div', 'chunkToolbar');
+                 this.div.innerHTML = "<input type='button' class='dropbtn' value='. . .'/>";
+                 const self = this;
+                 this.div.onclick = function(event){
+                     console.log("toolbar got click!");
+                     return self.handleEvent(event); };
+             }
+             addLink(Parent, Text){
+                 const NewLink = document.createElement('a');
+                 NewLink.id=Text;
+                 NewLink.appendChild(document.createTextNode(Text));
+                 Parent.appendChild(NewLink);
+             }
+             insert(event, chunkType){
+                 console.log("ChunkInsert");
+                 let newChunk = LP5.newChunk(chunkType, this.chunk);
+                 //                 newChunk.edit(true);
+                 LP5.setActiveEditor(newChunk);
+             }
+             /* When the user clicks on the button,
+                toggle between hiding and showing the dropdown content */
+             display(event) {
+                 const MenuButton  = event.target;
+                 const MenuDiv     = MenuButton.parentElement;
+                 const DropdownDiv = Util.createElement('div', 'dropdown-content');
+
+                 this.addLink(DropdownDiv, "Insert HTML");
+                 MenuDiv.appendChild(DropdownDiv);
+                 DropdownDiv.style.display = 'block';
+                 this.menu = DropdownDiv;
+             }
+             remove(){
+                 if(this.menu)
+                     this.menu.remove();
+                 this.menu = null;
+             }
+
+             // handle all clicks while menu is active
+             handleEvent(event){
+                 console.log("Click!");
+                 // if menu not currently displayed
+                 if(this.menu == null){
+                     console.log("    this.menu is null");
+                     this.display(event);
+                     event.stopPropagation();
+                     // Install transient click handler to detect clicks outside our menu
+                     document.addEventListener('click', this, false);
+                     return;
+                 }
+                 else if(event.target){
+                     console.log("id = " + event.target.id);
+                     switch(event.target.id){
+                         case 'Insert HTML' :
+                             console.log('Insert!!');
+                             this.insert(event, 'html');
+                             break;
+                     }
+                 }
+                 this.menu.remove();
+                 document.removeEventListener('click',this,false);
+             }
+             
+         }
+         class ChunkDisplay {
+             constructor(chunk){
+                 this.chunk = chunk;
+                 this.div = Util.createElement('div', 'chunkDisplay');
+                 const self = this;
+                 this.div.onclick = function(event){
+                     console.log("ChunkDisplay got click!");
+                     self.chunk.edit(true);
+                 };
+                 this.text = "";
+             }
+             getText(){
+                 return this.text;
+             }
+             setText(text){
+                 this.text = text;
+                 this.div.innerHTML = text;
+             }
+         }
+        </script>
+    </head>
+    <body>
+        <div class="Top">
+            <ul>
+                <li>Home</li>
+                <li>About</li>
+                <li>
+                    Portfolio
+                    <ul>
+                        <li>Web Design</li>
+                        <li>Web Development</li>
+                        <li>Illustrations</li>
+                    </ul>
+                </li>
+                <li>Blog</li>
+                <li>Contact</li>
+            </ul>
+        </div>
+        <div class="Container">
+            <div class="Left">nav tree</div>
+            <div class="Middle" id="sections">
+            </div>
+            <div class="Right">output code</div>
+        </div>
+    </body>
+</html>

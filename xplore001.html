@@ -1,0 +1,30 @@
+<html>
+    <head>
+        <title>test</title>
+        <script language="javascript" type="text/javascript">
+         function doOnLoad(){
+             addScript('inject', 'myCode');
+         }
+
+         function addScript(inject,code){
+             var _in        = document.getElementById(inject);
+             var tmplFrag   = document.getElementById(code).content;
+             
+             _in.appendChild(document.importNode(tmplFrag, true));
+         }
+
+        </script>
+    </head>
+    <body onload="doOnLoad();">
+        <template id="myCode">
+            <script>
+             function foo(){
+                 alert('injected');
+             }
+            </script>
+        </template>
+        <div id="header">some content</div>
+        <div id="inject"></div>
+        <input type="button" onclick="foo(); return false;" value="Test Injected" />
+    </body>
+</html>

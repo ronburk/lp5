@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>template problem</title>
+    </head>
+    <body>
+        <template>
+            <span>a simple template</span>
+        </template>
+        <p>content</p>
+
+        <script type="text/javascript">
+         function testTemplate(){
+             console.assert(document != null);
+             console.assert(document.body != null);
+             console.assert(document.body.firstElementChild != null);
+             let thisTemplate = document.body.firstElementChild;
+             let otherWindow  = window.open("");
+             let otherDocument= otherWindow.document;
+             otherDocument.writeln("<!doctype html><head></head><body>");
+             let otherDiv = otherDocument.createElement("div");
+             otherDocument.body.appendChild(otherDiv);
+             let otherTemplate=otherDocument.createElement("template");
+             let otherContent=otherDocument.importNode(thisTemplate.content);
+             console.log("otherContent = ");
+             console.log(otherContent);
+             //         otherTemplate.appendChild(otherContent);
+             otherDiv.appendChild(otherContent);
+             //         otherDocument.body.appendChild(otherTemplate);
+             otherDocument.body.appendChild(otherDiv);
+             otherDocument.writeln("</body></html>");
+             otherDocument.close();
+             console.log(otherDocument.body);
+         }
+         document.body.onclick = testTemplate;
+         //     window.onload = testTemplate;
+        </script>
+        
+    </body>
+</html>
