@@ -107,6 +107,7 @@
          }
          #BL-Output{
              grid-area: output;
+             white-space: pre-line;
          }
          #BL-Menu {
              height:50px;
@@ -184,29 +185,35 @@
              },
              compile: function(){
 
-                 // ??? rlb 08/02/2022
-                 // store a reference to our file handle
-                 let dirHandle;
+                 /*
+                    // ??? rlb 08/02/2022
+                    // store a reference to our file handle
+                    let dirHandle;
 
-                 async function getFile() {
-                     // open file picker
-                     //                     [fileHandle] = await window.showOpenFilePicker();
-                     dirHandle = await window.showDirectoryPicker({mode:'readwrite'});
+                    async function getFile() {
+                    // open file picker
+                    //                     [fileHandle] = await window.showOpenFilePicker();
+                    dirHandle = await window.showDirectoryPicker({mode:'readwrite'});
 
-                     console.assert(dirHandle.kind === 'directory');
-                     console.log("Got me a directory!");
-                     let fileHandle = await dirHandle.getFileHandle('killme.foo', {create:true});
-                     let fileHandle2 = await dirHandle.getFileHandle('killme2.foo', {create:true});
+                    console.assert(dirHandle.kind === 'directory');
+                    console.log("Got me a directory!");
+                    let fileHandle = await dirHandle.getFileHandle('killme.foo', {create:true});
+                    let fileHandle2 = await dirHandle.getFileHandle('killme2.foo', {create:true});
 
-                 }
-                 getFile();
-                 return;
-
+                    }
+                    getFile();
+                    return;
+                  */
 
                  let dataUrl = {str:""};
                  expandBL(dataUrl, BL.index, " ");
-                 let otherWindow = window.open("data:text/html," +
-                                               encodeURIComponent(dataUrl.str));
+                 let pane = document.getElementById('BL-Output');
+                 pane.textContent = dataUrl.str;
+                 var tab = window.open('about:blank', '_blank');
+                 tab.document.write(dataUrl.str); // where 'html' is a variable containing your HTML
+                 tab.document.close(); // to finish loading the page
+                 //                 let otherWindow = window.open("data:text/html," +
+                 //                                               encodeURIComponent(dataUrl.str));
 
                  if(false){
                      console.assert(otherWindow, "Could not open my demo window!");
@@ -820,9 +827,7 @@
                     </script>
                     <h1>lp5 v0.0</h1>
                     <p>
-                        This is the simplest/smallest possible version of lp5,
-                        a hierarchical text editor/preprocessor for creating
-                        documented software.
+                        This is the simplest/smallest possible version of lp5.
                         This initial version offers only the ability to
                         <em>view</em>
                         lp5 source and little else.
@@ -837,7 +842,7 @@
                 <div>
                     <h2>Overview</h2>
                     <p>
-                        lp5 is a browser-based hierarchical text editor and preprocessor
+                        lp5 is a browser-based, hierarchical, text editor and preprocessor
                         designed to enable a different style of creating
                         software.
                         The programmer uses lp5 to create a <q>web</q>
@@ -905,7 +910,7 @@
                                 lp5 cares dramatically less about pretty-printing
                                 code;
                                 is built on HTML5, not TeX;
-                                is WYSIWYG;
+                                is more WYSIWYG than batch;
                                 makes multi-file support a first-class feature;
                                 and, relatedly, is concerned with working with version control.
                                 History suggests the phrase "literate programming" has been
@@ -932,7 +937,7 @@
                         and is independent of the order of the code
                         in the final HTML output
                         (which is produced by asking blitpro to <q>compile</q>).
-                        Most blitpro sections are quite short
+                        Most lp5 sections are quite short
                         and often contain not much more than a dozen
                         lines of code.
                         Simple parts, simply related:
@@ -970,7 +975,7 @@
                     <p>
                         Code fragments that share the same name will
                         be combined together in the output in the order
-                        they appeared in the blitpro source sections.
+                        they appeared in the lp5 source sections.
                         This greatly alleviates the need to think of
                         unique names for each logical group of global variables,
                         CSS declarations, etc.
@@ -981,11 +986,11 @@
                 <div>
                     <h2>Bootstrap</h2>
                     <p>
-                        v0.0 of blitpro is really only intended for
+                        v0.0 of lp5 is really only intended for
                         operating on its own source code to
-                        produce a more functional version of blitpro.
+                        produce a more functional version of lp5.
                         v0.0 is an HTML file that contains two
-                        copies of the blitpro IDE.
+                        copies of the lp5 IDE.
                         One copy is the actual code that is
                         executing as you read this.
                         The other copy is a passive version
@@ -993,22 +998,22 @@
                     </p>
                     <p>
                         This is only confusing because of self-reference.
-                        blitpro is an HTML5 program that operates on text
-                        (blitpro source code) residing in a particular
+                        lp5 is an HTML5 program that operates on text
+                        (lp5 source code) residing in a particular
                         <code>&lt;template&gt;</code> tag. It just so happens
                         that the source code being operated on here is
-                        the source to blitpro itself.
+                        the source to lp5 itself.
                     </p>
                     <div style="text-align:center;">
-<svg width="4.4955in" height="2.191in" version="1.1" viewBox="0 0 114.19 55.653" xmlns="http://www.w3.org/2000/svg"><text x="85.046585" y="31.740494" style="fill:#000000;font-family:sans-serif;font-size:4.2333px;letter-spacing:0px;line-height:1.25;stroke-width:.26458;word-spacing:0px" xml:space="preserve"><tspan x="85.046585" y="31.740494" style="stroke-width:.26458"><tspan x="85.046585" y="31.740494" style="stroke-width:.26458">blitpro source </tspan></tspan><tspan x="85.046585" y="37.032158" style="stroke-width:.26458"><tspan x="85.046585" y="37.032158" style="stroke-width:.26458">being edited.</tspan></tspan></text><rect x="41.754" y=".13224" width="42.656" height="55.39" style="fill:none;opacity:.55;stroke-width:.26458;stroke:#000"/><text x="46.559536" y="7.3767023" style="fill:#000000;font-family:sans-serif;font-size:3.5278px;letter-spacing:0px;line-height:1.25;stroke-width:.26458;word-spacing:0px" xml:space="preserve"><tspan x="46.559536" y="7.3767023" style="stroke-width:.26458"><tspan x="46.559536" y="7.3767023" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458">&lt;html&gt;</tspan><tspan x="59.25127" y="7.3767023" dx="0" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458"/></tspan><tspan x="46.559536" y="11.865985" style="stroke-width:.26458"><tspan x="46.559536" y="11.865985" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458">  &lt;head&gt;</tspan><tspan x="63.481846" y="11.865985" dx="0" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458"/></tspan><tspan x="55.020691" y="20.890038" style="stroke-width:.26458"><tspan x="46.559536" y="16.355267" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458"/><tspan x="55.020691" y="16.355267" style="font-family:'Courier New';font-weight:bold;stroke-width:.26458">...</tspan><tspan x="61.36655" y="16.355267" dx="0" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458"/></tspan><tspan x="46.559536" y="25.379318" style="stroke-width:.26458"><tspan x="46.559536" y="20.890038" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458">  &lt;/head&gt;</tspan><tspan x="65.59713" y="20.890038" dx="0" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458"/></tspan><tspan x="46.559536" y="29.868607" style="stroke-width:.26458"><tspan x="46.559536" y="25.379318" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458">  &lt;body&gt;</tspan><tspan x="63.481846" y="25.379318" dx="0" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458"/></tspan><tspan x="46.559536" y="34.357895" style="stroke-width:.26458"><tspan x="46.559536" y="29.868607" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458">    &lt;template&gt;</tspan><tspan x="76.173584" y="29.868607" dx="0" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458"/></tspan><tspan x="59.25127" y="43.381947" style="stroke-width:.26458"><tspan x="46.559536" y="34.357895" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458"/><tspan x="59.25127" y="34.357895" style="font-family:'Courier New';font-weight:bold;stroke-width:.26458">...</tspan><tspan x="65.59713" y="34.357895" dx="0" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458"/></tspan><tspan x="46.559536" y="47.871223" style="stroke-width:.26458"><tspan x="46.559536" y="38.892662" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458">    &lt;/template&gt;</tspan><tspan x="78.288872" y="38.892662" dx="0" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458"/></tspan><tspan x="46.559536" y="52.360504" style="stroke-width:.26458"><tspan x="46.559536" y="43.381947" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458">      ...</tspan><tspan x="65.59713" y="43.381947" dx="0" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458"/></tspan><tspan x="46.559536" y="-23.968761" style="stroke-width:.26458"><tspan x="46.559536" y="47.871223" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458">  &lt;/body&gt;</tspan><tspan x="65.59713" y="47.871223" dx="0" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458"/></tspan><tspan x="46.559536" y="-23.171875" style="stroke-width:.26458"><tspan x="46.559536" y="52.360504" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458">&lt;/html&gt;</tspan></tspan></text><path d="m78.796 27.819s1.8604 0.05758 2.3624 0.7087c0.84614 1.0977-0.7097 3.0618 0.14174 4.1554 0.47845 0.61449 2.2442 0.64964 2.2442 0.64964-0.78837 0.22046-1.8889 0.2147-2.3742 0.9095-0.78864 1.1293 0.66868 2.9623-0.05906 4.1318-0.45773 0.73554-2.3151 1.1812-2.3151 1.1812" style="fill:none;stroke-width:.26458px;stroke:#000"/><rect x="54.14" y="26.95" width="24.656" height="13.831" style="fill:#0f0;opacity:.1;stroke-width:.26458;stroke:#000"/><path d="m47.45 5.3642s-1.8604 0.05758-2.3624 0.7087c-0.84614 1.0977 0.25491 20.116-0.59653 21.21-0.47845 0.61449-2.2442 0.64964-2.2442 0.64964 0.78837 0.22046 1.8889 0.2147 2.3742 0.9095 0.78864 1.1293-0.04334 21.552 0.6844 22.721 0.45773 0.73554 2.3151 1.1812 2.3151 1.1812" style="fill:none;stroke-width:.26458px;stroke:#000"/><text x="-0.23772226" y="26.381998" style="fill:#000000;font-family:sans-serif;font-feature-settings:normal;font-size:4.2335px;font-variant-caps:normal;font-variant-ligatures:normal;font-variant-numeric:normal;letter-spacing:0px;line-height:1.25;stroke-width:.26459;word-spacing:0px" xml:space="preserve"><tspan x="-0.23772226" y="26.381998" style="font-family:sans-serif;font-feature-settings:normal;font-size:4.2335px;font-variant-caps:normal;font-variant-ligatures:normal;font-variant-numeric:normal;stroke-width:.26459"><tspan x="-0.23772226" y="26.381998" style="font-family:sans-serif;font-feature-settings:normal;font-size:4.2335px;font-variant-caps:normal;font-variant-ligatures:normal;font-variant-numeric:normal;stroke-width:.26459">Code to implement </tspan></tspan><tspan x="-0.23772226" y="30.791803" style="font-family:sans-serif;font-feature-settings:normal;font-size:4.2335px;font-variant-caps:normal;font-variant-ligatures:normal;font-variant-numeric:normal;stroke-width:.26459"><tspan x="-0.23772226" y="30.791803" style="font-family:sans-serif;font-feature-settings:normal;font-size:4.2335px;font-variant-caps:normal;font-variant-ligatures:normal;font-variant-numeric:normal;stroke-width:.26459">blitpro IDE.</tspan></tspan></text></svg>
+<svg width="4.4955in" height="2.191in" version="1.1" viewBox="0 0 114.19 55.653" xmlns="http://www.w3.org/2000/svg"><text x="85.046585" y="31.740494" style="fill:#000000;font-family:sans-serif;font-size:4.2333px;letter-spacing:0px;line-height:1.25;stroke-width:.26458;word-spacing:0px" xml:space="preserve"><tspan x="85.046585" y="31.740494" style="stroke-width:.26458"><tspan x="85.046585" y="31.740494" style="stroke-width:.26458">lp5 source </tspan></tspan><tspan x="85.046585" y="37.032158" style="stroke-width:.26458"><tspan x="85.046585" y="37.032158" style="stroke-width:.26458">being edited.</tspan></tspan></text><rect x="41.754" y=".13224" width="42.656" height="55.39" style="fill:none;opacity:.55;stroke-width:.26458;stroke:#000"/><text x="46.559536" y="7.3767023" style="fill:#000000;font-family:sans-serif;font-size:3.5278px;letter-spacing:0px;line-height:1.25;stroke-width:.26458;word-spacing:0px" xml:space="preserve"><tspan x="46.559536" y="7.3767023" style="stroke-width:.26458"><tspan x="46.559536" y="7.3767023" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458">&lt;html&gt;</tspan><tspan x="59.25127" y="7.3767023" dx="0" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458"/></tspan><tspan x="46.559536" y="11.865985" style="stroke-width:.26458"><tspan x="46.559536" y="11.865985" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458">  &lt;head&gt;</tspan><tspan x="63.481846" y="11.865985" dx="0" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458"/></tspan><tspan x="55.020691" y="20.890038" style="stroke-width:.26458"><tspan x="46.559536" y="16.355267" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458"/><tspan x="55.020691" y="16.355267" style="font-family:'Courier New';font-weight:bold;stroke-width:.26458">...</tspan><tspan x="61.36655" y="16.355267" dx="0" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458"/></tspan><tspan x="46.559536" y="25.379318" style="stroke-width:.26458"><tspan x="46.559536" y="20.890038" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458">  &lt;/head&gt;</tspan><tspan x="65.59713" y="20.890038" dx="0" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458"/></tspan><tspan x="46.559536" y="29.868607" style="stroke-width:.26458"><tspan x="46.559536" y="25.379318" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458">  &lt;body&gt;</tspan><tspan x="63.481846" y="25.379318" dx="0" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458"/></tspan><tspan x="46.559536" y="34.357895" style="stroke-width:.26458"><tspan x="46.559536" y="29.868607" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458">    &lt;template&gt;</tspan><tspan x="76.173584" y="29.868607" dx="0" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458"/></tspan><tspan x="59.25127" y="43.381947" style="stroke-width:.26458"><tspan x="46.559536" y="34.357895" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458"/><tspan x="59.25127" y="34.357895" style="font-family:'Courier New';font-weight:bold;stroke-width:.26458">...</tspan><tspan x="65.59713" y="34.357895" dx="0" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458"/></tspan><tspan x="46.559536" y="47.871223" style="stroke-width:.26458"><tspan x="46.559536" y="38.892662" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458">    &lt;/template&gt;</tspan><tspan x="78.288872" y="38.892662" dx="0" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458"/></tspan><tspan x="46.559536" y="52.360504" style="stroke-width:.26458"><tspan x="46.559536" y="43.381947" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458">      ...</tspan><tspan x="65.59713" y="43.381947" dx="0" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458"/></tspan><tspan x="46.559536" y="-23.968761" style="stroke-width:.26458"><tspan x="46.559536" y="47.871223" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458">  &lt;/body&gt;</tspan><tspan x="65.59713" y="47.871223" dx="0" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458"/></tspan><tspan x="46.559536" y="-23.171875" style="stroke-width:.26458"><tspan x="46.559536" y="52.360504" style="font-family:'Courier New';font-size:3.5278px;stroke-width:.26458">&lt;/html&gt;</tspan></tspan></text><path d="m78.796 27.819s1.8604 0.05758 2.3624 0.7087c0.84614 1.0977-0.7097 3.0618 0.14174 4.1554 0.47845 0.61449 2.2442 0.64964 2.2442 0.64964-0.78837 0.22046-1.8889 0.2147-2.3742 0.9095-0.78864 1.1293 0.66868 2.9623-0.05906 4.1318-0.45773 0.73554-2.3151 1.1812-2.3151 1.1812" style="fill:none;stroke-width:.26458px;stroke:#000"/><rect x="54.14" y="26.95" width="24.656" height="13.831" style="fill:#0f0;opacity:.1;stroke-width:.26458;stroke:#000"/><path d="m47.45 5.3642s-1.8604 0.05758-2.3624 0.7087c-0.84614 1.0977 0.25491 20.116-0.59653 21.21-0.47845 0.61449-2.2442 0.64964-2.2442 0.64964 0.78837 0.22046 1.8889 0.2147 2.3742 0.9095 0.78864 1.1293-0.04334 21.552 0.6844 22.721 0.45773 0.73554 2.3151 1.1812 2.3151 1.1812" style="fill:none;stroke-width:.26458px;stroke:#000"/><text x="-0.23772226" y="26.381998" style="fill:#000000;font-family:sans-serif;font-feature-settings:normal;font-size:4.2335px;font-variant-caps:normal;font-variant-ligatures:normal;font-variant-numeric:normal;letter-spacing:0px;line-height:1.25;stroke-width:.26459;word-spacing:0px" xml:space="preserve"><tspan x="-0.23772226" y="26.381998" style="font-family:sans-serif;font-feature-settings:normal;font-size:4.2335px;font-variant-caps:normal;font-variant-ligatures:normal;font-variant-numeric:normal;stroke-width:.26459"><tspan x="-0.23772226" y="26.381998" style="font-family:sans-serif;font-feature-settings:normal;font-size:4.2335px;font-variant-caps:normal;font-variant-ligatures:normal;font-variant-numeric:normal;stroke-width:.26459">Code to implement </tspan></tspan><tspan x="-0.23772226" y="30.791803" style="font-family:sans-serif;font-feature-settings:normal;font-size:4.2335px;font-variant-caps:normal;font-variant-ligatures:normal;font-variant-numeric:normal;stroke-width:.26459"><tspan x="-0.23772226" y="30.791803" style="font-family:sans-serif;font-feature-settings:normal;font-size:4.2335px;font-variant-caps:normal;font-variant-ligatures:normal;font-variant-numeric:normal;stroke-width:.26459">lp5 IDE.</tspan></tspan></text></svg>
                     </div>
                     <p>
                         The practical consequence is that when you
                         edit the HTML source to this page,
                         you will find two copies of just about any
                         particular line of code.
-                        To edit the actual source code to blitpro,
-                        just make sure you edit the blitpro source that
+                        To edit the actual source code to lp5,
+                        just make sure you edit the lp5 source that
                         resides inside the
                         <code>&lt;template&gt;</code>
                         tag in this HTML file.
@@ -1018,33 +1023,33 @@
                     </p>
                     <b>Creating v0.1</b>
                     <p>
-                        Of course, editing the blitpro source code does
+                        Of course, editing the lp5 source code does
                         not actually change the functionality of this HTML page
                         (you're just editing text inside of a 
                         <code>&lt;template&gt;</code>
                         that the browser never parses).
                         To test your source code changes,
                         hit the <q>Compile</q> menu button at the top of the screen.
-                        This will compile your blitpro source into HTML code in
+                        This will compile your lp5 source into HTML code in
                         a separate tab in your browser.
                         There, you can check to see if your changes work
                         as expected&mdash;the other window will also
-                        contain a copy of your blitpro source code just like this
+                        contain a copy of your lp5 source code just like this
                         window does.
                     </p>
                     <p>
                         At some point, you will have added enough wonderful improvements
-                        to blitpro that the fact that none of them show up until you hit
+                        to lp5 that the fact that none of them show up until you hit
                         <q>Compile</q> will be tedious.
                         To upgrade this HTML file so that it implements your
-                        latest blitpro source, just copy the <q>Output</q> pane to
+                        latest lp5 source, just copy the <q>Output</q> pane to
                         the clipboard,
                         and use that to clobber this HTML file.
                         (Prudent backup, version control, etc. are recommended.).
                     </p>
                     <p>
                         Obviously, these somewhat primitive processes are just
-                        features of the primitive state of bootstrapping blitpro and
+                        features of the primitive state of bootstrapping lp5 and
                         hopefully will be replaced by a less tedious workflow
                         as a fuller functionality is reached.
                     </p>
@@ -1110,7 +1115,7 @@
                         <code>&lt;div&gt;</code>s
                         that are mostly very simple because
                         their content will be filled dynamically
-                        from the blitpro source code being displayed:
+                        from the lp5 source code being displayed:
                     </p>
                 </div>
                 <script type="text/html" data-BL="BL_GridAreas">
@@ -1303,7 +1308,7 @@
                         </li>
                         <li>
                             The middle column (<code>div</code> <code>#BL-Source</code>)
-                            contains the blitpro source,
+                            contains the lp5 source,
                             and is where most of the action is.
                             The column is a flex box of sections
                             (<code>.BL-Section</code>),
@@ -1509,7 +1514,7 @@
                     <html lang="en">
                         <head>
                             <meta charset="utf-8">
-                            <title>blitpro bootstrap</title>
+                            <title>lp5 bootstrap</title>
                             <style>
                              @<BL_GlobalCSS@>
                             </style>

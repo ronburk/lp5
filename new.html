@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <script>
+         var LP5 = {
+             open: async()=>{
+                 let fileHandle;
+                 [fileHandle] = await window.showOpenFilePicker({multiple:false});
+                 const file   = await fileHandle.getFile();
+                 const data   = await file.text();
+                 console.log(data);
+             },
+             newSection: async()=>{
+                 let newID    = crypto.randomUUID();
+                 console.log("New Section " + newID);
+                 return false;
+             }
+         };
+        </script>
+    </head>
+    <body>
+        <template>
+            
+        </template>
+        <a onClick="return LP5.open()">Open</a>
+        <a onClick="return LP5.newSection()">New</a>
+    </body>
+</html>
