@@ -2,27 +2,184 @@
 <html lang="en">
     <head>
         <script>
-         var LP5 = {
-             open: async()=>{
+         "use strict";
+         var LP5 = function(){
+             var result = {
+                 currentTemplate : null,
+                 templates       : [],
+                 dirHandle       : null,
+                 dirParentHandle : null,
+                 projects        : [],
+             };
+             result.start = function(){
+                 let templates = document.querySelectorAll("template");
+                 console.log(templates);
+                 for(const t of templates){
+                     console.log(t.id);
+                     LP5.templates[t.id] = t.content.cloneNode(true);
+                 }
+                 this.setBody("lp5-select-parent");
+             }
+             result.selectParentDir = async function(){
+                 console.log(this);
+                 let options = {mode:'readwrite'};
+                 try {
+
+                     LP5.dirParentHandle = await window.showDirectoryPicker(options);
+                 } catch (error) {
+                     console.log(error);
+                     return;
+                 }
+                 if(LP5.dirParentHandle){
+                     console.log(options);
+                     console.log(LP5.dirParentHandle);
+                     for await (let [name, handle] of LP5.dirParentHandle) {
+                         console.log("name, handle");
+                         console.log(name, handle);
+                         if(name.endsWith('.lp5') && handle.kind == 'directory'){
+                             LP5.projects[name] = { handle: handle };
+                         }
+                     }
+                     if(LP5.projects.length == 0){
+                         LP5.setBody("lp5-enter-dir-name");
+                     }
+                 }
+
+             }
+             result.createProject = async function (button){
+                 console.log("Create Project!");
+                 console.log(this);
+                 let textBox = document.querySelector("#lp5InputFile");
+                 let dirName = textBox.value;
+                 if(!dirName.endsWith('lp5')){
+                     alert("lp5 project directory name must end with '.lp5'");
+                 } else {
+                     let options = {create:true};
+                     try {
+                         LP5.lp5DirHandle = await LP5.dirParentHandle.getDirectoryHandle(dirName, options);
+                     } catch (error) {
+                         LP5.setBody("lp5-start-form");
+                         return;
+                     }
+                     console.log(LP5.lp5DirHandle);
+                     console.log("Created a directory!");
+                     // create a TOC resource
+                     let newTOC = LP5.templates["lp5-new-TOC"]
+                     let elem   = newTOC.querySelector("li");
+                     elem.innerText = dirName;
+                     let strTOC = newTOC.innerHTML;
+                     console.log(strTOC);
+                     let fileHandle = await LP5.lp5DirHandle.getFileHandle(dirName,{create:true});
+                     let writable  = await fileHandle.createWritable();
+                     await writable.write(strTOC);
+                     await writable.close();
+                     LP5.setBody("lp5-main-page");
+                 }
+             }
+             result.cancelNewProject = function(){
+                 console.log("cancelNewProject()");
+                 LP5.setBody("lp5-start-form");
+             }
+             result.create = async function(){
+                 console.log(this);
+                 let options = {mode:'readwrite'};
+                 try {
+
+                     LP5.dirParentHandle = await window.showDirectoryPicker(options);
+                 } catch (error) {
+                     console.log(error);
+                     return;
+                 }
+                 if(LP5.dirParentHandle){
+                     console.log(options);
+                     console.log(LP5.dirParentHandle);
+                     LP5.setBody("lp5-enter-dir-name");
+                 }
+             }
+             // LP5.open - open an existing project
+             result.open = async function(){
                  let fileHandle;
                  [fileHandle] = await window.showOpenFilePicker({multiple:false});
                  const file   = await fileHandle.getFile();
                  const data   = await file.text();
                  console.log(data);
-             },
-             newSection: async()=>{
+             }
+             result.newSection = async function (){
                  let newID    = crypto.randomUUID();
                  console.log("New Section " + newID);
                  return false;
              }
-         };
+             result.setBody = function (name){
+                 console.log("setBody(", name, ")");
+                 if(LP5.currentTemplate){
+                     console.log("in use is: ", LP5.templates[name]);
+                 }
+                 console.log(LP5.templates[name], LP5.templates[name].childElementCount);
+                 document.body.replaceChildren(LP5.templates[name].cloneNode(true));
+                 LP5.currentTemplate = name;
+             }
+             result.exists = function(name){
+                 console.assert(this.dirHandle);
+                 
+             }
+             return result;
+         }();
         </script>
     </head>
     <body>
-        <template>
-            
+        <template id="lp5-select-parent">
+            <div>
+                <center>
+                    <p title="Restricted browser access to local filesystem makes our UI a little funky here, sorry.">
+                        Select <emph>parent</emph> directory of existing or new lp5 project.
+                    </p>
+                    <input autofocus type="button" value="Select" onclick="LP5.selectParentDir(this);">
+                </center>
+            </div>
         </template>
-        <a onClick="return LP5.open()">Open</a>
-        <a onClick="return LP5.newSection()">New</a>
+        <template id="lp5-start-form">
+            <div>
+                <p>Open an existing lp5 project (a .lp5 directory)
+                    or create a new lp5 project.
+                </p>
+                <button onclick="return LP5.open()" type="button">
+                    Open</button>
+                <button onclick="return LP5.create()" type="button">
+                    Create</button>
+            </div>
+        </template>
+        <template id="lp5-enter-dir-name">
+            <div style="position:absolute; top:50%; left:50%;">
+                <dialog open>
+                    <form method="dialog">
+                        <label>No existing lp5 projects found. Enter (directory) name for new project:</label>
+                        <input id='lp5InputFile' type='text' autofocus>
+                        <input type="button" value="Create" onclick="LP5.createProject(this);">
+                        <input type="button" value="Cancel" onclick="LP5.cancelNewProject(this);">
+                </form>
+                </dialog>
+            </div>
+        </template>
+        <template id="lp5-main-page">
+            <div>
+                <p>main page</p>
+            </div>
+        </template>
+        <template id="lp5-new-section">
+            <div>
+                
+            </div>
+        </template>
+        <!-- table of contents -->
+        <template id="lp5-new-TOC">
+            <div>
+                <ul>
+                    <li></li>
+                </ul>
+            </div>
+        </template>
+        <script>
+         LP5.start();
+        </script>
     </body>
 </html>
