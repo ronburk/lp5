@@ -1,6 +1,8 @@
 <!doctype html>
 <html lang="en">
     <head>
+        //  get a wrapper for indexedDB
+        <script src="https://cdn.jsdelivr.net/npm/idb@7/build/umd.js"></script>
         <script>
          "use strict";
          var LP5 = function(){
@@ -10,13 +12,43 @@
                  dirHandle       : null,
                  dirParentHandle : null,
                  projects        : [],
+                 dbHandle        : null,
              };
+             result.test = function(){
+                 console.log("test!");
+                 try {
+                     LP5.storeBlob("this is a test");
+                 } catch(err) {
+                     console.log("Error: ", err);
+                 }
+             }
+             // storeBlob() - store data in a blob, return name (SHA256)
+             result.storeBlob = async function(string){
+                 console.assert(LP5.dirHandle);
+                 let encoder = new TextEncoder();
+                 let data    = encoder.encode(string);
+                 let hash    = await window.crypto.subtle.digest('SHA-256', data);
+                 
+                 console.log("hash is: ", hash);
+                 hash = btoa(String.fromCharCode(...new Uint8Array(hash))).replace(/\//g, '_').replace(/\+/g, '-').replace(/=/g, '');
+                 console.log("hash[", hash.length, "] is now: ", hash);
+             }
+
              result.start = function(){
+                 // open our private database
+                 if(false)
+                     LP5.dbHandle = indexedDB.open("lp5",{
+                         upgrade(db){
+                             
+                         }
+                     });
+                 
+
                  let templates = document.querySelectorAll("template");
                  console.log(templates);
                  for(const t of templates){
                      console.log(t.id);
-                     LP5.templates[t.id] = t.content.cloneNode(true);
+                     LP5.templates[t.id] = t.content.firstElementChild.cloneNode(true);
                  }
                  this.setBody("lp5-select-parent");
              }
@@ -31,6 +63,7 @@
                      return;
                  }
                  if(LP5.dirParentHandle){
+                     
                      console.log(options);
                      console.log(LP5.dirParentHandle);
                      for await (let [name, handle] of LP5.dirParentHandle) {
@@ -64,14 +97,16 @@
                      console.log(LP5.lp5DirHandle);
                      console.log("Created a directory!");
                      // create a TOC resource
-                     let newTOC = LP5.templates["lp5-new-TOC"]
+                     let newTOC = LP5.templates["lp5-new-TOC"].cloneNode(true);
+                     console.log("newTOC is: ", newTOC);
                      let elem   = newTOC.querySelector("li");
                      elem.innerText = dirName;
                      let strTOC = newTOC.innerHTML;
-                     console.log(strTOC);
+                     console.log("strTOC is: ", strTOC);
                      let fileHandle = await LP5.lp5DirHandle.getFileHandle(dirName,{create:true});
                      let writable  = await fileHandle.createWritable();
-                     await writable.write(strTOC);
+                     options = {type:"write", data: strTOC};
+                     await writable.write(options);
                      await writable.close();
                      LP5.setBody("lp5-main-page");
                  }
@@ -116,6 +151,10 @@
                  }
                  console.log(LP5.templates[name], LP5.templates[name].childElementCount);
                  document.body.replaceChildren(LP5.templates[name].cloneNode(true));
+                 // let's make autofocus work
+                 let focus = document.body.querySelector("input[autofocus]");
+                 if(focus)
+                     focus.focus();
                  LP5.currentTemplate = name;
              }
              result.exists = function(name){
@@ -134,6 +173,7 @@
                         Select <emph>parent</emph> directory of existing or new lp5 project.
                     </p>
                     <input autofocus type="button" value="Select" onclick="LP5.selectParentDir(this);">
+                    <input type="button" value="[test]" onclick="LP5.test(this)">
                 </center>
             </div>
         </template>
@@ -170,14 +210,10 @@
                 
             </div>
         </template>
-        <!-- table of contents -->
-        <template id="lp5-new-TOC">
-            <div>
-                <ul>
-                    <li></li>
-                </ul>
-            </div>
-        </template>
+<!-- table of contents -->
+<template id="lp5-new-TOC">
+<a href="SHA1">title override</a>
+</template>
         <script>
          LP5.start();
         </script>
