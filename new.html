@@ -22,6 +22,15 @@
                      console.log("Error: ", err);
                  }
              }
+             // search a directory for an lp5 project, return handle to that directory
+             result.findProjectInDir = async function(dirHandle){
+                 console.assert(dirHandle);
+
+                 let projectHandle = null;
+                 for await (let handle of directoryHandle.values()){
+                     console.log("handle is: ", handle);
+                 }
+             }
              // storeBlob() - store data in a blob, return name (SHA256)
              result.storeBlob = async function(string){
                  console.assert(LP5.dirHandle);
@@ -43,13 +52,14 @@
                          }
                      });
                  
-
+                 // create index of all the "pages" (templates) we use
                  let templates = document.querySelectorAll("template");
                  console.log(templates);
                  for(const t of templates){
                      console.log(t.id);
                      LP5.templates[t.id] = t.content.firstElementChild.cloneNode(true);
                  }
+                 // go to initial page
                  this.setBody("lp5-select-parent");
              }
              result.selectParentDir = async function(){
@@ -151,10 +161,16 @@
                  }
                  console.log(LP5.templates[name], LP5.templates[name].childElementCount);
                  document.body.replaceChildren(LP5.templates[name].cloneNode(true));
-                 // let's make autofocus work
-                 let focus = document.body.querySelector("input[autofocus]");
-                 if(focus)
-                     focus.focus();
+                 let dialog = document.body.querySelector("dialog");
+                 if(dialog)
+                     dialog.showModal();
+                 else {
+                     // if not showing dialog, autofocus only valid on page load, so fix that.
+                     // https://html.spec.whatwg.org/multipage/interaction.html#the-autofocus-attribute
+                     let focus = document.body.querySelector("input[autofocus]");
+                     if(focus)
+                         focus.focus();
+                 }
                  LP5.currentTemplate = name;
              }
              result.exists = function(name){
@@ -168,13 +184,15 @@
     <body>
         <template id="lp5-select-parent">
             <div>
-                <center>
+                <dialog>
+                    <center>
                     <p title="Restricted browser access to local filesystem makes our UI a little funky here, sorry.">
                         Select <emph>parent</emph> directory of existing or new lp5 project.
                     </p>
                     <input autofocus type="button" value="Select" onclick="LP5.selectParentDir(this);">
                     <input type="button" value="[test]" onclick="LP5.test(this)">
-                </center>
+                    </center>
+                </dialog>
             </div>
         </template>
         <template id="lp5-start-form">
@@ -190,7 +208,7 @@
         </template>
         <template id="lp5-enter-dir-name">
             <div style="position:absolute; top:50%; left:50%;">
-                <dialog open>
+                <dialog>
                     <form method="dialog">
                         <label>No existing lp5 projects found. Enter (directory) name for new project:</label>
                         <input id='lp5InputFile' type='text' autofocus>
