@@ -6,13 +6,22 @@
         <script>
          "use strict";
          var LP5 = function(){
+             var url = {
+                 baseURL : null,
+                 virtualURL : null,
+                 init() {
+                     window.history.replaceState(LP5.url, null, "");
+                 },
+             };
              var result = {
                  currentTemplate : null,
                  templates       : [],
                  dirHandle       : null,
                  dirParentHandle : null,
-                 projects        : [],
+                 projects        : new Map(),
                  dbHandle        : null,
+                 projectName     : null,
+                 url             : url,
              };
              result.test = function(){
                  console.log("test!");
@@ -20,15 +29,6 @@
                      LP5.storeBlob("this is a test");
                  } catch(err) {
                      console.log("Error: ", err);
-                 }
-             }
-             // search a directory for an lp5 project, return handle to that directory
-             result.findProjectInDir = async function(dirHandle){
-                 console.assert(dirHandle);
-
-                 let projectHandle = null;
-                 for await (let handle of directoryHandle.values()){
-                     console.log("handle is: ", handle);
                  }
              }
              // storeBlob() - store data in a blob, return name (SHA256)
@@ -44,6 +44,7 @@
              }
 
              result.start = function(){
+                 console.log("location is ", window.location.href);
                  // open our private database
                  if(false)
                      LP5.dbHandle = indexedDB.open("lp5",{
@@ -73,18 +74,22 @@
                      return;
                  }
                  if(LP5.dirParentHandle){
-                     
                      console.log(options);
                      console.log(LP5.dirParentHandle);
                      for await (let [name, handle] of LP5.dirParentHandle) {
                          console.log("name, handle");
                          console.log(name, handle);
                          if(name.endsWith('.lp5') && handle.kind == 'directory'){
-                             LP5.projects[name] = { handle: handle };
+                             console.log("looks like a project: ", handle);
+                             LP5.projects.set(name, { handle: handle });
+                             LP5.projectName = name;
                          }
                      }
-                     if(LP5.projects.length == 0){
+                     if(LP5.projects.size == 0){
                          LP5.setBody("lp5-enter-dir-name");
+                     } else {
+                         LP5.setBody("lp5-project-home");
+                         location.href = location.href + "#" + LP5.projectName;
                      }
                  }
 
@@ -179,6 +184,7 @@
              }
              return result;
          }();
+         LP5.url.init();
         </script>
     </head>
     <body>
@@ -226,6 +232,11 @@
         <template id="lp5-new-section">
             <div>
                 
+            </div>
+        </template>
+        <template id="lp5-project-home">
+            <div>
+                <p> this is the project home. </p>
             </div>
         </template>
 <!-- table of contents -->
