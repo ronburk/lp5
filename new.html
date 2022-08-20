@@ -21,11 +21,13 @@
              };
              // interface to a view
              const viewInterface = {
+                 name         : "",
                  active       : false,
-                 notifyChange : null,
+                 notify       : null,
                  rootNode     : null,
              };
              const views = {
+                 views       : {},
                  eventTarget : new EventTarget(),
                  inProgress  : 0,
                  current     : null,
@@ -111,13 +113,21 @@
 
              result.start = function(){
                  console.log("LP5.start: location is ", window.location.href);
-                 // open our private database
-                 if(false)
-                     LP5.dbHandle = indexedDB.open("lp5",{
-                         upgrade(db){
-                             
-                         }
-                     });
+                 
+                 document.querySelectorAll('template').forEach((t)=>{
+                     const iView    = structuredClone(viewInterface);
+                     const name     = t.dataset.name;
+                     iView.name     = name;
+                     iView.rootNode = t.content.firstElementChild.cloneNode(true);
+                     const script   = t.content.querySelector('script');
+                     // remove script else it will run when frag inserted into DOM
+                     script.remove();
+                     // run the script to obtain its notification functions
+                     iView.notify   = eval(script.innerHTML);
+                     // two templates with same name is a mistake
+                     console.assert(!LP5.views.views.hasOwnProperty(name));
+                     LP5.views.views[iView.name] = iView;
+                 });
                  
                  let templates = document.querySelectorAll("template");
                  console.log(templates);
@@ -126,6 +136,7 @@
                      const name  = t.dataset.name;
                      io.rootNode = t.content.firstElementChild.cloneNode(true);
                      //                     const click = io.rootNode.attributes['onclick'];
+                     
                      const click = io.rootNode.getAttribute('onclick');
                      if(click){
                          console.log("typeof(io.rootNode) = ", typeof(click));
@@ -505,13 +516,13 @@ if(false){
                  }
                  }
                  let x = 99;
-                 export var result = { retval : x };
-                 result
+                 console.assert(false);
+                 { retval : x }
                 </script>
             </div>
         </template>
         <!-- table of contents -->
-        <template id="lp5-new-TOC">
+        <template id="lp5-new-TOC" data-name="toc">
 
             <a href="SHA1">title override</a>
         </template>
