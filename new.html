@@ -1,21 +1,77 @@
 <!doctype html>
+<!--
+
+
+-->
 <html lang="en">
     <head>
-        //  get a wrapper for indexedDB
+        <meta charset="utf-8" >
+        <title>lp5</title>
+        <!--   get a wrapper for indexedDB -->
         <script src="https://cdn.jsdelivr.net/npm/idb@7/build/umd.js"></script>
         <script>
          "use strict";
          var LP5 = function(){
-             var url = {
+             const url = {
                  baseURL : null,
                  virtualURL : null,
                  init() {
-                     window.history.replaceState(LP5.url, null, "");
+                     //     window.history.replaceState(LP5.url, null, "");
                  },
              };
+             // interface to a view
+             const viewInterface = {
+                 active       : false,
+                 notifyChange : null,
+                 rootNode     : null,
+             };
+             const views = {
+                 eventTarget : new EventTarget(),
+                 inProgress  : 0,
+                 current     : null,
+                 dialog      : null,
+                 notifyChange(eventName){
+                     //                     eventTarget.dispatchEvent(
+                 },
+                 change(viewName) {
+                     console.log(`views.change(${viewName})`);
+                     ++this.inProgress;
+                     this.current = viewName;
+                     LP5.setBody(viewName);
+                     --this.inProgress;
+                 },
+                 push(dialogName) {
+                     console.assert(this.current);
+                     ++this.inProgress;
+                     this.dialog = dialogName;
+                     LP5.setBody(dialogName);
+                     --this.inProgress;
+                 },
+                 pop() {
+                     console.assert(this.dialog);
+                     console.assert(this.current);
+                     ++this.inProgress;
+                     LP5.setBody(this.current);
+                     this.current = null;
+                     --this.inProgress;
+                 },
+                 onHashChange(event){
+                     console.log("onHashChange(): ", event);
+                     // newHash = everything after '#'
+                     let newHash = event.newURL.replace(/^[^#]*#/, '');
+                     // newPage = everthing after '#' and before any '/'
+                     let newPage = newHash.replace(/^([^/]+).*/, '$1');
+                     console.log("newHash = ", newHash, "newPage = ", newPage);
+                     //                 location.replace("#"+newHash);
+                     //                 LP5.setBody(newHash);
+                     if(LP5.views.inProgress <= 0)
+                         LP5.views.change(newPage);
+                 }
+             };
              var result = {
+                 views           : views,
                  currentTemplate : null,
-                 templates       : [],
+                 templates       : {},
                  dirHandle       : null,
                  dirParentHandle : null,
                  projects        : new Map(),
@@ -23,10 +79,20 @@
                  projectName     : null,
                  url             : url,
              };
+             result.pageState = (function * (){
+                 let state    = null;
+                 let newState = null;
+                 while((newState=yield))
+                     switch(newState){
+                         case '':
+                             break;
+                     }
+             })();
              result.test = function(){
                  console.log("test!");
                  try {
-                     LP5.storeBlob("this is a test");
+                     location.hash = "lp5-select-parent";
+                     //                     LP5.storeBlob("this is a test");
                  } catch(err) {
                      console.log("Error: ", err);
                  }
@@ -44,7 +110,7 @@
              }
 
              result.start = function(){
-                 console.log("location is ", window.location.href);
+                 console.log("LP5.start: location is ", window.location.href);
                  // open our private database
                  if(false)
                      LP5.dbHandle = indexedDB.open("lp5",{
@@ -53,15 +119,46 @@
                          }
                      });
                  
-                 // create index of all the "pages" (templates) we use
                  let templates = document.querySelectorAll("template");
                  console.log(templates);
                  for(const t of templates){
-                     console.log(t.id);
-                     LP5.templates[t.id] = t.content.firstElementChild.cloneNode(true);
+                     const io    = structuredClone(viewInterface);
+                     const name  = t.dataset.name;
+                     io.rootNode = t.content.firstElementChild.cloneNode(true);
+                     //                     const click = io.rootNode.attributes['onclick'];
+                     const click = io.rootNode.getAttribute('onclick');
+                     if(click){
+                         console.log("typeof(io.rootNode) = ", typeof(click));
+                         console.log("io.rootNode = ", click);
+                         //                     io.rootNode.attributes['onclick']();
+                         console.log("   ", Object.keys(click));
+                         console.log("onclick = ", io.rootNode.onclick);
+                     }
+                     const script = t.content.querySelector("script");
+                     if(script && name == 'home'){
+                         script.remove();
+                         console.log(`script = ${script}`);
+                         const val = eval(script.innerHTML);
+                         console.log (` returns ${val}`);
+                         console.log(`val.retval = ${JSON.stringify(val)}`);
+                         console.log(`typeof(val)=${typeof(val)}`);
+                         console.log("==>", Object.keys(val));
+                         console.log("retval is ", val.retval);
+                     }
                  }
+
+                 // create index of all the "pages" (templates) we use
+                 templates = document.querySelectorAll("template");
+                 console.log(templates);
+                 for(const t of templates){
+                     LP5.templates[t.dataset.name] =
+                         t.content.firstElementChild.cloneNode(true);
+                 }
+                 window.addEventListener('hashchange', LP5.views.onHashChange);
                  // go to initial page
-                 this.setBody("lp5-select-parent");
+                 //                 this.setBody("SelectParent");
+                 //                 window.location.hash = "home";
+                 LP5.views.change("home");
              }
              result.selectParentDir = async function(){
                  console.log(this);
@@ -77,8 +174,8 @@
                      console.log(options);
                      console.log(LP5.dirParentHandle);
                      for await (let [name, handle] of LP5.dirParentHandle) {
-                         console.log("name, handle");
-                         console.log(name, handle);
+                         //                         console.log("name, handle");
+                         //                         console.log(name, handle);
                          if(name.endsWith('.lp5') && handle.kind == 'directory'){
                              console.log("looks like a project: ", handle);
                              LP5.projects.set(name, { handle: handle });
@@ -88,11 +185,16 @@
                      if(LP5.projects.size == 0){
                          LP5.setBody("lp5-enter-dir-name");
                      } else {
-                         LP5.setBody("lp5-project-home");
-                         location.href = location.href + "#" + LP5.projectName;
+                         document.title = LP5.projectName;
+                         LP5.views.change("home");
+                         //                         LP5.setBody("home");
+                         //                         window.location.hash = "#home";
+                         //                         location.href = location.href + "#" + LP5.projectName;
+                         
                      }
                  }
-
+                 LP5.views.pop();
+                 console.log("<= selectParentDir returns");
              }
              result.createProject = async function (button){
                  console.log("Create Project!");
@@ -160,18 +262,23 @@
                  return false;
              }
              result.setBody = function (name){
-                 console.log("setBody(", name, ")");
-                 if(LP5.currentTemplate){
-                     console.log("in use is: ", LP5.templates[name]);
-                 }
-                 console.log(LP5.templates[name], LP5.templates[name].childElementCount);
-                 document.body.replaceChildren(LP5.templates[name].cloneNode(true));
-                 let dialog = document.body.querySelector("dialog");
-                 if(dialog)
+                 console.log("setBody(", name, ") in use=", LP5.templates[name]);
+                 location.hash = name;
+                 console.log("back from location.hash = name;");
+                 const template = LP5.templates[name].cloneNode(true);
+                 console.log("back from cloneNode of template");
+                 let dialog = template.querySelector("dialog");
+                 if(dialog){
+                     document.body.prepend(template);
                      dialog.showModal();
-                 else {
-                     // if not showing dialog, autofocus only valid on page load, so fix that.
-                     // https://html.spec.whatwg.org/multipage/interaction.html#the-autofocus-attribute
+                 } else {
+                     console.log("before replaceChildren");
+                     document.body.replaceChildren(template);
+                     console.log("after replaceChildren");
+                     /* if not showing dialog, autofocus only valid on page load,
+                      * so fix that manually.
+                      * https://html.spec.whatwg.org/multipage/interaction.html#the-autofocus-attribute
+                      */
                      let focus = document.body.querySelector("input[autofocus]");
                      if(focus)
                          focus.focus();
@@ -186,22 +293,36 @@
          }();
          LP5.url.init();
         </script>
+        <style>
+        </style>
     </head>
     <body>
-        <template id="lp5-select-parent">
+        <template data-name="SelectParent">
             <div>
-                <dialog>
+                <dialog onClose="console.log('ONCLOSE!!!!', event.which, event);">
                     <center>
-                    <p title="Restricted browser access to local filesystem makes our UI a little funky here, sorry.">
-                        Select <emph>parent</emph> directory of existing or new lp5 project.
-                    </p>
-                    <input autofocus type="button" value="Select" onclick="LP5.selectParentDir(this);">
-                    <input type="button" value="[test]" onclick="LP5.test(this)">
+                        <p>
+                            Select <em>parent</em> directory of existing
+                            or new lp5 project.
+                            <span style="background-color:#ffffa0; border-radius:50%; cursor:help;" title="I need access to the parent directory to place generated files there.&#10;A user click is required by Chrome for me to ask for this permission.">&#9432</span>
+                            <!--
+                                 <span class="tooltip">&#9432;
+                                 <span class="tool-content">
+                                 I need access to the parent directory to place generated files there. A user click is required by Chrome for me to ask for this permission.
+                                 </span>
+                                 </span>
+                            -->
+                        </p>
+                        <input autofocus type="button" value="Select" onclick="LP5.selectParentDir(this);">
+                        <!--                         <input type="button" value="[test]" onclick="LP5.test(this)"> -->
                     </center>
                 </dialog>
+                <script>
+                 console.log("in form SelectParent!!!!");
+                </script>
             </div>
         </template>
-        <template id="lp5-start-form">
+        <template data-name="foo">
             <div>
                 <p>Open an existing lp5 project (a .lp5 directory)
                     or create a new lp5 project.
@@ -212,7 +333,7 @@
                     Create</button>
             </div>
         </template>
-        <template id="lp5-enter-dir-name">
+        <template data-name="EnterDirectory">
             <div style="position:absolute; top:50%; left:50%;">
                 <dialog>
                     <form method="dialog">
@@ -220,31 +341,183 @@
                         <input id='lp5InputFile' type='text' autofocus>
                         <input type="button" value="Create" onclick="LP5.createProject(this);">
                         <input type="button" value="Cancel" onclick="LP5.cancelNewProject(this);">
-                </form>
+                    </form>
                 </dialog>
             </div>
         </template>
-        <template id="lp5-main-page">
+        <template data-name="lp5-main-page">
             <div>
                 <p>main page</p>
             </div>
         </template>
-        <template id="lp5-new-section">
+        <template data-name="lp5-new-section">
             <div>
                 
             </div>
         </template>
-        <template id="lp5-project-home">
-            <div>
-                <p> this is the project home. </p>
+        <template data-name="home">
+            <div class="lp5-body" onclick="console.log('Whoo hoo');">
+                <style>
+                 .lp5-body {
+                     display: grid;
+                     grid-template-areas:
+                         "menu menu menu"
+                         "toc source output"
+                         "footer footer footer";
+                     grid-template-rows: 60px 3fr 60px;
+                     grid-template-columns: 1fr 3fr 1fr;
+                     grid-gap: 10px;
+                     height: 100vh;
+                     margin: 0;
+                 }
+                 #LP5-Footer{ grid-area: footer; }
+                 #LP5-Toc a {text-decoration: none;}
+                 #LP5-Toc a:visited { color: rgb(0,0,238); }
+                 #LP5-Toc {
+                     font-family: Helvetica;
+                     grid-area: toc;
+                 }
+                 #LP5-Toc h1 {
+                     margin: inherit;
+                     cursor: pointer;
+                     font-size: 18px;
+                 }
+                 #LP5-Toc h2 {
+                     text-indent: 5%;
+                     margin: inherit;
+                     cursor: pointer;
+                     font-size: 15px;
+                 }
+                 #LP5-Toc h3 {
+                     text-indent: 10%;
+                     margin: inherit;
+                     cursor: pointer;
+                     font-size: 15px;
+                 }
+                 #LP5-Source{
+                     background-color: #FFFFEB;
+                     grid-area: source;
+                     overflow: auto;
+                     display: flex;
+                     flex-flow: column;
+                     /*             align-items: stretch; */
+                 }
+                 .LP5-Section{
+                     border-bottom: 1px dotted  #a5c8ba;
+                     padding-right: 5px;
+                     padding-left: 5px;
+                     background-color: #FFFFC9;
+                     width: fit-content;
+                     /*             width: auto;*/
+                 }
+                 .LP5-Code {
+                     font-family: "Consolas", monospace;
+                     white-space: pre;
+                     background-color: #FFFFFF;
+                     border-top:2px solid #FFFF00;
+                     margin-left: -4px;
+                     line-height: 100%;
+                 }
+                 .LP5-Code p {
+                     margin: 0;
+                 }
+                 .LP5-Code-Unref {
+                     background-color: #FFa0FF;
+                     font-family: "Verdana", "Arial", Gadget, sans-serif;
+                     white-space: normal;
+                 }
+                 .LP5-Code-Ref {
+                     background-color: #FFFFEB;
+                     font-family: "Verdana", "Arial", Gadget, sans-serif;
+                     white-space: normal;
+                 }
+                 .LP5-CodeName {
+                     font-family: "Arial", Gadget, sans-serif;
+                     background-color: #F9FFF0;
+                     word-wrap: break-word;
+                     white-space: normal;
+                 }
+                 .LP5-CodeNameBrackets { font-family: monospace; }
+                 .LP5-Comment{
+                     /*             background-color: #FFFFEB; */
+                 }
+                 .LP5-Comment h1 {
+                     margin: .2em 0 .2em 0;
+                 }
+                 .LP5-Comment h2 {
+                     margin: .15em 0 .15em 0;
+                 }
+                 .LP5-Comment h3 {
+                     margin: .1em 0 .1em 0;
+                 }
+                 #LP5-Output{
+                     grid-area: output;
+                     white-space: pre-line;
+                 }
+                 #LP5-Menu {
+                     height:50px;
+                     background:#d0d0d0;
+                     border:1px solid #b9b9b9;
+                     grid-area: menu;
+                 }
+                 #LP5-Menu ul {
+                     display: flex;
+                     align-items: center;
+                     list-style: none;
+                     background-color: #d0d0d0;
+                     color: #11F;
+                 }
+                 #LP5-Menu li {
+                     margin-left: 20px;
+                     cursor: pointer;
+                     transition: .5s;
+                 }
+                 #LP5-Menu li:hover {
+                     color: red;
+                 }
+                </style>
+                <div id="LP5-Menu">
+                    <ul>
+                        <li id="LP5-Menu-Compile">Compile</li>
+                        <li>Menu 2</li>
+                        <li>Menu 3</li>
+                        <li>Menu 4</li>
+                    </ul>
+                </div>
+                <div id="LP5-Toc">
+                </div>
+                <div id="LP5-Source">
+                </div>
+                <div id="LP5-Output">
+                    Here be some output!
+                    Code as it would be generated from the current source should appear here.
+                </div>
+                <div id="LP5-Footer">
+                    Here's a footer! Maybe some kind of status info would go here.
+                </div>
+                <script type="module">
+
+                 console.log("home page script executing!!!!!!");
+                 // if we have no directory to work on, put up the dir selection dialog
+if(false){
+                 if(!LP5.dirParentHandle){
+                     LP5.views.push("SelectParent");
+                 }
+                 }
+                 let x = 99;
+                 export var result = { retval : x };
+                 result
+                </script>
             </div>
         </template>
-<!-- table of contents -->
-<template id="lp5-new-TOC">
-<a href="SHA1">title override</a>
-</template>
+        <!-- table of contents -->
+        <template id="lp5-new-TOC">
+
+            <a href="SHA1">title override</a>
+        </template>
         <script>
-         LP5.start();
+         LP5.start(); // main entry point!
         </script>
     </body>
 </html>
+<!DOCTYPE html>

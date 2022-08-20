@@ -1,4 +1,41 @@
-test
+file structure
+==============
+This is local file structure for using lp5 offline when the web
+server is unavailable. The user has essentially checked out a
+private branch. We need the "current" source separated from any
+other (undo, commits) source so it's easy to use git as a backup
+version control.
+
+Even locally, we want to allow separate tabs to access the same
+backing store coherently.
+
+Is "undo" orthogonal to commits?
+
+
+bison/flex multi-actions
+=======================
+Many programmers wish they could put their bison/flex actions separate
+from the lex/grammar rule. lp5 makes that easy. But if we also offer
+conditional inclusion, then lp5 would also make it easy to write
+lex/grammar rules for more than one language -- you pick which one
+of the mutually exclusive language choices you want to include when
+you "compile" your lp5 program.
+
+Exploit power of DOM for click/select lists
+===========================================
+Can we let the user define, e.g., custom attributes that we offer
+services for? Example, user wants to define "data-color" to be
+a restricted set of colors (e.g., an approved color palette).
+Would need:
+
+a) generic way for user to say "I want to enter a color here" and
+b) automatic generation of code to offer the restricted selection set
+
+The "restricted" selection set could be open-ended. It could be:
+you can only pick from "data-color" values already existing in
+the project.
+
+
 Design: location-counter style macro/preproc tool
 ==================================================
 Here's the use case. I have a bit of Javascript that is very closely
@@ -36,6 +73,27 @@ sections. I would have to give each property its own section
 and codename, and then make a TOC browse sequence that listed
 each one. OK, that's not so bad, I guess, and just overloads
 existing syntax/features.
+
+Another use case: C++ classes. Can lp5 eliminate the tedium of
+dual-typing function signatures? E.g.:
+
+foo.h
+-----
+class Foo {
+    int something(const char* str);
+    };
+
+foo.cc
+------
+#include "foo.h"
+
+int Foo::something(const char* str)
+    {
+    return str? 1 : 99;
+    }
+
+Aspect oriented programming
+composite oriented programming
 
 
 
