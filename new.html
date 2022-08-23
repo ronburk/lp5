@@ -10,357 +10,6 @@
         <!--   get a wrapper for indexedDB -->
         <script src="https://cdn.jsdelivr.net/npm/idb@7/build/umd.js"></script>
         <script>
-         "use strict";
-         var LP5 = function(){
-             const url = {
-                 baseURL : null,
-                 virtualURL : null,
-                 init() {
-                     //     window.history.replaceState(LP5.url, null, "");
-                 },
-             };
-             async function modelLoad(name){
-                 // ??? have to delete any existing model
-                 console.log(`modelLoad('${name}')`);
-                 console.assert(this.projects.hasOwnProperty(name));
-                 const dirHandle = this.projects[name].dirHandle;
-                 const rootName = name;
-                 const fileHandle = await dirHandle.getFileHandle(name);
-                 console.assert(fileHandle);
-                 const file = await fileHandle.getFile();
-                 console.log(`file = ${file}`);
-                 const text = await file.text();
-                 console.log(`text = ${text}`);
-             }
-             async function modelLoadFile(dirHandle, fileName){
-                 const fileHandle = await dirHandle.getFileHandle(fileName);
-                 console.assert(fileHandle);
-                 const file = await fileHandle.getFile();
-                 console.log(`file = ${file}`);
-                 const text = await file.text();
-                 console.log(`text = ${text}`);
-                 return text;
-             }
-             const model = {
-                 dirHandle       : null,
-                 dirParentHandle : null,
-                 projectName     : null,
-                 toc             : null,
-                 projects        : {},
-                 load            : modelLoad,
-             };
-             // interface to a view
-             const viewInterface = {
-                 name         : "",
-                 dialog       : null,
-                 active       : false,
-                 notify       : null,
-                 rootNode     : null,
-             };
-             const views = {
-                 views       : {},
-                 eventTarget : new EventTarget(),
-                 inProgress  : 0,
-                 current     : null,
-                 dialog      : null,
-                 notifyChange(eventName){
-                     //                     eventTarget.dispatchEvent(
-                 },
-                 exists(viewName) {
-                     return this.views.hasOwnProperty(viewName);
-                 },
-                 change(viewName) {
-                     console.log(`views.change(${viewName})`);
-                     ++this.inProgress;
-                     // get interface to incoming view
-                     const iView = this.views[viewName];
-                     this.current = iView;
-                     LP5.setBody(iView);
-                     --this.inProgress;
-                     this.current.notify.init();
-                 },
-                 push(dialogName) {
-                     console.assert(this.current);
-                     ++this.inProgress;
-                     const iView = this.views[dialogName];
-                     this.dialog = iView;
-                     LP5.setBody(iView);
-                     --this.inProgress;
-                 },
-                 pop() {
-                     console.assert(this.dialog);
-                     console.assert(this.current);
-                     console.log(`pop() this.current = ${this.current}`);
-                     ++this.inProgress;
-                     LP5.setBody(this.current);
-                     this.current.notify.init();
-                     --this.inProgress;
-                 },
-                 onHashChange(event){
-                     console.log("onHashChange(): ", event);
-                     // newHash = everything after '#'
-                     let newHash = event.newURL.replace(/^[^#]*#/, '');
-                     // newPage = everthing after '#' and before any '/'
-                     let newPage = newHash.replace(/^([^/]+).*/, '$1');
-                     console.log("newHash = ", newHash, "newPage = ", newPage);
-                     //                 location.replace("#"+newHash);
-                     //                 LP5.setBody(newHash);
-                     if(!LP5.views.exists(newPage)){
-                         alert(`unknown URL: ${newPage}`);
-                         history.back();
-                     }
-                     else if(LP5.views.inProgress <= 0)
-                         LP5.views.change(newPage);
-                 }
-             };
-             var result = {
-                 model           : model,
-                 views           : views,
-                 currentTemplate : null,
-                 templates       : {},
-                 dirHandle       : null,
-                 dirParentHandle : null,
-                 dbHandle        : null,
-                 url             : url,
-             };
-             result.pageState = (function * (){
-                 let state    = null;
-                 let newState = null;
-                 while((newState=yield))
-                     switch(newState){
-                         case '':
-                             break;
-                     }
-             })();
-             result.test = function(){
-                 console.log("test!");
-                 try {
-                     location.hash = "lp5-select-parent";
-                     //                     LP5.storeBlob("this is a test");
-                 } catch(err) {
-                     console.log("Error: ", err);
-                 }
-             }
-             // storeBlob() - store data in a blob, return name (SHA256)
-             result.storeBlob = async function(string){
-                 console.assert(LP5.dirHandle);
-                 let encoder = new TextEncoder();
-                 let data    = encoder.encode(string);
-                 let hash    = await window.crypto.subtle.digest('SHA-256', data);
-                 
-                 console.log("hash is: ", hash);
-                 hash = btoa(String.fromCharCode(...new Uint8Array(hash))).replace(/\//g, '_').replace(/\+/g, '-').replace(/=/g, '');
-                 console.log("hash[", hash.length, "] is now: ", hash);
-             }
-
-             result.start = function(){
-                 console.log("LP5.start: location is ", window.location.href);
-                 
-                 document.querySelectorAll('template').forEach((t)=>{
-                     const iView    = structuredClone(viewInterface);
-                     const name     = t.dataset.name;
-                     iView.name     = name;
-                     iView.dialog   = t.querySelector('dialog');
-                     iView.rootNode = t.content.firstElementChild.cloneNode(true);
-                     const script   = t.content.querySelector('script');
-                     if(script){
-                         // remove script else it will run when frag inserted into DOM
-                         script.remove();
-                         // run the script to obtain its notification functions
-                         iView.notify   = eval(script.innerHTML);
-                         console.assert(iView.notify.hasOwnProperty('init'));
-                         console.assert(iView.notify.hasOwnProperty('change'));
-                     }
-                     // two templates with same name is a mistake
-                     console.assert(!LP5.views.views.hasOwnProperty(name));
-                     LP5.views.views[iView.name] = iView;
-                 });
-
-                 // known starting place must be defined
-                 console.assert(LP5.views.views.hasOwnProperty('home'));
-                 
-                 if(false){
-                     let templates = document.querySelectorAll("template");
-                     console.log(templates);
-                     for(const t of templates){
-                         const io    = structuredClone(viewInterface);
-                         const name  = t.dataset.name;
-                         io.rootNode = t.content.firstElementChild.cloneNode(true);
-                         //                     const click = io.rootNode.attributes['onclick'];
-                         
-                         const click = io.rootNode.getAttribute('onclick');
-                         if(click){
-                             console.log("typeof(io.rootNode) = ", typeof(click));
-                             console.log("io.rootNode = ", click);
-                             //                     io.rootNode.attributes['onclick']();
-                             console.log("   ", Object.keys(click));
-                             console.log("onclick = ", io.rootNode.onclick);
-                         }
-                         const script = t.content.querySelector("script");
-                         if(script && name == 'home'){
-                             script.remove();
-                             console.log(`script = ${script}`);
-                             const val = eval(script.innerHTML);
-                             console.log (` returns ${val}`);
-                             console.log(`val.retval = ${JSON.stringify(val)}`);
-                             console.log(`typeof(val)=${typeof(val)}`);
-                             console.log("==>", Object.keys(val));
-                             console.log("retval is ", val.retval);
-                         }
-                     }
-
-                     // create index of all the "pages" (templates) we use
-                     templates = document.querySelectorAll("template");
-                     console.log(templates);
-                     for(const t of templates){
-                         LP5.templates[t.dataset.name] =
-                             t.content.firstElementChild.cloneNode(true);
-                     }
-                 }
-                 window.addEventListener('hashchange', LP5.views.onHashChange);
-                 // go to initial page
-                 //                 this.setBody("SelectParent");
-                 //                 window.location.hash = "home";
-                 LP5.views.change("home");
-             }
-             result.selectParentDir = async function(){
-                 const model = LP5.model;
-                 console.log(this);
-                 let options = {mode:'readwrite'};
-                 try {
-                     model.dirParentHandle = await window.showDirectoryPicker(options);
-                 } catch (error) {
-                     console.log(error);
-                     return;
-                 }
-                 if(model.dirParentHandle){
-                     console.log(model.dirParentHandle);
-                     let projectCount = 0;
-                     for await (let [name, handle] of model.dirParentHandle) {
-                         if(name.endsWith('.lp5') && handle.kind == 'directory'){
-                             console.log("looks like a project: ", handle);
-                             model.projects[name] = { dirHandle: handle };
-                             model.projectName = name;
-                             ++projectCount;
-                         }
-                     }
-                     console.log(`projectCount = ${projectCount}`);
-                     if(projectCount != 1){
-                         LP5.setBody("lp5-enter-dir-name");
-                     } else {
-                         document.title = model.projectName;
-                         await model.load(model.projectName);
-                         //                         if(LP5.model.load(model.projectName)){
-                         //                             const file = await model.projects[name].handle.getFile();
-                         //                             console.log(file);
-                         //                         }
-                         LP5.views.change("home");
-                     }
-                 }
-                 LP5.views.pop();
-                 console.log("<= selectParentDir returns");
-             }
-             result.createProject = async function (button){
-                 console.log("Create Project!");
-                 console.log(this);
-                 let textBox = document.querySelector("#lp5InputFile");
-                 let dirName = textBox.value;
-                 if(!dirName.endsWith('lp5')){
-                     alert("lp5 project directory name must end with '.lp5'");
-                 } else {
-                     let options = {create:true};
-                     try {
-                         LP5.lp5DirHandle = await LP5.dirParentHandle.getDirectoryHandle(dirName, options);
-                     } catch (error) {
-                         LP5.setBody("lp5-start-form");
-                         return;
-                     }
-                     console.log(LP5.lp5DirHandle);
-                     console.log("Created a directory!");
-                     // create a TOC resource
-                     let newTOC = LP5.templates["lp5-new-TOC"].cloneNode(true);
-                     console.log("newTOC is: ", newTOC);
-                     let elem   = newTOC.querySelector("li");
-                     elem.innerText = dirName;
-                     let strTOC = newTOC.innerHTML;
-                     console.log("strTOC is: ", strTOC);
-                     let fileHandle = await LP5.lp5DirHandle.getFileHandle(dirName,{create:true});
-                     let writable  = await fileHandle.createWritable();
-                     options = {type:"write", data: strTOC};
-                     await writable.write(options);
-                     await writable.close();
-                     LP5.setBody("lp5-main-page");
-                 }
-             }
-             result.cancelNewProject = function(){
-                 console.log("cancelNewProject()");
-                 LP5.setBody("lp5-start-form");
-             }
-             result.create = async function(){
-                 console.log(this);
-                 let options = {mode:'readwrite'};
-                 try {
-
-                     LP5.dirParentHandle = await window.showDirectoryPicker(options);
-                 } catch (error) {
-                     console.log(error);
-                     return;
-                 }
-                 if(LP5.dirParentHandle){
-                     console.log(options);
-                     console.log(LP5.dirParentHandle);
-                     LP5.setBody("lp5-enter-dir-name");
-                 }
-             }
-             // LP5.open - open an existing project
-             result.open = async function(){
-                 let fileHandle;
-                 [fileHandle] = await window.showOpenFilePicker({multiple:false});
-                 const file   = await fileHandle.getFile();
-                 const data   = await file.text();
-                 console.log(data);
-             }
-             result.newSection = async function (){
-                 let newID    = crypto.randomUUID();
-                 console.log("New Section " + newID);
-                 return false;
-             }
-             result.setBody = function (iView){
-                 const name = iView.name;
-                 console.log(`setBody(${name}) in use=${LP5.templates[name]}`);
-                 history.pushState(null, "", "#" + name);
-                 //                 location.hash = name;
-                 console.log("back from location.hash = name;");
-                 const template = LP5.views.views[name].rootNode.cloneNode(true);
-                 console.log("back from cloneNode of template");
-                 let dialog = template.querySelector("dialog");
-                 if(dialog){
-                     document.body.prepend(template);
-                     dialog.showModal();
-                 } else {
-                     // if we are popping a dialog
-                     if(LP5.views.dialog){
-                     }
-                     console.log("before replaceChildren");
-                     document.body.replaceChildren(template);
-                     console.log("after replaceChildren");
-                     /* if not showing dialog, autofocus only valid on page load,
-                      * so fix that manually.
-                      * https://html.spec.whatwg.org/multipage/interaction.html#the-autofocus-attribute
-                      */
-                     let focus = document.body.querySelector("input[autofocus]");
-                     if(focus)
-                         focus.focus();
-                 }
-                 LP5.currentTemplate = name;
-             }
-             result.exists = function(name){
-                 console.assert(this.dirHandle);
-                 
-             }
-             return result;
-         }();
-         LP5.url.init();
         </script>
         <style>
         </style>
@@ -382,7 +31,8 @@
                                  </span>
                             -->
                         </p>
-                        <input autofocus type="button" value="Select" onclick="LP5.selectParentDir(this);">
+                        <input id="SelectParentDir"
+                               autofocus type="button" value="Select" >
                         <!--                         <input type="button" value="[test]" onclick="LP5.test(this)"> -->
                     </center>
                 </dialog>
@@ -401,19 +51,19 @@
                 </script>
             </div>
         </template>
-<!--
-        <template data-name="foo">
-            <div>
-                <p>Open an existing lp5 project (a .lp5 directory)
-                    or create a new lp5 project.
-                </p>
-                <button onclick="return LP5.open()" type="button">
-                    Open</button>
-                <button onclick="return LP5.create()" type="button">
-                    Create</button>
-            </div>
-        </template>
- -->
+        <!--
+             <template data-name="foo">
+             <div>
+             <p>Open an existing lp5 project (a .lp5 directory)
+             or create a new lp5 project.
+             </p>
+             <button onclick="return LP5.open()" type="button">
+             Open</button>
+             <button onclick="return LP5.create()" type="button">
+             Create</button>
+             </div>
+             </template>
+        -->
         <template data-name="EnterDirectory">
             <div style="position:absolute; top:50%; left:50%;">
                 <dialog>
@@ -597,7 +247,7 @@
                          init(){
                              console.log("home page script init!!!!!!");
                              if(!LP5.dirParentHandle){
-                                 //                                 LP5.views.push("SelectParent");
+                                 //   LP5.views.push("SelectParent");
                                  setTimeout(()=>LP5.views.push('SelectParent'));
                              } else
                              if(LP5.model.projectName){
@@ -619,8 +269,418 @@
             <a href="SHA1">title override</a>
         </template>
         <script>
-         LP5.start(); // main entry point!
+
+         "use strict";
+         var LP5 = function(){
+             const url = {
+                 baseURL : null,
+                 virtualURL : null,
+                 init() {
+                     //     window.history.replaceState(LP5.url, null, "");
+                 },
+             };
+             async function modelLoad(name){
+                 // ??? have to delete any existing model
+                 console.log(`modelLoad('${name}')`);
+                 console.assert(this.projects.hasOwnProperty(name));
+                 const dirHandle = this.projects[name].dirHandle;
+                 const rootName = name;
+                 const fileHandle = await dirHandle.getFileHandle(name);
+                 console.assert(fileHandle);
+                 const file = await fileHandle.getFile();
+                 console.log(`file = ${file}`);
+                 const text = await file.text();
+                 console.log(`text = ${text}`);
+             }
+             async function modelLoadFile(dirHandle, fileName){
+                 const fileHandle = await dirHandle.getFileHandle(fileName);
+                 console.assert(fileHandle);
+                 const file = await fileHandle.getFile();
+                 console.log(`file = ${file}`);
+                 const text = await file.text();
+                 console.log(`text = ${text}`);
+                 return text;
+             }
+             const state = {
+                 name: "initial",
+                 entry(){
+                     LP5.start();
+                 }
+             };
+             let control = {
+                 currentState: null,
+                 states: {
+                     initial: {
+                         entry(){
+                             for(const [key,value] of Object.entries(LP5.control.states)){
+                                 value.name = key;
+                             }
+                             LP5.views.loadTemplates();
+                             addEventListener('hashchange', LP5.views.onHashChange);
+                             LP5.control.goto('home');
+                         }
+                     },
+                     home: {
+                         entry(){
+                             LP5.views.change('home');
+                             if(!LP5.model.dirParentHandle){
+                                 LP5.control.goto('selectParent');
+                             }
+                         }
+                     },
+                     selectParent: {
+                         entry(){
+                             LP5.views.change('SelectParent');
+                         },
+                         next(event){
+                             if(event.type == 'click')
+                                 if(event.target.id == 'SelectParentDir')
+                                     console.log("Click!!!!");
+                         },
+                     }
+                 },
+                 next(event){
+                     console.log(`control.next(${event})`);
+                     console.log(event);
+                     LP5.control.currentState.next(event);
+                 },
+                 goto(stateName){
+                     console.log(`control.goto("${stateName}")`);
+                     let currentState = this.currentState;
+                     if(currentState && currentState.hasOwnProperty('exit'))
+                         currentState.exit();
+                     currentState = this.currentState = this.states[stateName];
+                     if(currentState && currentState.hasOwnProperty('entry'))
+                         currentState.entry();
+                 }
+             };
+             [
+                 'click',
+             ].forEach(e=>document.body.addEventListener(e,control.next));
+
+             const model = {
+                 dirHandle       : null,
+                 dirParentHandle : null,
+                 projectName     : null,
+                 toc             : null,
+                 projects        : {},
+                 load            : modelLoad,
+             };
+             // interface to a view
+             const viewInterface = {
+                 name         : "",
+                 dialog       : null,
+                 active       : false,
+                 notify       : null,
+                 rootNode     : null,
+             };
+             const views = {
+                 views       : {},
+                 eventTarget : new EventTarget(),
+                 inProgress  : 0,
+                 current     : null,
+                 dialog      : null,
+                 loadTemplates(){
+                     document.querySelectorAll('template').forEach((t)=>{
+                         const iView    = structuredClone(viewInterface);
+                         const name     = t.dataset.name;
+                         iView.name     = name;
+                         iView.dialog   = t.querySelector('dialog');
+                         iView.rootNode = t.content.firstElementChild.cloneNode(true);
+                         const script   = t.content.querySelector('script');
+                         if(script){
+                             // remove script else it will run when frag inserted into DOM
+                             script.remove();
+                             // run the script to obtain its notification functions
+                             iView.notify   = eval(script.innerHTML);
+                             console.assert(iView.notify.hasOwnProperty('init'));
+                             console.assert(iView.notify.hasOwnProperty('change'));
+                         }
+                         // two templates with same name is a mistake
+                         console.assert(!LP5.views.views.hasOwnProperty(name));
+                         LP5.views.views[iView.name] = iView;
+                     });
+                     // known starting place must be defined
+                     console.assert(LP5.views.views.hasOwnProperty('home'));
+
+                 },
+                 notifyChange(eventName){
+                     //                     eventTarget.dispatchEvent(
+                 },
+                 exists(viewName) {
+                     return this.views.hasOwnProperty(viewName);
+                 },
+                 change(viewName) {
+                     console.log(`views.change(${viewName})`);
+                     ++this.inProgress;
+                     // get interface to incoming view
+                     const iView = this.views[viewName];
+                     this.current = iView;
+                     LP5.setBody(iView);
+                     --this.inProgress;
+                     this.current.notify.init();
+                 },
+                 push(dialogName) {
+                     console.assert(this.current);
+                     ++this.inProgress;
+                     const iView = this.views[dialogName];
+                     this.dialog = iView;
+                     LP5.setBody(iView);
+                     --this.inProgress;
+                 },
+                 pop() {
+                     console.assert(this.dialog);
+                     console.assert(this.current);
+                     console.log(`pop() this.current = ${this.current}`);
+                     ++this.inProgress;
+                     LP5.setBody(this.current);
+                     this.current.notify.init();
+                     --this.inProgress;
+                 },
+                 onHashChange(event){
+                     console.log("onHashChange(): ", event);
+                     // newHash = everything after '#'
+                     let newHash = event.newURL.replace(/^[^#]*#/, '');
+                     // newPage = everthing after '#' and before any '/'
+                     let newPage = newHash.replace(/^([^/]+).*/, '$1');
+                     console.log("newHash = ", newHash, "newPage = ", newPage);
+                     //                 location.replace("#"+newHash);
+                     //                 LP5.setBody(newHash);
+                     if(!LP5.views.exists(newPage)){
+                         alert(`unknown URL: ${newPage}`);
+                         history.back();
+                     }
+                     else if(LP5.views.inProgress <= 0)
+                         LP5.views.change(newPage);
+                 }
+             };
+             var result = {
+                 control         : control,
+                 model           : model,
+                 views           : views,
+                 currentTemplate : null,
+                 templates       : {},
+                 dirHandle       : null,
+                 dirParentHandle : null,
+                 dbHandle        : null,
+                 url             : url,
+             };
+             result.pageState = (function * (){
+                 let state    = null;
+                 let newState = null;
+                 while((newState=yield))
+                     switch(newState){
+                         case '':
+                             break;
+                     }
+             })();
+             result.test = function(){
+                 console.log("test!");
+                 try {
+                     location.hash = "lp5-select-parent";
+                     //                     LP5.storeBlob("this is a test");
+                 } catch(err) {
+                     console.log("Error: ", err);
+                 }
+             }
+             // storeBlob() - store data in a blob, return name (SHA256)
+             result.storeBlob = async function(string){
+                 console.assert(LP5.dirHandle);
+                 let encoder = new TextEncoder();
+                 let data    = encoder.encode(string);
+                 let hash    = await window.crypto.subtle.digest('SHA-256', data);
+                 
+                 console.log("hash is: ", hash);
+                 hash = btoa(String.fromCharCode(...new Uint8Array(hash))).replace(/\//g, '_').replace(/\+/g, '-').replace(/=/g, '');
+                 console.log("hash[", hash.length, "] is now: ", hash);
+             }
+
+             result.start = function(){
+                 console.log("LP5.start: location is ", window.location.href);
+                 
+                 if(false){
+                     let templates = document.querySelectorAll("template");
+                     console.log(templates);
+                     for(const t of templates){
+                         const io    = structuredClone(viewInterface);
+                         const name  = t.dataset.name;
+                         io.rootNode = t.content.firstElementChild.cloneNode(true);
+                         //                     const click = io.rootNode.attributes['onclick'];
+                         
+                         const click = io.rootNode.getAttribute('onclick');
+                         if(click){
+                             console.log("typeof(io.rootNode) = ", typeof(click));
+                             console.log("io.rootNode = ", click);
+                             //                     io.rootNode.attributes['onclick']();
+                             console.log("   ", Object.keys(click));
+                             console.log("onclick = ", io.rootNode.onclick);
+                         }
+                         const script = t.content.querySelector("script");
+                         if(script && name == 'home'){
+                             script.remove();
+                             console.log(`script = ${script}`);
+                             const val = eval(script.innerHTML);
+                             console.log (` returns ${val}`);
+                             console.log(`val.retval = ${JSON.stringify(val)}`);
+                             console.log(`typeof(val)=${typeof(val)}`);
+                             console.log("==>", Object.keys(val));
+                             console.log("retval is ", val.retval);
+                         }
+                     }
+
+                     // create index of all the "pages" (templates) we use
+                     templates = document.querySelectorAll("template");
+                     console.log(templates);
+                     for(const t of templates){
+                         LP5.templates[t.dataset.name] =
+                             t.content.firstElementChild.cloneNode(true);
+                     }
+                 }
+                 // go to initial page
+                 //                 this.setBody("SelectParent");
+                 //                 window.location.hash = "home";
+                 //                 LP5.views.change("home");
+             }
+             result.selectParentDir = async function(){
+                 const model = LP5.model;
+                 console.log(this);
+                 let options = {mode:'readwrite'};
+                 try {
+                     model.dirParentHandle = await window.showDirectoryPicker(options);
+                 } catch (error) {
+                     console.log(error);
+                     return;
+                 }
+                 if(model.dirParentHandle){
+                     console.log(model.dirParentHandle);
+                     let projectCount = 0;
+                     for await (let [name, handle] of model.dirParentHandle) {
+                         if(name.endsWith('.lp5') && handle.kind == 'directory'){
+                             console.log("looks like a project: ", handle);
+                             model.projects[name] = { dirHandle: handle };
+                             model.projectName = name;
+                             ++projectCount;
+                         }
+                     }
+                     console.log(`projectCount = ${projectCount}`);
+                     if(projectCount != 1){
+                         LP5.setBody("lp5-enter-dir-name");
+                     } else {
+                         document.title = model.projectName;
+                         await model.load(model.projectName);
+                         //                         if(LP5.model.load(model.projectName)){
+                         //                             const file = await model.projects[name].handle.getFile();
+                         //                             console.log(file);
+                         //                         }
+                         LP5.views.change("home");
+                     }
+                 }
+                 LP5.views.pop();
+                 console.log("<= selectParentDir returns");
+             }
+             result.createProject = async function (button){
+                 console.log("Create Project!");
+                 console.log(this);
+                 let textBox = document.querySelector("#lp5InputFile");
+                 let dirName = textBox.value;
+                 if(!dirName.endsWith('lp5')){
+                     alert("lp5 project directory name must end with '.lp5'");
+                 } else {
+                     let options = {create:true};
+                     try {
+                         LP5.lp5DirHandle = await LP5.dirParentHandle.getDirectoryHandle(dirName, options);
+                     } catch (error) {
+                         LP5.setBody("lp5-start-form");
+                         return;
+                     }
+                     console.log(LP5.lp5DirHandle);
+                     console.log("Created a directory!");
+                     // create a TOC resource
+                     let newTOC = LP5.templates["lp5-new-TOC"].cloneNode(true);
+                     console.log("newTOC is: ", newTOC);
+                     let elem   = newTOC.querySelector("li");
+                     elem.innerText = dirName;
+                     let strTOC = newTOC.innerHTML;
+                     console.log("strTOC is: ", strTOC);
+                     let fileHandle = await LP5.lp5DirHandle.getFileHandle(dirName,{create:true});
+                     let writable  = await fileHandle.createWritable();
+                     options = {type:"write", data: strTOC};
+                     await writable.write(options);
+                     await writable.close();
+                     LP5.setBody("lp5-main-page");
+                 }
+             }
+             result.cancelNewProject = function(){
+                 console.log("cancelNewProject()");
+                 LP5.setBody("lp5-start-form");
+             }
+             result.create = async function(){
+                 console.log(this);
+                 let options = {mode:'readwrite'};
+                 try {
+
+                     LP5.dirParentHandle = await window.showDirectoryPicker(options);
+                 } catch (error) {
+                     console.log(error);
+                     return;
+                 }
+                 if(LP5.dirParentHandle){
+                     console.log(options);
+                     console.log(LP5.dirParentHandle);
+                     LP5.setBody("lp5-enter-dir-name");
+                 }
+             }
+             // LP5.open - open an existing project
+             result.open = async function(){
+                 let fileHandle;
+                 [fileHandle] = await window.showOpenFilePicker({multiple:false});
+                 const file   = await fileHandle.getFile();
+                 const data   = await file.text();
+                 console.log(data);
+             }
+             result.newSection = async function (){
+                 let newID    = crypto.randomUUID();
+                 console.log("New Section " + newID);
+                 return false;
+             }
+             result.setBody = function (iView){
+                 const name = iView.name;
+                 console.log(`setBody(${name}) in use=${LP5.templates[name]}`);
+                 history.pushState(null, "", "#" + name);
+                 //                 location.hash = name;
+                 console.log("back from location.hash = name;");
+                 //                 const template = LP5.views.views[name].rootNode.cloneNode(true);
+                 const template = iView.rootNode.cloneNode(true);
+                 console.log("back from cloneNode of template");
+                 let dialog = template.querySelector("dialog");
+                 if(dialog){
+                     document.body.prepend(template);
+                     dialog.showModal();
+                 } else {
+                     // if we are popping a dialog
+                     if(LP5.views.dialog){
+                     }
+                     console.log("before replaceChildren");
+                     document.body.replaceChildren(template);
+                     console.log("after replaceChildren");
+                     /* if not showing dialog, autofocus only valid on page load,
+                      * so fix that manually.
+                      * https://html.spec.whatwg.org/multipage/interaction.html#the-autofocus-attribute
+                      */
+                     let focus = document.body.querySelector("input[autofocus]");
+                     if(focus)
+                         focus.focus();
+                 }
+                 LP5.currentTemplate = name;
+             }
+             result.exists = function(name){
+                 console.assert(this.dirHandle);
+                 
+             }
+             return result;
+         }();
+         LP5.url.init();
+         LP5.control.goto('initial');
         </script>
     </body>
 </html>
-<!DOCTYPE html>
