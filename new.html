@@ -17,7 +17,7 @@
     <body>
         <template data-name="SelectParent">
             <div>
-                <dialog onClose="console.log('ONCLOSE!!!!', event.which, event);">
+                <dialog>
                     <center>
                         <p>
                             Select <em>parent</em> directory of existing
@@ -316,33 +316,64 @@
                                  value.name = key;
                              }
                              LP5.views.loadTemplates();
-                             addEventListener('hashchange', LP5.views.onHashChange);
-                             LP5.control.goto('home');
+                             //                             LP5.control.goto('home');
+                             LP5.control.queueNext('home');
                          }
                      },
+                     // on the home page
                      home: {
                          entry(){
                              LP5.views.change('home');
                              if(!LP5.model.dirParentHandle){
-                                 LP5.control.goto('selectParent');
+                                 LP5.control.queueNext('selectParent');
                              }
                          }
                      },
+                     // need to ask user to select parent dir
                      selectParent: {
                          entry(){
-                             LP5.views.change('SelectParent');
+                             LP5.views.push('SelectParent');
                          },
-                         next(event){
-                             if(event.type == 'click')
-                                 if(event.target.id == 'SelectParentDir')
+                         next(event, target){
+                             switch(target){
+                                 case "click#SelectParentDir" :
                                      console.log("Click!!!!");
+                                     if(!LP5.selectParentDir())
+                                         LP5.control.goto('home');
+                                     break;
+                                 case "close#" :
+                                     event.target.close();
+//                                     LP5.control.goto('home');
+                                     LP5.control.queueNext('home');
+                                     break;
+                                 default:
+                                     console.log("Can't handle this event.");
+                                     return false;
+                             }
+                             return true;
                          },
+                         exit(){
+                             LP5.views.pop();
+                         }
                      }
                  },
                  next(event){
-                     console.log(`control.next(${event})`);
-                     console.log(event);
-                     LP5.control.currentState.next(event);
+                     const target = event.type + "#" + event.target.id;
+                     console.log("control.next", target, event);
+                     // if state didn't handle event
+                     if(!LP5.control.currentState.next(event, target)){
+                         if(target == "hashchange#undefined")
+                             ;
+                         else if(target.startsWith('click#')){
+                             console.log("ignore click");
+                         } else {
+                             console.assert(false);
+                         }
+                     }
+                 },
+                 queueNext(stateName){
+                     console.log(`queueNext('${stateName}')`);
+                     setTimeout(()=>this.goto(stateName));
                  },
                  goto(stateName){
                      console.log(`control.goto("${stateName}")`);
@@ -356,8 +387,28 @@
              };
              [
                  'click',
-             ].forEach(e=>document.body.addEventListener(e,control.next));
+                 'close',
+                 'hashchange',
+             ].forEach(e=>document.addEventListener(e, control.next, true));
 
+             const ctl = {
+                 *startup(){
+                     LP5.start();  // initialize everything we need
+                     // if we don't recall any project, have to ask user for one
+                     if(!LP5.dirParentHandle){
+                         LP5.views.push('SelectParent');
+                     }
+                 },
+                 *SelectParent(){
+                     LP5.views.push('SelectParent');
+            getEvent:while(event = yield)switch(event){
+                case 'x' : continue getEvent;
+            }
+                     do {
+                         event = yield;
+                     }while(true);
+                 }
+             };
              const model = {
                  dirHandle       : null,
                  dirParentHandle : null,
@@ -369,7 +420,7 @@
              // interface to a view
              const viewInterface = {
                  name         : "",
-                 dialog       : null,
+                 dialogNode   : null,
                  active       : false,
                  notify       : null,
                  rootNode     : null,
@@ -381,12 +432,19 @@
                  current     : null,
                  dialog      : null,
                  loadTemplates(){
+                     console.log("views.loadTemplates()");
                      document.querySelectorAll('template').forEach((t)=>{
                          const iView    = structuredClone(viewInterface);
                          const name     = t.dataset.name;
                          iView.name     = name;
-                         iView.dialog   = t.querySelector('dialog');
                          iView.rootNode = t.content.firstElementChild.cloneNode(true);
+                         iView.dialogNode   = iView.rootNode.querySelector('dialog');
+                         // Removing the open attribute will usually hide the dialog.
+                         // However, doing so has a number of strange additional consequences:
+                         // https://html.spec.whatwg.org/multipage/interactive-elements.html#the-dialog-element
+                         // on 08/23/2022
+                         if(iView.dialogNode)
+                             console.assert(typeof iView.dialogNode.close === 'function');
                          const script   = t.content.querySelector('script');
                          if(script){
                              // remove script else it will run when frag inserted into DOM
@@ -400,9 +458,9 @@
                          console.assert(!LP5.views.views.hasOwnProperty(name));
                          LP5.views.views[iView.name] = iView;
                      });
+
                      // known starting place must be defined
                      console.assert(LP5.views.views.hasOwnProperty('home'));
-
                  },
                  notifyChange(eventName){
                      //                     eventTarget.dispatchEvent(
@@ -416,6 +474,7 @@
                      // get interface to incoming view
                      const iView = this.views[viewName];
                      this.current = iView;
+                     console.assert(this.current);
                      LP5.setBody(iView);
                      --this.inProgress;
                      this.current.notify.init();
@@ -431,10 +490,16 @@
                  pop() {
                      console.assert(this.dialog);
                      console.assert(this.current);
-                     console.log(`pop() this.current = ${this.current}`);
+                     console.log("pop() this.current = ", this.current);
                      ++this.inProgress;
-                     LP5.setBody(this.current);
-                     this.current.notify.init();
+                     console.log(this.dialog.dialogNode);
+                     console.log(this.dialog.dialogNode.close);
+                     this.dialog.dialogNode.close('pop closes dialog');
+                     console.log("pop() closes dialog");
+                     this.dialog.dialogNode.remove();
+                     this.dialog = null;
+                     //                     LP5.setBody(this.current);
+                     //                     this.current.notify.init();
                      --this.inProgress;
                  },
                  onHashChange(event){
@@ -528,12 +593,14 @@
                          }
                      }
 
-                     // create index of all the "pages" (templates) we use
-                     templates = document.querySelectorAll("template");
-                     console.log(templates);
-                     for(const t of templates){
-                         LP5.templates[t.dataset.name] =
-                             t.content.firstElementChild.cloneNode(true);
+                     if(false){
+                         // create index of all the "pages" (templates) we use
+                         templates = document.querySelectorAll("template");
+                         console.log(templates);
+                         for(const t of templates){
+                             LP5.templates[t.dataset.name] =
+                                 t.content.firstElementChild.cloneNode(true);
+                         }
                      }
                  }
                  // go to initial page
@@ -549,7 +616,7 @@
                      model.dirParentHandle = await window.showDirectoryPicker(options);
                  } catch (error) {
                      console.log(error);
-                     return;
+                     return false;
                  }
                  if(model.dirParentHandle){
                      console.log(model.dirParentHandle);
@@ -568,15 +635,12 @@
                      } else {
                          document.title = model.projectName;
                          await model.load(model.projectName);
-                         //                         if(LP5.model.load(model.projectName)){
-                         //                             const file = await model.projects[name].handle.getFile();
-                         //                             console.log(file);
-                         //                         }
-                         LP5.views.change("home");
+                         //                         LP5.views.change("home");
                      }
                  }
-                 LP5.views.pop();
+                 //                 LP5.views.pop();
                  console.log("<= selectParentDir returns");
+                 return false;
              }
              result.createProject = async function (button){
                  console.log("Create Project!");
@@ -644,12 +708,13 @@
                  return false;
              }
              result.setBody = function (iView){
+                 //                 console.assert(false);
                  const name = iView.name;
-                 console.log(`setBody(${name}) in use=${LP5.templates[name]}`);
+                 console.log(`setBody(${name})`);
                  history.pushState(null, "", "#" + name);
                  //                 location.hash = name;
-                 console.log("back from location.hash = name;");
-                 //                 const template = LP5.views.views[name].rootNode.cloneNode(true);
+                 console.log(`history.pushState("#${name}")`);
+
                  const template = iView.rootNode.cloneNode(true);
                  console.log("back from cloneNode of template");
                  let dialog = template.querySelector("dialog");
