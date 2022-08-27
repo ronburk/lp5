@@ -343,7 +343,7 @@
                                      break;
                                  case "close#" :
                                      event.target.close();
-//                                     LP5.control.goto('home');
+                                     //                                     LP5.control.goto('home');
                                      LP5.control.queueNext('home');
                                      break;
                                  default:
@@ -391,24 +391,26 @@
                  'hashchange',
              ].forEach(e=>document.addEventListener(e, control.next, true));
 
-             const ctl = {
-                 *startup(){
-                     LP5.start();  // initialize everything we need
-                     // if we don't recall any project, have to ask user for one
-                     if(!LP5.dirParentHandle){
-                         LP5.views.push('SelectParent');
-                     }
-                 },
-                 *SelectParent(){
-                     LP5.views.push('SelectParent');
-            getEvent:while(event = yield)switch(event){
-                case 'x' : continue getEvent;
-            }
-                     do {
-                         event = yield;
-                     }while(true);
+             // home page
+             function*coHome(){
+                 let event;
+
+                 LP5.views.change('home');
+                 // if we don't recall any project, have to ask user for one
+                 if(!LP5.dirParentHandle){
+                     event = yield 'coSelectParent';
+                     console.log("Event from coSelectParent is ", event);
                  }
-             };
+                 while(event=yield){
+                     console.log("coHome gets ", event);
+                 }
+             }
+             function*coSelectParent(){
+                 LP5.views.push('SelectParent');
+                 while(event = yield)
+                     if(event){
+                     }
+             }
              const model = {
                  dirHandle       : null,
                  dirParentHandle : null,
