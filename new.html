@@ -17,7 +17,7 @@
     <body>
         <template data-name="SelectParent">
             <div>
-                <dialog>
+                <dialog id="SelectParentDialog">
                     <center>
                         <p>
                             Select <em>parent</em> directory of existing
@@ -246,6 +246,7 @@
                      return {
                          init(){
                              console.log("home page script init!!!!!!");
+if(false){
                              if(!LP5.dirParentHandle){
                                  //   LP5.views.push("SelectParent");
                                  setTimeout(()=>LP5.views.push('SelectParent'));
@@ -254,6 +255,7 @@
                                  const footer = document.body.querySelector('#LP5-Footer');
                                  footer.innerText = LP5.model.projectName;
                              }
+                 }
                          },
                          change(){
                              console.log("home page script change!!!!!!");
@@ -265,8 +267,9 @@
         </template>
         <!-- table of contents -->
         <template id="lp5-new-TOC" data-name="toc">
-
-            <a href="SHA1">title override</a>
+            <div>
+                <a href="SHA1">title override</a>
+            </div>
         </template>
         <script>
 
@@ -307,110 +310,164 @@
                      LP5.start();
                  }
              };
-             let control = {
-                 currentState: null,
-                 states: {
-                     initial: {
-                         entry(){
-                             for(const [key,value] of Object.entries(LP5.control.states)){
-                                 value.name = key;
+             if(false){
+                 let control = {
+                     currentState: null,
+                     states: {
+                         initial: {
+                             entry(){
+                                 for(const [key,value] of Object.entries(LP5.control.states)){
+                                     value.name = key;
+                                 }
+                                 LP5.views.loadTemplates();
+                                 //                             LP5.control.goto('home');
+                                 LP5.control.queueNext('home');
                              }
-                             LP5.views.loadTemplates();
-                             //                             LP5.control.goto('home');
-                             LP5.control.queueNext('home');
+                         },
+                         // on the home page
+                         home: {
+                             entry(){
+                                 LP5.views.change('home');
+                                 if(!LP5.model.dirParentHandle){
+                                     LP5.control.queueNext('selectParent');
+                                 }
+                             }
+                         },
+                         // need to ask user to select parent dir
+                         selectParent: {
+                             entry(){
+                                 LP5.views.push('SelectParent');
+                             },
+                             next(event, target){
+                                 switch(target){
+                                     case "click#SelectParentDir" :
+                                         console.log("Click!!!!");
+                                         if(!LP5.selectParentDir())
+                                             LP5.control.goto('home');
+                                         break;
+                                     case "close#" :
+                                         event.target.close();
+                                         //                                     LP5.control.goto('home');
+                                         LP5.control.queueNext('home');
+                                         break;
+                                     default:
+                                         console.log("Can't handle this event.");
+                                         return false;
+                                 }
+                                 return true;
+                             },
+                             exit(){
+                                 LP5.views.pop();
+                             }
                          }
                      },
-                     // on the home page
-                     home: {
-                         entry(){
-                             LP5.views.change('home');
-                             if(!LP5.model.dirParentHandle){
-                                 LP5.control.queueNext('selectParent');
+                     next(event){
+                         const target = event.type + "#" + event.target.id;
+                         console.log("control.next", target, event);
+                         // if state didn't handle event
+                         if(!LP5.control.currentState.next(event, target)){
+                             if(target == "hashchange#undefined")
+                                 ;
+                             else if(target.startsWith('click#')){
+                                 console.log("ignore click");
+                             } else {
+                                 console.assert(false);
                              }
                          }
                      },
-                     // need to ask user to select parent dir
-                     selectParent: {
-                         entry(){
-                             LP5.views.push('SelectParent');
-                         },
-                         next(event, target){
-                             switch(target){
-                                 case "click#SelectParentDir" :
-                                     console.log("Click!!!!");
-                                     if(!LP5.selectParentDir())
-                                         LP5.control.goto('home');
-                                     break;
-                                 case "close#" :
-                                     event.target.close();
-                                     //                                     LP5.control.goto('home');
-                                     LP5.control.queueNext('home');
-                                     break;
-                                 default:
-                                     console.log("Can't handle this event.");
-                                     return false;
+                     queueNext(stateName){
+                         console.log(`queueNext('${stateName}')`);
+                         setTimeout(()=>this.goto(stateName));
+                     },
+                     goto(stateName){
+                         console.log(`control.goto("${stateName}")`);
+                         let currentState = this.currentState;
+                         if(currentState && currentState.hasOwnProperty('exit'))
+                             currentState.exit();
+                         currentState = this.currentState = this.states[stateName];
+                         if(currentState && currentState.hasOwnProperty('entry'))
+                             currentState.entry();
+                     }
+                 };
+             };
+             const coro = {
+                 callee    : null,
+                 callStack : [],
+                 // events come here first, get passed to current coroutine
+                 async eventHandler(event){
+                     const coro = LP5.coro;
+                     console.log("coro.eventHandler", event);
+                     console.assert(coro.callee);
+                     do {
+                         let result = await coro.callee.next(event);
+                         // if the callee wants to return
+                         if(result.done){
+                             console.log("callee wants to return");
+                             console.assert(coro.callStack.length > 0);
+                             coro.callee = coro.callStack.pop();
+                             event  = result.value;
+                         } // if callee wants to 'call' another coroutine
+                         else if(typeof result.value === 'string'){
+                             console.log("callee wants to call ", result.value);
+                             let callerName = result.value;
+                             console.assert(coro.hasOwnProperty(callerName));
+                             coro.callStack.push(coro.callee);
+                             coro.callee = coro[callerName]();
+                             event = null;
+                         }else{
+                             console.log("coro.eventHandler saw return: ", result);
+                             break;
+                         }
+                     } while(true);
+                     console.log("coro.eventHandler returns");
+                 },
+                 // home page
+                 *coHome(){
+                     console.log("coHome");
+                     let event;
+                     LP5.views.change('home');
+                     console.log("coHome changed view");
+                     // if we don't recall any project, have to ask user for one
+                     if(!LP5.dirParentHandle){
+                         console.log("coHome yielding to coSelectParent");
+                         event = yield 'coSelectParent';
+                         console.log("Event from coSelectParent is ", event);
+                     }
+                     while(event=yield){
+                         console.log("coHome gets ", event);
+                     }
+                     console.log("coHome returns");
+                 },
+                 async*coSelectParent(){
+                     console.log("coSelectParent");
+                     LP5.views.push('SelectParent');
+                     console.log("coSelectParent yielding to wait for event");
+                     while(event = yield){
+                         console.log("coSelectParent got event ", event);
+                         if(event.target.id == "SelectParentDir"){
+                             console.log("coSelectParent calling select");
+                             await LP5.selectParentDir();
+                             console.log("coSelectParent back from select");
+                             if(LP5.model.dirParentHandle){
+                                 console.log("coSelectParent got a dirParentHandle");
+                                 break;
                              }
-                             return true;
-                         },
-                         exit(){
-                             LP5.views.pop();
+                         } else if(event.type == 'close'){
+                             console.log("select parent got close.");
+                             break;
                          }
                      }
+                     LP5.views.pop();
+                     return LP5.model.dirParentHandle;
                  },
-                 next(event){
-                     const target = event.type + "#" + event.target.id;
-                     console.log("control.next", target, event);
-                     // if state didn't handle event
-                     if(!LP5.control.currentState.next(event, target)){
-                         if(target == "hashchange#undefined")
-                             ;
-                         else if(target.startsWith('click#')){
-                             console.log("ignore click");
-                         } else {
-                             console.assert(false);
-                         }
-                     }
-                 },
-                 queueNext(stateName){
-                     console.log(`queueNext('${stateName}')`);
-                     setTimeout(()=>this.goto(stateName));
-                 },
-                 goto(stateName){
-                     console.log(`control.goto("${stateName}")`);
-                     let currentState = this.currentState;
-                     if(currentState && currentState.hasOwnProperty('exit'))
-                         currentState.exit();
-                     currentState = this.currentState = this.states[stateName];
-                     if(currentState && currentState.hasOwnProperty('entry'))
-                         currentState.entry();
-                 }
              };
              [
                  'click',
                  'close',
                  'hashchange',
-             ].forEach(e=>document.addEventListener(e, control.next, true));
+             ].forEach(e=>document.addEventListener(e, coro.eventHandler, true));
 
-             // home page
-             function*coHome(){
-                 let event;
 
-                 LP5.views.change('home');
-                 // if we don't recall any project, have to ask user for one
-                 if(!LP5.dirParentHandle){
-                     event = yield 'coSelectParent';
-                     console.log("Event from coSelectParent is ", event);
-                 }
-                 while(event=yield){
-                     console.log("coHome gets ", event);
-                 }
-             }
-             function*coSelectParent(){
-                 LP5.views.push('SelectParent');
-                 while(event = yield)
-                     if(event){
-                     }
-             }
              const model = {
                  dirHandle       : null,
                  dirParentHandle : null,
@@ -422,32 +479,45 @@
              // interface to a view
              const viewInterface = {
                  name         : "",
-                 dialogNode   : null,
-                 active       : false,
+                 isDialog     : false,
                  notify       : null,
                  rootNode     : null,
              };
              const views = {
                  views       : {},
-                 eventTarget : new EventTarget(),
+                 stack       : [],
+//                 eventTarget : new EventTarget(),
                  inProgress  : 0,
-                 current     : null,
-                 dialog      : null,
+//                 isDialog    : false,
+//                 rootNode    : null,
+                 currentView   : null,
+//                 dialog      : null,
                  loadTemplates(){
                      console.log("views.loadTemplates()");
                      document.querySelectorAll('template').forEach((t)=>{
                          const iView    = structuredClone(viewInterface);
-                         const name     = t.dataset.name;
-                         iView.name     = name;
-                         iView.rootNode = t.content.firstElementChild.cloneNode(true);
-                         iView.dialogNode   = iView.rootNode.querySelector('dialog');
+                         iView.name     = t.dataset.name; // data-name='xxx'
+
+                         // we assume everything is in one enclosing div
+                         console.assert(t.content.childElementCount == 1);
+                         const templateRoot = t.content.firstElementChild;
+                         console.assert(templateRoot.nodeName == "DIV");
+                         
+                         // clone template, then discard it
+                         iView.rootNode = templateRoot.cloneNode(true);
+                         t.remove();
+
+                         const dialogNode = iView.rootNode.querySelector('dialog');
+                         if(dialogNode){
+                             iView.isDialog = true;
+                             // do not define dialog 'open' attribute, please
+                             console.assert(!dialogNode.hasAttribute('open'));
+                         }
+
                          // Removing the open attribute will usually hide the dialog.
-                         // However, doing so has a number of strange additional consequences:
+                         // However, doing so has strange additional consequences:
                          // https://html.spec.whatwg.org/multipage/interactive-elements.html#the-dialog-element
-                         // on 08/23/2022
-                         if(iView.dialogNode)
-                             console.assert(typeof iView.dialogNode.close === 'function');
-                         const script   = t.content.querySelector('script');
+                         const script   = iView.rootNode.querySelector('script');
                          if(script){
                              // remove script else it will run when frag inserted into DOM
                              script.remove();
@@ -457,11 +527,11 @@
                              console.assert(iView.notify.hasOwnProperty('change'));
                          }
                          // two templates with same name is a mistake
-                         console.assert(!LP5.views.views.hasOwnProperty(name));
+                         console.assert(!LP5.views.views.hasOwnProperty(iView.name));
                          LP5.views.views[iView.name] = iView;
                      });
 
-                     // known starting place must be defined
+                     // known starting view must be defined
                      console.assert(LP5.views.views.hasOwnProperty('home'));
                  },
                  notifyChange(eventName){
@@ -474,34 +544,34 @@
                      console.log(`views.change(${viewName})`);
                      ++this.inProgress;
                      // get interface to incoming view
-                     const iView = this.views[viewName];
-                     this.current = iView;
-                     console.assert(this.current);
-                     LP5.setBody(iView);
+                     this.currentView = this.views[viewName];
+                     console.assert(this.currentView);
+                     LP5.setBody(this.currentView);
                      --this.inProgress;
-                     this.current.notify.init();
+                     this.currentView.notify.init();
                  },
                  push(dialogName) {
-                     console.assert(this.current);
+                     console.assert(this.currentView);
                      ++this.inProgress;
+                     this.stack.push(this.currentView);
                      const iView = this.views[dialogName];
-                     this.dialog = iView;
                      LP5.setBody(iView);
+                     this.currentView = iView;
                      --this.inProgress;
                  },
                  pop() {
-                     console.assert(this.dialog);
-                     console.assert(this.current);
-                     console.log("pop() this.current = ", this.current);
+                     console.assert(this.currentView.isDialog);
+                     console.assert(this.currentView);
+                     console.log("pop() this.current = ", this.currentView);
                      ++this.inProgress;
-                     console.log(this.dialog.dialogNode);
-                     console.log(this.dialog.dialogNode.close);
-                     this.dialog.dialogNode.close('pop closes dialog');
+                     // our root is a div containing a dialog
+                     const liveRootNode   = document.body.firstElementChild;
+                     const liveDialogNode = liveRootNode.firstElementChild;
+                     console.assert(liveDialogNode.nodeName == "DIALOG");
+                     liveDialogNode.close();
                      console.log("pop() closes dialog");
-                     this.dialog.dialogNode.remove();
-                     this.dialog = null;
-                     //                     LP5.setBody(this.current);
-                     //                     this.current.notify.init();
+                     liveRootNode.remove();
+                     this.currentView = this.stack.pop();
                      --this.inProgress;
                  },
                  onHashChange(event){
@@ -522,7 +592,8 @@
                  }
              };
              var result = {
-                 control         : control,
+                 coro            : coro,
+                 //                 control         : control,
                  model           : model,
                  views           : views,
                  currentTemplate : null,
@@ -549,7 +620,7 @@
                  } catch(err) {
                      console.log("Error: ", err);
                  }
-             }
+             };
              // storeBlob() - store data in a blob, return name (SHA256)
              result.storeBlob = async function(string){
                  console.assert(LP5.dirHandle);
@@ -560,7 +631,7 @@
                  console.log("hash is: ", hash);
                  hash = btoa(String.fromCharCode(...new Uint8Array(hash))).replace(/\//g, '_').replace(/\+/g, '-').replace(/=/g, '');
                  console.log("hash[", hash.length, "] is now: ", hash);
-             }
+             };
 
              result.start = function(){
                  console.log("LP5.start: location is ", window.location.href);
@@ -572,7 +643,6 @@
                          const io    = structuredClone(viewInterface);
                          const name  = t.dataset.name;
                          io.rootNode = t.content.firstElementChild.cloneNode(true);
-                         //                     const click = io.rootNode.attributes['onclick'];
                          
                          const click = io.rootNode.getAttribute('onclick');
                          if(click){
@@ -594,23 +664,10 @@
                              console.log("retval is ", val.retval);
                          }
                      }
-
-                     if(false){
-                         // create index of all the "pages" (templates) we use
-                         templates = document.querySelectorAll("template");
-                         console.log(templates);
-                         for(const t of templates){
-                             LP5.templates[t.dataset.name] =
-                                 t.content.firstElementChild.cloneNode(true);
-                         }
-                     }
                  }
-                 // go to initial page
-                 //                 this.setBody("SelectParent");
-                 //                 window.location.hash = "home";
-                 //                 LP5.views.change("home");
-             }
+             };
              result.selectParentDir = async function(){
+                 console.log("=> selectParentDir this==");
                  const model = LP5.model;
                  console.log(this);
                  let options = {mode:'readwrite'};
@@ -747,7 +804,12 @@
              return result;
          }();
          LP5.url.init();
-         LP5.control.goto('initial');
+         console.log("calling loadTemplates");
+         LP5.views.loadTemplates();
+         console.log("setting callee");
+         LP5.coro.callee = LP5.coro.coHome();
+         //         LP5.coro.callee.next();
+         LP5.coro.eventHandler(null);
         </script>
     </body>
 </html>
