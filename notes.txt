@@ -1,3 +1,14 @@
+compiled view
+=============
+
+In lp5, one is really defining a tree-structure that dictates
+how code in sections is inserted into the output. The compiled
+view should let the user optionally see that hierarchy. E.g.,
+should be possible to see a "table of contents" that indexes
+the compiled output, where each line in this table of contents
+is a code reference from the lp5 source.
+
+
 file structure
 ==============
 This is local file structure for using lp5 offline when the web
