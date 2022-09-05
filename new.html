@@ -32,18 +32,17 @@
                     </center>
                 </dialog>
                 <script>
-                 let model = require('model');
+//                 let model = require('model');
 
-                 const result = {
-                     init(){
-                         console.log(`model is ${model}`);
+                 return  {
+                     init(iView){
+//                         console.log(`model is ${model}`);
                          console.log("SelectParent page script init!!!!!!");
                      },
-                     change(){
+                     render(){
                          console.log("SelectParent page script change!!!!!!");
                      }
                  };
-                 result;
                 </script>
             </div>
         </template>
@@ -51,26 +50,38 @@
             <div>
                 <dialog id="PickOrCreateProject">
                     <center>
-                        <p>
-                            Select <em>parent</em> directory of existing
-                            or new lp5 project.
-                            <span style="background-color:#ffffa0; border-radius:50%; cursor:help;" title="I need access to the parent directory to place generated files there.&#10;A user click is required by Chrome for me to ask for this permission.">&#9432</span>
-                        </p>
-                        <input id="SelectParentDirButton"
-                               autofocus type="button" value="Select" >
+                        Project name: <input type="text" name="txtCombo" id="txtCombo"/>
+                        <input type="button" value="Create" >
+                        <br/>
+                        <div id="hideme">
+                            <select></select>
+                            <input type="button"  value="Select">
+                        </div>
                     </center>
                 </dialog>
                 <script>
-                 (function(){
-                     return {
-                         init(){
-                             console.log("PickOrCreateProject page script init!!!!!!");
-                         },
-                         change(){
-                             console.log("PickOrCreateProject page script change!!!!!!");
-                         }
-                     };
-                 })();
+                 const model = require('model');
+                 function init(iView){
+                     const projectCount = Object.keys(model.projects).length;
+                     console.log("PickOrCreateProject page script init!!!!!!");
+                     console.log("# of projects = ", projectCount);
+                     const select = iView.rootNode.querySelector("select");
+                     for(const proj in model.projects){
+                         console.log("Proj = ", proj);
+                         const option = document.createElement('option');
+                         console.log(option);
+                         option.innerText = proj;
+                         option.value     = proj;
+                         console.log(option);
+                         select.appendChild(option);
+                         console.log(select);
+                     }
+                     
+                 };
+                 function render(iView){
+                         console.log("PickOrCreateProject page script change!!!!!!");
+                     }
+                 return { init:init, render:render };
                 </script>
             </div>
         </template>
@@ -247,8 +258,17 @@
                 <div id="LP5-Output">
                     Here be some output!
                     <template>
-                        <div>
-                            <p> hahahahaha </p>
+                        <div><p> hahahahaha </p>
+                            <script>
+                             console.log("hahahahaha");
+                             function init(iView){
+                                 console.log("ha init!!!!!!");
+                             }
+                             function render(){
+                                 console.log("ha change!!!!!!");
+                             }
+                             return {init:init, render:render};
+                            </script>
                         </div>
                     </template>
                     Code as it would be generated from the current source should appear here.
@@ -257,27 +277,14 @@
                     Here's a footer! Maybe some kind of status info would go here.
                 </div>
                 <script>
-                 (function(){
-                     
-                     return {
-                         init(){
-                             console.log("home page script init!!!!!!");
-                             if(false){
-                                 if(!LP5.dirParentHandle){
-                                     //   LP5.views.push("SelectParent");
-                                     setTimeout(()=>LP5.views.push('SelectParent'));
-                                 } else
-                                     if(LP5.model.projectName){
-                                         const footer = document.body.querySelector('#LP5-Footer');
-                                         footer.innerText = LP5.model.projectName;
-                                     }
-                             }
-                         },
-                         change(){
-                             console.log("home page script change!!!!!!");
-                         }
-                     };
-                 })();
+                 return {
+                     init(iView){
+                         console.log("home page script init!!!!!!");
+                     },
+                     render(){
+                         console.log("home page script change!!!!!!");
+                     }
+                 };
                 </script>
             </div>
         </template>
@@ -499,18 +506,6 @@
              result.main = main;
              return result;
          }();
-         //         console.log("calling loadTemplates");
-         //         LP5.views.loadTemplates();
-         if(false){
-             let f = LP5.main(LP5.model, LP5.views);
-             [
-                 'load',
-                 'click',
-                 'close',
-                 'hashchange',
-                 'asyncComplete',
-             ].forEach(e=>window.addEventListener(e, e=>f.next(e), true));
-         }
          async function selectParentDir(model, asyncComplete){
              console.log("selectParentDir()");
 
@@ -626,7 +621,7 @@
                          console.assert(false);
                  }
              }
-             return eval(script);
+             return new Function("require", '"use strict";' + script)(require);
          }
 
          // interface to a view
@@ -664,17 +659,21 @@
                      const templateRoot = t.content.firstElementChild;
                      console.assert(templateRoot.nodeName == "DIV");
                      
-                     // clone template, then discard it
-                     iView.rootNode = templateRoot.cloneNode(true);
-                     t.remove();
-
-
-                     const dialogNode = iView.rootNode.querySelector('dialog');
-                     if(dialogNode){
-                         iView.isDialog = true;
-                         // do not define dialog 'open' attribute, please
-                         console.assert(!dialogNode.hasAttribute('open'));
+                     if(parentView){
+                         iView.rootNode = templateRoot;
+                         t.replaceWith(templateRoot);
+                     } else {
+                         // clone template, then discard it
+                         iView.rootNode = templateRoot.cloneNode(true);
+                         t.remove();
+                         const dialogNode = iView.rootNode.querySelector('dialog');
+                         if(dialogNode){
+                             iView.isDialog = true;
+                             // do not define dialog 'open' attribute, please
+                             console.assert(!dialogNode.hasAttribute('open'));
+                         }
                      }
+
 
                      // Removing the open attribute will usually hide the dialog.
                      // However, doing so has strange additional consequences:
@@ -686,7 +685,7 @@
                          // run the script to obtain its notification functions
                          iView.notify   = scopedEval(script.innerHTML);
                          console.assert(iView.notify.hasOwnProperty('init'));
-                         console.assert(iView.notify.hasOwnProperty('change'));
+                         console.assert(iView.notify.hasOwnProperty('render'));
                      }
                      // two templates with same name is a mistake
                      //                         console.assert(!LP5.views.views.hasOwnProperty(iView.name));
@@ -721,7 +720,12 @@
                  console.assert(this.currentView);
                  this.setBody(this.currentView);
                  --this.inProgress;
-                 this.currentView.notify.init();
+                 //                 this.currentView.notify.init();
+                 this.init(this.currentView);
+             },
+             init(iView){
+                 iView.notify.init(iView);
+                 iView.children.forEach((i)=>i.notify.init(iView));
              },
              push(dialogName) {
                  console.assert(this.currentView);
@@ -731,7 +735,8 @@
                  this.setBody(iView);
                  this.currentView = iView;
                  --this.inProgress;
-                 this.currentView.notify.init();
+//                 this.currentView.notify.init();
+                 this.init(this.currentView);
              },
              pop() {
                  console.assert(this.currentView.isDialog);
@@ -740,7 +745,7 @@
                      ++this.inProgress;
                  // our root is a div containing a dialog
                  const liveRootNode   = document.body.firstElementChild;
-                 const liveDialogNode = liveRootNode.firstElementChild;
+                 const liveDialogNode = liveRootNode.querySelector("dialog");
                  console.assert(liveDialogNode.nodeName == "DIALOG");
                  liveDialogNode.close();
                  console.log("pop() closes dialog");
