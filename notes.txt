@@ -1,3 +1,36 @@
+reentrancy
+==========
+
+https://stackoverflow.com/questions/338110/avoiding-a-javascript-race-condition
+
+
+
+
+
+arch
+====
+
+Surrendering control of the controller makes it hard to enforce any
+constraints. For example, suppose the UI has a button called "Foo" and
+a corresponding click handler called doFoo(). The programmer must take
+the initiative to notice whether there are any program states in which
+executing doFoo() violates a constraint. Then, the programmer must
+arrange to prevent the effects of doFoo() when entering such states
+and re-enable it when exiting such states.  Since the program state is
+implicit and spread across many mini-tasks, it is hard to be sure all
+such constraints have been enforced, even when the job is well-defined
+and has the programmer's full attention.
+
+Forcing all events through centralized, state-based code inverts the
+problem. Now, no events get acted on in a given state without explicit
+code to permit it. One must opt in to reentrancy bugs rather than the
+more daunting task of opting out.  Program state (at least in regards
+to control flow) is explicit and visible.  Flow-of-control bugs are
+less likely to be subtle and distributed and more likely to be an
+obvious failure to handle a valid event, a failure whose location in
+the code will likewise be obvious.
+
+
 compiled view
 =============
 

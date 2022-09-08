@@ -28,21 +28,21 @@
                             <span style="background-color:#ffffa0; border-radius:50%; cursor:help;" title="I need access to the parent directory to place generated files there.&#10;A user click is required by Chrome for me to ask for this permission.">&#9432</span>
                         </p>
                         <input id="SelectParentDirButton"
-                               autofocus type="button" value="Select" >
+                               autofocus type="button" value="Select" data-id="selectButton" >
                     </center>
                 </dialog>
                 <script>
-//                 let model = require('model');
+                 const iView = require('iView');
+                 const {selectButton} = iView;
 
-                 return  {
-                     init(iView){
-//                         console.log(`model is ${model}`);
-                         console.log("SelectParent page script init!!!!!!");
-                     },
-                     render(){
-                         console.log("SelectParent page script change!!!!!!");
-                     }
-                 };
+                 function init(){
+                     console.log("SelectParent page script init!!!!!!");
+                 }
+
+                 function render(){
+                     console.log("SelectParent page script change!!!!!!");
+                 }
+                 return  { init: init, render: render };
                 </script>
             </div>
         </template>
@@ -50,23 +50,53 @@
             <div>
                 <dialog id="PickOrCreateProject">
                     <center>
-                        Project name: <input type="text" name="txtCombo" id="txtCombo"/>
-                        <input type="button" value="Create" >
+                        Project name: <input type="text" data-id="textProject" />
+                        <input type="button" value="Create" data-id="createButton">
                         <br/>
-                        <div id="hideme">
-                            <select></select>
-                            <input type="button"  value="Select">
+                        <div data-id="div">
+                            <select data-id="select"></select>
+                            <input type="button" value="Select" data-id="selectButton">
                         </div>
                     </center>
                 </dialog>
                 <script>
-                 const model = require('model');
-                 function init(iView){
-                     const projectCount = Object.keys(model.projects).length;
+                 const {projects} = require('model');
+                 const iView      = require('iView');
+                 const {rootNode} = iView;
+                 const {createButton,div,select,selectButton,textProject} = iView.dataID;
+
+                 function clickCreate(event){
+                     console.log("clickCreate()!!!");
+                 }
+
+                 function clickSelect(event){
+                     console.log("clickSelect()!!!");
+                     let projName = select.options[select.selectedIndex].text;
+                     console.log(projName);
+                     document.dispatchEvent(
+                         new CustomEvent('selectProject', { detail : projName }));
+                 }
+                 function changeSelect(event){
+                     console.log("changeSelect()!!!");
+                     selectButton.disabled = false;
+                 }
+                 function changeText(event){
+                     console.log("changeText()!!!");
+                     createButton.disabled = textProject.value.length == 0;
+                 }
+                 function init(){
+                     createButton.disabled = true;
+                     createButton.addEventListener('click', clickCreate);
+                     selectButton.disabled = true;
+                     selectButton.addEventListener('click', clickSelect);
+                     select.addEventListener('input', changeSelect);
+                     select.addEventListener('change', changeSelect);
+                     select.addEventListener('click', changeSelect);
+                     textProject.addEventListener('input', changeText);
+                     const projectCount = Object.keys(projects).length;
                      console.log("PickOrCreateProject page script init!!!!!!");
                      console.log("# of projects = ", projectCount);
-                     const select = iView.rootNode.querySelector("select");
-                     for(const proj in model.projects){
+                     for(const proj in projects){
                          console.log("Proj = ", proj);
                          const option = document.createElement('option');
                          console.log(option);
@@ -76,7 +106,6 @@
                          select.appendChild(option);
                          console.log(select);
                      }
-                     
                  };
                  function render(iView){
                          console.log("PickOrCreateProject page script change!!!!!!");
@@ -506,6 +535,7 @@
              result.main = main;
              return result;
          }();
+
          async function selectParentDir(model, asyncComplete){
              console.log("selectParentDir()");
 
@@ -513,11 +543,19 @@
              try {
                  model.dirParentHandle = await window.showDirectoryPicker(options);
              } catch (error) {
+                 //
+                 console.log(typeof error);
                  console.log(error);
-                 asyncComplete(false);
-                 return;
+             } finally {
+                 if(!model.dirParentHandle){
+                     asyncComplete(false);
+                     console.log("selectParentDir() returns early");
+                     return;
+                 }                     
              }
-             if(model.dirParentHandle){
+             console.assert(model.dirParentHandle);
+             // now we have a handle to the parent directory
+             try {
                  console.log(model.dirParentHandle);
                  let projectCount = 0;
                  for await (let [name, handle] of model.dirParentHandle) {
@@ -528,35 +566,52 @@
                          ++projectCount;
                      }
                  }
+             } catch(error) {
+                 console.log("What is this error? Filesystem problem?");
+                 console.log(error);
+                 asyncComplete(false);
+                 return;
              }
              if(model.dirParentHandle){
                  console.log("coSelectParent got a dirParentHandle");
              }
-             asyncComplete(!!model.dirParentHandle);
+             console.log("selectParentDir() returns");
+             asyncComplete(true);
          }
 
          function controller(event){
              const { model, views, asyncSchedule } = controller;
 
+             console.log(">>>>>>>>>>>>>>>>>>>>>>>>>enter controller");
+             console.log(event);
              console.assert(!controller.inSync);
              controller.inSync = true;
+             console.log("controller.state = ", controller.state);
              switch(controller.state){
                  case 'load' :
                      console.log(event);
-                     console.assert(event.type == 'load');
+                     console.assert(event.type == 'load', event);
                      views.loadTemplates();
                      views.change('home');
                      views.push('SelectParent');
                      controller.state = 'SelectParent';
                      break;
                  case 'SelectParent' :
+                     console.log(event);
                      if(event.target.id == "SelectParentDirButton"){
+                         console.assert(event.type == 'click');
+                         console.log(">>>>>>>>>>>>>asyncSchedule!!!!!!");
                          asyncSchedule(selectParentDir, model);
+                         console.log("<<<<<<<<<<<<<asyncSchedule!!!!!!");
                          controller.state = 'SelectingParent';
+                     } else {
+                         console.assert(false, event);
                      }
                      break;
                  case 'SelectingParent':
-                     console.assert(event.type == 'asyncComplete');
+                     console.log(event);
+                     if(event.type != 'asyncComplete') return;
+                     console.assert(event.type == 'asyncComplete', event);
                      views.pop();
                      if(event.detail){
                          console.assert(model.dirParentHandle);
@@ -568,20 +623,25 @@
                      }
                      break;
                  case 'PickOrCreateProject' :
-                     
+                     console.log(event);
+                     // let current view handle event
                      break;
                  default:
                      console.log("Can't happen, unknown state: ", controller.state);
                      console.assert(false);
              }
              controller.inSync = false;
+             console.log("<<<<<<<<<<<<<<<<<<<<<<<<<exit controller");
          }
          [
-             'load',
+             'asyncComplete',
+             'change',
              'click',
              'close',
              'hashchange',
-             'asyncComplete',
+             'input',
+             'load',
+             'selectProject',
          ].forEach(e=>window.addEventListener(e, e=>controller(e), true));
 
          //             window.onload = controller;
@@ -590,9 +650,12 @@
              setTimeout(()=>func(...args, controller.asyncComplete));
          }
          controller.asyncComplete = function(value){
-             setTimeout(()=>
+             function f() {
+                 console.log("inside asyncComplete");
                  document.dispatchEvent(
-                     new CustomEvent('asyncComplete', { detail:value})));
+                     new CustomEvent('asyncComplete', { detail:value}));
+             }
+             setTimeout(f);
          };
          controller.states = new Set([
              'load',
@@ -612,11 +675,20 @@
          controller.inSync = false;
          controller.state  = 'load';
 
-         function scopedEval(script){
+         function scopedEval(script, iView){
+             for(const element of iView.rootNode.querySelectorAll("[data-ID]"))
+                 iView.dataID[element.dataset.id] = element;
+
              function require(thing){
                  switch(thing){
+                     case 'controller':
+                         return controller;
                      case 'model':
                          return controller.model;
+                     case 'views' :
+                         return controller.views;
+                     case 'iView':
+                         return iView;
                      default:
                          console.assert(false);
                  }
@@ -631,6 +703,7 @@
              notify       : null,
              children     : [],
              rootNode     : null,
+             dataID       : {},
          };
          controller.views = {
              views       : {},
@@ -683,7 +756,7 @@
                          // remove script else it will run when frag inserted into DOM
                          script.remove();
                          // run the script to obtain its notification functions
-                         iView.notify   = scopedEval(script.innerHTML);
+                         iView.notify   = scopedEval(script.innerHTML, iView);
                          console.assert(iView.notify.hasOwnProperty('init'));
                          console.assert(iView.notify.hasOwnProperty('render'));
                      }
@@ -716,9 +789,11 @@
                  console.log(`views.change(${viewName})`);
                      ++this.inProgress;
                  // get interface to incoming view
-                 this.currentView = this.views[viewName];
-                 console.assert(this.currentView);
-                 this.setBody(this.currentView);
+                 const newView = this.views[viewName];
+ //                 this.currentView = this.views[viewName];
+//                 console.assert(this.currentView);
+                 console.assert(newView);
+                 this.setBody(newView);
                  --this.inProgress;
                  //                 this.currentView.notify.init();
                  this.init(this.currentView);
@@ -728,27 +803,28 @@
                  iView.children.forEach((i)=>i.notify.init(iView));
              },
              push(dialogName) {
+                 ++this.inProgress;
                  console.assert(this.currentView);
-                     ++this.inProgress;
                  this.stack.push(this.currentView);
                  const iView = this.views[dialogName];
                  this.setBody(iView);
                  this.currentView = iView;
-                 --this.inProgress;
-//                 this.currentView.notify.init();
                  this.init(this.currentView);
+                 --this.inProgress;
              },
              pop() {
-                 console.assert(this.currentView.isDialog);
-                 console.assert(this.currentView);
-                 console.log("pop() this.current = ", this.currentView);
-                     ++this.inProgress;
+                 ++this.inProgress;
+                 const currentView = this.currentView;
+                 console.assert(currentView.isDialog);
+                 console.assert(currentView);
+                 console.log("pop() this.current = ", currentView);
                  // our root is a div containing a dialog
                  const liveRootNode   = document.body.firstElementChild;
                  const liveDialogNode = liveRootNode.querySelector("dialog");
                  console.assert(liveDialogNode.nodeName == "DIALOG");
                  liveDialogNode.close();
                  console.log("pop() closes dialog");
+//                 currentView.rootNode.replaceChildren(liveRootNode);
                  liveRootNode.remove();
                  this.currentView = this.stack.pop();
                  --this.inProgress;
@@ -770,21 +846,32 @@
                      LP5.views.change(newPage);
              },
              setBody(iView){
-                 const {name} = iView;
+                 const {name}      = iView;
+                 const currentView = this.currentView;
+                 const body        = document.body;
+
                  console.log(`setBody(${name})`);
                  history.pushState(null, "", "#" + name);
-                 //                 location.hash = name;
                  console.log(`history.pushState("#${name}")`);
+                 // give current view back its nodes
+                 // this only happens when change()ing one non-dialog to another
+                 if(currentView && !iView.isDialog){
+                     currentView.rootNode.replaceChildren(body.firstElementChild);
+                 }
 
-                 const template = iView.rootNode.cloneNode(true);
+                             //???                 const template = iView.rootNode.cloneNode(true);
+                 const template = iView.rootNode;
                  let dialog = template.querySelector("dialog");
                  if(dialog){
-                     document.body.prepend(template);
+                     if(false){
+                         const div = body.createElement("div");
+                         body.prepend(div);
+                         body.firstElementChild.replaceChildren(template);
+                     }
+                     body.prepend(template);
                      dialog.showModal();
                  } else {
-                     console.log("before replaceChildren");
                      document.body.replaceChildren(template);
-                     console.log("after replaceChildren");
                      /* if not showing dialog, autofocus only valid on page load,
                       * so fix that manually.
                       * https://html.spec.whatwg.org/multipage/interaction.html#the-autofocus-attribute
@@ -793,7 +880,7 @@
                      if(focus)
                          focus.focus();
                  }
-//                 LP5.currentTemplate = name;
+                 this.currentView = iView;
              }
          };
 
