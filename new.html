@@ -581,15 +581,15 @@
 
          function controller(event){
              const { model, views, asyncSchedule } = controller;
+             const currentViewName = views.currentView
+                                   ? views.currentView.name : "";
 
-             console.log(">>>>>>>>>>>>>>>>>>>>>>>>>enter controller");
+             console.log(">>>>>>>>>>>>>>>>>>>>>>>>>enter controller ", controller.state);
              console.log(event);
              console.assert(!controller.inSync);
              controller.inSync = true;
-             console.log("controller.state = ", controller.state);
              switch(controller.state){
                  case 'load' :
-                     console.log(event);
                      console.assert(event.type == 'load', event);
                      views.loadTemplates();
                      views.change('home');
@@ -597,30 +597,43 @@
                      controller.state = 'SelectParent';
                      break;
                  case 'SelectParent' :
-                     console.log(event);
+                     console.assert(currentViewName == 'SelectParent', currentViewName);
                      if(event.target.id == "SelectParentDirButton"){
                          console.assert(event.type == 'click');
                          console.log(">>>>>>>>>>>>>asyncSchedule!!!!!!");
                          asyncSchedule(selectParentDir, model);
                          console.log("<<<<<<<<<<<<<asyncSchedule!!!!!!");
                          controller.state = 'SelectingParent';
+                     } else if(event.type == 'close') {
+                         console.log("Clse event came in");
                      } else {
                          console.assert(false, event);
                      }
                      break;
                  case 'SelectingParent':
-                     console.log(event);
-                     if(event.type != 'asyncComplete') return;
-                     console.assert(event.type == 'asyncComplete', event);
-                     views.pop();
-                     if(event.detail){
-                         console.assert(model.dirParentHandle);
-                         controller.state = 'PickOrCreateProject';
-                         views.push('PickOrCreateProject');
+                     if(event.type == 'hashchange'){
+                         controller.state = 'SelectingParentHashChanged';
+                         controller.oldURL = event.oldURL;
                      } else {
-                         views.push('SelectParent');
-                         controller.state = 'SelectParent';
+                         console.assert(event.type == 'asyncComplete', event);
+                         views.pop();
+                         if(event.detail){
+                             console.assert(model.dirParentHandle);
+                             controller.state = 'PickOrCreateProject';
+                             views.push('PickOrCreateProject');
+                         } else {
+                             views.push('SelectParent');
+                             controller.state = 'SelectParent';
+                         }
                      }
+                     break;
+                 // unusual case where user changed hash while sysdialog was up
+                 case 'SelectingParentHashChanged' :
+                     console.assert(event.type == 'asyncComplete');
+                     window.location = controller.oldURL;
+                     views.pop();
+                     views.push('SelectParent');
+                     controller.state = 'SelectParent';
                      break;
                  case 'PickOrCreateProject' :
                      console.log(event);
@@ -631,7 +644,7 @@
                      console.assert(false);
              }
              controller.inSync = false;
-             console.log("<<<<<<<<<<<<<<<<<<<<<<<<<exit controller");
+             console.log("<<<<<<<<<<<<<<<<<<<<<<<<<exit controller: ", controller.state);
          }
          [
              'asyncComplete',
@@ -661,6 +674,7 @@
              'load',
              'SelectParent',
              'SelectingParent',
+             'SelectingParentHashChanged',
              'PickOrCreateProject',
              'main'
          ]);
