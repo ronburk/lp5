@@ -6,8 +6,6 @@
     <head>
         <meta charset="utf-8" >
         <title>lp5</title>
-        <!--   get a wrapper for indexedDB -->
-        <script src="https://cdn.jsdelivr.net/npm/idb@7/build/umd.js"></script>
         <script>
         </script>
         <style>
@@ -31,20 +29,22 @@
                                autofocus type="button" value="Select" data-id="selectButton" >
                     </center>
                 </dialog>
-                <script>
-                 const iView = require('iView');
-                 const {selectButton} = iView;
-
-                 function init(){
-                     console.log("SelectParent page script init!!!!!!");
-                 }
-
-                 function render(){
-                     console.log("SelectParent page script change!!!!!!");
-                 }
-                 return  { init: init, render: render };
-                </script>
             </div>
+            <script>
+             //selectParentDialog
+             const iView = require('iView');
+             const {selectButton} = iView.dataID;
+
+             function init(){
+                 console.log("SelectParent page script init!!!!!!");
+             }
+
+             function render(){
+                 console.log("SelectParent page script change!!!!!!");
+             }
+             let result = { init: init, render: render };
+             return result;
+            </script>
         </template>
         <template data-name="PickOrCreateProject">
             <div>
@@ -59,60 +59,65 @@
                         </div>
                     </center>
                 </dialog>
-                <script>
-                 const {projects} = require('model');
-                 const iView      = require('iView');
-                 const {rootNode} = iView;
-                 const {createButton,div,select,selectButton,textProject} = iView.dataID;
-
-                 function clickCreate(event){
-                     console.log("clickCreate()!!!");
-                 }
-
-                 function clickSelect(event){
-                     console.log("clickSelect()!!!");
-                     let projName = select.options[select.selectedIndex].text;
-                     console.log(projName);
-                     document.dispatchEvent(
-                         new CustomEvent('selectProject', { detail : projName }));
-                 }
-                 function changeSelect(event){
-                     console.log("changeSelect()!!!");
-                     selectButton.disabled = false;
-                 }
-                 function changeText(event){
-                     console.log("changeText()!!!");
-                     createButton.disabled = textProject.value.length == 0;
-                 }
-                 function init(){
-                     createButton.disabled = true;
-                     createButton.addEventListener('click', clickCreate);
-                     selectButton.disabled = true;
-                     selectButton.addEventListener('click', clickSelect);
-                     select.addEventListener('input', changeSelect);
-                     select.addEventListener('change', changeSelect);
-                     select.addEventListener('click', changeSelect);
-                     textProject.addEventListener('input', changeText);
-                     const projectCount = Object.keys(projects).length;
-                     console.log("PickOrCreateProject page script init!!!!!!");
-                     console.log("# of projects = ", projectCount);
-                     for(const proj in projects){
-                         console.log("Proj = ", proj);
-                         const option = document.createElement('option');
-                         console.log(option);
-                         option.innerText = proj;
-                         option.value     = proj;
-                         console.log(option);
-                         select.appendChild(option);
-                         console.log(select);
-                     }
-                 };
-                 function render(iView){
-                         console.log("PickOrCreateProject page script change!!!!!!");
-                     }
-                 return { init:init, render:render };
-                </script>
             </div>
+            <script>
+             const {projects} = require('model');
+             const iView      = require('iView');
+             const {rootNode} = iView;
+             const {createButton,div,select,selectButton,textProject} = iView.dataID;
+
+             console.log("load ", rootNode);
+
+             function clickCreate(event){
+                 console.log("clickCreate()!!!");
+             }
+
+             function clickSelect(event){
+                 console.log("clickSelect()!!!");
+                 let projName = select.options[select.selectedIndex].text;
+                 console.log(projName);
+                 document.dispatchEvent(
+                     new CustomEvent('selectProject', {
+                         detail : projName,
+                 }));
+             }
+             function changeSelect(event){
+                 console.log("changeSelect()!!!");
+                 selectButton.disabled = false;
+             }
+             function changeText(event){
+                 console.log("changeText()!!!");
+                 createButton.disabled = textProject.value.length == 0;
+             }
+             function init(){
+                 console.log("init ", rootNode);
+                 createButton.disabled = true;
+                 createButton.addEventListener('click', clickCreate);
+                 selectButton.disabled = true;
+                 selectButton.addEventListener('click', clickSelect);
+                 select.addEventListener('input', changeSelect);
+                 select.addEventListener('change', changeSelect);
+                 select.addEventListener('click', changeSelect);
+                 textProject.addEventListener('input', changeText);
+                 const projectCount = Object.keys(projects).length;
+                 console.log("PickOrCreateProject page script init!!!!!!");
+                 console.log("# of projects = ", projectCount);
+                 for(const proj in projects){
+                     console.log("Proj = ", proj);
+                     const option = document.createElement('option');
+                     console.log(option);
+                     option.innerText = proj;
+                     option.value     = proj;
+                     console.log(option);
+                     select.appendChild(option);
+                     console.log(select);
+                 }
+             };
+             function render(iView){
+                 console.log("PickOrCreateProject page script change!!!!!!");
+             }
+             return { init:init, render:render };
+            </script>
         </template>
 
         <template data-name="EnterDirectory">
@@ -280,41 +285,72 @@
                         <li>Menu 4</li>
                     </ul>
                 </div>
-                <div id="LP5-Toc">
-                </div>
+                <template>
+                    <div id="LP5-Toc">
+                    </div>
+                    <script>
+                     const iView = require('iView');
+                     const model = require('model');
+                     function init(){
+                         console.log("ha init toc!!!!!!");
+                     };
+                     function render(){
+                         console.log("render toc");
+                         if(model.rootTOC){
+                             console.log("render toc nodes");
+                             iView.rootNode.replaceChildren(model.rootTOC);
+                         }
+                     };
+                     let result = {init:init, render:render};
+                     return result;
+                    </script>
+                </template>
                 <div id="LP5-Source">
                 </div>
                 <div id="LP5-Output">
                     Here be some output!
                     <template>
                         <div><p> hahahahaha </p>
-                            <script>
-                             console.log("hahahahaha");
-                             function init(iView){
-                                 console.log("ha init!!!!!!");
-                             }
-                             function render(){
-                                 console.log("ha change!!!!!!");
-                             }
-                             return {init:init, render:render};
-                            </script>
                         </div>
+                        <script>
+                         // LP5-Output
+                         console.log("hahahahaha");
+                         function init(iView){
+                             console.log("ha init output!!!!!!");
+                         }
+                         function render(){
+                             console.log("ha change!!!!!!");
+                         }
+                         let result = {init:init, render:render};
+                         return result;
+                        </script>
                     </template>
                     Code as it would be generated from the current source should appear here.
                 </div>
+                
                 <div id="LP5-Footer">
-                    Here's a footer! Maybe some kind of status info would go here.
+                    <template>
+                        <style>
+                         span { background-color: #f88; }
+                        </style>
+                        <div>
+                            <span data-id="span"></span>
+                            Here's a footer! Maybe some kind of status info would go here.
+                        </div>
+                        <script>
+                         const iView = require('iView');
+                         const {span} = iView.dataID;
+
+                         function init(){
+                             if(navigator.webdriver)
+                                 span.innerText = "webdriver";
+                         };
+                         function render(){
+                         };
+                         return {init:init, render:render};
+                        </script>
+                    </template>
                 </div>
-                <script>
-                 return {
-                     init(iView){
-                         console.log("home page script init!!!!!!");
-                     },
-                     render(){
-                         console.log("home page script change!!!!!!");
-                     }
-                 };
-                </script>
             </div>
         </template>
         <!-- table of contents -->
@@ -324,218 +360,45 @@
             </div>
         </template>
         <script>
-
          "use strict";
-         var LP5 = function(){
 
-             async function*main(model, views){
-                 let selectParentDir=async function*(){
-                     console.log("selectParentDir: ", model, views);
-                     let result = false; // assume failure
-                     views.push('SelectParent');
-                     while(event = yield){
-                         console.log("SelectParent got event ", typeof(event));
-                         console.log(event);
-                         if(event.target.id == "SelectParentDirButton"){
-                             console.log(this);
-                             let options = {mode:'readwrite'};
-                             try {
-                                 model.dirParentHandle = await window.showDirectoryPicker(options);
-                             } catch (error) {
-                                 console.log(error);
-                                 return false;
-                             }
-                             if(model.dirParentHandle){
-                                 console.log(model.dirParentHandle);
-                                 let projectCount = 0;
-                                 for await (let [name, handle] of model.dirParentHandle) {
-                                     if(name.endsWith('.lp5') && handle.kind == 'directory'){
-                                         console.log("looks like a project: ", handle);
-                                         model.projects[name] = { dirHandle: handle };
-                                         model.projectName = name;
-                                         ++projectCount;
-                                     }
-                                 }
-                                 console.log(`projectCount = ${projectCount}`);
-                                 if(projectCount != 1){
-                                     LP5.setBody("lp5-enter-dir-name");
-                                 } else {
-                                     document.title = model.projectName;
-                                     await model.load(model.projectName);
-                                 }
-                             }
-                             if(model.dirParentHandle){
-                                 console.log("coSelectParent got a dirParentHandle");
-                                 result = true;
-                                 break;
-                             }
-                         } else if(event.type == 'close'){
-                             console.log("select parent got close.");
-                             break;
-                         }
-                         console.log("selectParentDir got event: ", event);
-                     }
-                     views.pop();
-                     return result;
-                 };
-                 let tocPane = async function*(model, views){
-                     
-                 };
+         async function modelLoadFile(dirHandle, fileName){
+             const fileHandle = await dirHandle.getFileHandle(fileName);
+             console.assert(fileHandle);
+             const file = await fileHandle.getFile();
+             console.log(`file = ${file}`);
+             const text = await file.text();
+             console.log(`text = ${text}`);
+             let node = document.createElement('div');
+             node.remove();
+             console.log("div node is ", node);
+             node.innerHTML = text;
+             console.log("div node is ", node);
+             console.assert(node.firstElementChild.nodeName == 'TEMPLATE');
+             node = node.firstElementChild.content;
+             return node;  // return contents of template (a tree of nodes)
+         }
 
-                 console.log("main: ", model, views);
-                 views.change('home');
+         async function modelLoadTemplate(dirHandle, name){
+             
+         }
 
-                 if(!model.dirParentHandle){
-                     let value = yield* selectParentDir(model, views);
-                     console.log("selectParentDir returned: ", value);
-                 }
-                 console.log("main enters event loop");
-                 while(event = yield){
-                     console.log("main got event: ", event);
-                 }
-             };
-
-             async function modelLoadFile(dirHandle, fileName){
-                 const fileHandle = await dirHandle.getFileHandle(fileName);
-                 console.assert(fileHandle);
-                 const file = await fileHandle.getFile();
-                 console.log(`file = ${file}`);
-                 const text = await file.text();
-                 console.log(`text = ${text}`);
-                 return text;
-             }
-             var result = {
-                 //                 model           : model,
-                 //                 views           : views,
-                 currentTemplate : null,
-                 templates       : {},
-                 dirHandle       : null,
-                 dirParentHandle : null,
-                 dbHandle        : null,
-             };
-
-             result.test = function(){
-                 console.log("test!");
-                 try {
-                     location.hash = "lp5-select-parent";
-                     //                     LP5.storeBlob("this is a test");
-                 } catch(err) {
-                     console.log("Error: ", err);
-                 }
-             };
-             // storeBlob() - store data in a blob, return name (SHA256)
-             result.storeBlob = async function(string){
-                 console.assert(LP5.dirHandle);
-                 let encoder = new TextEncoder();
-                 let data    = encoder.encode(string);
-                 let hash    = await window.crypto.subtle.digest('SHA-256', data);
-                 
-                 console.log("hash is: ", hash);
-                 hash = btoa(String.fromCharCode(...new Uint8Array(hash))).replace(/\//g, '_').replace(/\+/g, '-').replace(/=/g, '');
-                 console.log("hash[", hash.length, "] is now: ", hash);
-             };
-
-             result.createProject = async function (button){
-                 console.log("Create Project!");
-                 console.log(this);
-                 let textBox = document.querySelector("#lp5InputFile");
-                 let dirName = textBox.value;
-                 if(!dirName.endsWith('lp5')){
-                     alert("lp5 project directory name must end with '.lp5'");
-                 } else {
-                     let options = {create:true};
-                     try {
-                         LP5.lp5DirHandle = await LP5.dirParentHandle.getDirectoryHandle(dirName, options);
-                     } catch (error) {
-                         LP5.setBody("lp5-start-form");
-                         return;
-                     }
-                     console.log(LP5.lp5DirHandle);
-                     console.log("Created a directory!");
-                     // create a TOC resource
-                     let newTOC = LP5.templates["lp5-new-TOC"].cloneNode(true);
-                     console.log("newTOC is: ", newTOC);
-                     let elem   = newTOC.querySelector("li");
-                     elem.innerText = dirName;
-                     let strTOC = newTOC.innerHTML;
-                     console.log("strTOC is: ", strTOC);
-                     let fileHandle = await LP5.lp5DirHandle.getFileHandle(dirName,{create:true});
-                     let writable  = await fileHandle.createWritable();
-                     options = {type:"write", data: strTOC};
-                     await writable.write(options);
-                     await writable.close();
-                     LP5.setBody("lp5-main-page");
-                 }
-             }
-             result.cancelNewProject = function(){
-                 console.log("cancelNewProject()");
-                 LP5.setBody("lp5-start-form");
-             }
-             result.create = async function(){
-                 console.log(this);
-                 let options = {mode:'readwrite'};
-                 try {
-
-                     LP5.dirParentHandle = await window.showDirectoryPicker(options);
-                 } catch (error) {
-                     console.log(error);
-                     return;
-                 }
-                 if(LP5.dirParentHandle){
-                     console.log(options);
-                     console.log(LP5.dirParentHandle);
-                     LP5.setBody("lp5-enter-dir-name");
-                 }
-             }
-             // LP5.open - open an existing project
-             result.open = async function(){
-                 let fileHandle;
-                 [fileHandle] = await window.showOpenFilePicker({multiple:false});
-                 const file   = await fileHandle.getFile();
-                 const data   = await file.text();
-                 console.log(data);
-             }
-             result.newSection = async function (){
-                 let newID    = crypto.randomUUID();
-                 console.log("New Section " + newID);
-                 return false;
-             }
-             result.setBody = function (iView){
-                 //                 console.assert(false);
-                 const name = iView.name;
-                 console.log(`setBody(${name})`);
-                 history.pushState(null, "", "#" + name);
-                 //                 location.hash = name;
-                 console.log(`history.pushState("#${name}")`);
-
-                 const template = iView.rootNode.cloneNode(true);
-                 console.log("back from cloneNode of template");
-                 let dialog = template.querySelector("dialog");
-                 if(dialog){
-                     document.body.prepend(template);
-                     dialog.showModal();
-                 } else {
-                     console.log("before replaceChildren");
-                     document.body.replaceChildren(template);
-                     console.log("after replaceChildren");
-                     /* if not showing dialog, autofocus only valid on page load,
-                      * so fix that manually.
-                      * https://html.spec.whatwg.org/multipage/interaction.html#the-autofocus-attribute
-                      */
-                     let focus = document.body.querySelector("input[autofocus]");
-                     if(focus)
-                         focus.focus();
-                 }
-                 LP5.currentTemplate = name;
-             }
-             result.exists = function(name){
-                 console.assert(this.dirHandle);
-                 
-             }
-             result.main = main;
-             return result;
-         }();
-
+         async function modelLoadTOC(dirHandle, name){
+             const template = await modelLoadTemplate(dirHandle, name);
+             
+         }
+         async function openProject(model, name, asyncComplete){
+             console.log("openProject ", name);
+if(false){
+             model.resources = new Map();
+             const {dirHandle} = model.projects[name];
+             console.log("dirHandle ", dirHandle);
+             model.rootTOC = await modelLoadFile(dirHandle, name);
+             model.rootTOC = await modelLoadTOC(dirHandle, name);
+             asyncComplete(true);
+         }
+             model.openProject(name, asyncComplete);
+         }
          async function selectParentDir(model, asyncComplete){
              console.log("selectParentDir()");
 
@@ -563,7 +426,7 @@
                          console.log("looks like a project: ", handle);
                          model.projects[name] = { dirHandle: handle };
                          model.projectName = name;
-                         ++projectCount;
+            ++projectCount;
                      }
                  }
              } catch(error) {
@@ -587,6 +450,10 @@
              console.log(">>>>>>>>>>>>>>>>>>>>>>>>>enter controller ", controller.state);
              console.log(event);
              console.assert(!controller.inSync);
+             if(event.type == 'error'){
+                 console.log("Oh oh, got error!");
+                 console.assert(false);
+             }
              controller.inSync = true;
              switch(controller.state){
                  case 'load' :
@@ -603,7 +470,10 @@
                          console.log(">>>>>>>>>>>>>asyncSchedule!!!!!!");
                          asyncSchedule(selectParentDir, model);
                          console.log("<<<<<<<<<<<<<asyncSchedule!!!!!!");
+
                          controller.state = 'SelectingParent';
+                     } else if(event.type == 'click') {
+                         // let the view handle clicks
                      } else if(event.type == 'close') {
                          console.log("Clse event came in");
                      } else {
@@ -627,7 +497,7 @@
                          }
                      }
                      break;
-                 // unusual case where user changed hash while sysdialog was up
+                     // unusual case where user changed hash while sysdialog was up
                  case 'SelectingParentHashChanged' :
                      console.assert(event.type == 'asyncComplete');
                      window.location = controller.oldURL;
@@ -636,8 +506,22 @@
                      controller.state = 'SelectParent';
                      break;
                  case 'PickOrCreateProject' :
-                     console.log(event);
-                     // let current view handle event
+                     if(event.type == 'click'){
+                     } else if(event.type == 'selectProject'){
+                         console.assert(event.type == 'selectProject');
+                         views.pop();
+                         controller.state = 'openProject';
+                         asyncSchedule(openProject, model, event.detail);
+                     } else {
+                         console.assert(false, event.type);
+                     }
+                     break;
+                 case 'openProject' :
+                     console.assert(event.type == 'asyncComplete');
+                     controller.state = 'home';
+                     views.render();
+                     break;
+                 case 'home' :
                      break;
                  default:
                      console.log("Can't happen, unknown state: ", controller.state);
@@ -651,13 +535,12 @@
              'change',
              'click',
              'close',
+             'error',
              'hashchange',
              'input',
              'load',
              'selectProject',
          ].forEach(e=>window.addEventListener(e, e=>controller(e), true));
-
-         //             window.onload = controller;
 
          controller.asyncSchedule = function(func, ...args){
              setTimeout(()=>func(...args, controller.asyncComplete));
@@ -671,12 +554,13 @@
              setTimeout(f);
          };
          controller.states = new Set([
+             'home',
              'load',
+             'openProject',
              'SelectParent',
              'SelectingParent',
              'SelectingParentHashChanged',
              'PickOrCreateProject',
-             'main'
          ]);
          Object.defineProperty(controller, 'state', {
              get() { return controller.state_; },
@@ -690,9 +574,17 @@
          controller.state  = 'load';
 
          function scopedEval(script, iView){
+             console.log("scopedEval: ", script);
+             //             debugger;
              for(const element of iView.rootNode.querySelectorAll("[data-ID]"))
                  iView.dataID[element.dataset.id] = element;
 
+             iView.dataID = new Proxy(iView.dataID, {
+                 get(trapTarget, key, receiver){
+                     console.assert(key in receiver, key);
+                     return Reflect.get(trapTarget, key, receiver);
+                 }
+             });
              function require(thing){
                  switch(thing){
                      case 'controller':
@@ -736,19 +628,71 @@
              },
              loadTemplates(rootElement=document, parentView=null){
                  console.log("views.loadTemplates()");
+                 
+                 // template most be of form: style? div script?
+                 function parseTemplate(template){
+                     let   style = null, div = null, script = null;
+                     const root  = template.content;
+                     console.assert(root);
+                     const children = root.children;
+                     console.assert(children);
+
+                     switch(children.length){
+                         case 1 :
+                             [div] = children;
+                             break;
+                         case 2 :
+                             if(children[0].nodeName == 'STYLE'){
+                                 [style, div] = children;
+                             }else{
+                                 [div, script] = children;
+                             }
+                             break;
+                         case 3:
+                             [style, div, script] = children;
+                             break;
+                         default:
+                             console.log("malformed template");
+                             console.assert(false, children);
+                     };
+                     if(style)
+                         console.assert(style.nodeName == 'STYLE');
+                     if(div)
+                         console.assert(div.nodeName == 'DIV');
+                     if(script)
+                         console.assert(script.nodeName == 'SCRIPT');
+
+                     const result = {style:style, div:div, script:script};
+                     console.log(result);
+                     return result;
+                 }
+
+                 let scripts = null;
                  rootElement.querySelectorAll('template').forEach((t)=>{
+                     const template = parseTemplate(t);
+                     // every script inside a template must be direct child of template
+                     scripts   = t.content.querySelectorAll('script');
+                     scripts.forEach(function (s){
+                         if(s.parentNode != t.content){
+                             let name = s.parentNode.nodeName;
+                             if(name != 'TEMPLATE'){
+                                 console.log("Script must be child of template, not ", name);
+                                 console.assert(false, s.parentNode);
+                             }
+                         }
+                     });
+
                      const iView    = structuredClone(viewInterface);
                      iView.name     = t.dataset.name; // data-name='xxx'
                      console.log("template named ", iView.name);
 
-                     // we assume everything is in one enclosing div
-                     console.assert(t.content.childElementCount == 1);
-                     const templateRoot = t.content.firstElementChild;
-                     console.assert(templateRoot.nodeName == "DIV");
+                     const templateRoot = template.div;
+                     const script       = template.script;
                      
+                     // if this is a child template
                      if(parentView){
                          iView.rootNode = templateRoot;
-                         t.replaceWith(templateRoot);
+                         t.replaceWith(t.content);
                      } else {
                          // clone template, then discard it
                          iView.rootNode = templateRoot.cloneNode(true);
@@ -761,18 +705,25 @@
                          }
                      }
 
-
                      // Removing the open attribute will usually hide the dialog.
                      // However, doing so has strange additional consequences:
                      // https://html.spec.whatwg.org/multipage/interactive-elements.html#the-dialog-element
-                     const script   = iView.rootNode.querySelector('script');
+//                     let script = templateRoot.querySelector('script');
                      if(script){
                          // remove script else it will run when frag inserted into DOM
                          script.remove();
-                         // run the script to obtain its notification functions
-                         iView.notify   = scopedEval(script.innerHTML, iView);
+                         try {
+                             // run the script to obtain its notification functions
+                             console.log(" eval the script");
+                             iView.notify   = scopedEval(script.innerHTML, iView);
+                         } catch(error){
+                             console.log("Failed on script: ", script.innerHTML);
+                             console.assert(false, error);
+                         }
                          console.assert(iView.notify.hasOwnProperty('init'));
                          console.assert(iView.notify.hasOwnProperty('render'));
+                     } else {
+                         iView.notify = null;
                      }
                      // two templates with same name is a mistake
                      //                         console.assert(!LP5.views.views.hasOwnProperty(iView.name));
@@ -801,11 +752,11 @@
              },
              change(viewName) {
                  console.log(`views.change(${viewName})`);
-                     ++this.inProgress;
+                 ++this.inProgress;
                  // get interface to incoming view
                  const newView = this.views[viewName];
- //                 this.currentView = this.views[viewName];
-//                 console.assert(this.currentView);
+                 //                 this.currentView = this.views[viewName];
+                 //                 console.assert(this.currentView);
                  console.assert(newView);
                  this.setBody(newView);
                  --this.inProgress;
@@ -813,11 +764,26 @@
                  this.init(this.currentView);
              },
              init(iView){
-                 iView.notify.init(iView);
-                 iView.children.forEach((i)=>i.notify.init(iView));
+                 console.log("init iView ", iView);
+                 if(iView.notify){
+                     console.log("    childcount= ", iView.children.length);
+                     iView.notify.init(iView);
+                 } else {
+                     console.log("   (no notify function!)");
+                 }
+                 iView.children.forEach((i)=>this.init(i));
+             },
+             render(iView){
+                 if(!iView)
+                     iView = this.currentView;
+                 console.log("render ", iView);
+                 if(iView.notify)
+                     iView.notify.render(iView);
+                 if(iView.children)
+                     iView.children.forEach((i)=>i.notify.render(i));
              },
              push(dialogName) {
-                 ++this.inProgress;
+            ++this.inProgress;
                  console.assert(this.currentView);
                  this.stack.push(this.currentView);
                  const iView = this.views[dialogName];
@@ -827,7 +793,7 @@
                  --this.inProgress;
              },
              pop() {
-                 ++this.inProgress;
+            ++this.inProgress;
                  const currentView = this.currentView;
                  console.assert(currentView.isDialog);
                  console.assert(currentView);
@@ -838,7 +804,7 @@
                  console.assert(liveDialogNode.nodeName == "DIALOG");
                  liveDialogNode.close();
                  console.log("pop() closes dialog");
-//                 currentView.rootNode.replaceChildren(liveRootNode);
+                 //                 currentView.rootNode.replaceChildren(liveRootNode);
                  liveRootNode.remove();
                  this.currentView = this.stack.pop();
                  --this.inProgress;
@@ -873,7 +839,7 @@
                      currentView.rootNode.replaceChildren(body.firstElementChild);
                  }
 
-                             //???                 const template = iView.rootNode.cloneNode(true);
+                 //???                 const template = iView.rootNode.cloneNode(true);
                  const template = iView.rootNode;
                  let dialog = template.querySelector("dialog");
                  if(dialog){
@@ -904,23 +870,59 @@
           */
 
          controller.model = function(views){
-             let dirtyCount = 0;
-             let locked     = false;
              let result = {
                  dirHandle       : null,
                  dirParentHandle : null,
                  projectName     : null,
-                 toc             : null,
+                 resources       : new Map(),
+                 rootTOC         : null,
                  projects        : {},
-                 lock() {
-                     if(!locked)
-                         return Promise.resolve(locked=true);
-                     else
-                         return new Promise(resolve=>{
-                             
-                         });
+                 async loadResource(dirHandle, filename){
+                     const result = {
+                         name     : filename,
+                         children : [],
+                         rootNode : null,
+                         text     : null,
+                     };
+                     this.resources.set(filename, result);
+                     const fileHandle = await dirHandle.getFileHandle(filename);
+                     console.assert(fileHandle);
+                     const file = await fileHandle.getFile();
+                     console.log(`file = ${file}`);
+                     const text = await file.text();
+                     console.log(`text = ${text}`);
+                     let node = document.createElement('div');
+                     node.remove();
+                     console.log("div node is ", node);
+                     node.innerHTML = text;
+                     console.log("div node is ", node);
+                     console.assert(node.firstElementChild.nodeName == 'TEMPLATE');
+                     result.rootNode = node.firstElementChild.content;
+                     console.log("model.loadResource() returns ", result);
+                     return result;
                  },
-                 isDirty(){ return dirtyCount},
+                 async loadTOC(dirHandle, name){
+                     console.log("loadTOC ", name);
+                     let resource = await this.loadResource(dirHandle, name);
+                     console.log(resource);
+                     let first = resource.rootNode.firstElementChild;
+                     if(first.nodeName == 'UL'){
+                         first.querySelectorAll('li').forEach(async (li)=>{
+                             let ID = li.getAttribute('id');
+                             let child = await this.loadTOC(dirHandle, ID);
+                             resource.children.push(child);
+                         });
+                     }
+                     return resource;
+                 },
+                 async openProject(name, asyncComplete){
+                     console.log("openProject ", name);
+                     this.resources = new Map();
+                     const {dirHandle} = this.projects[name];
+                     console.log("dirHandle ", dirHandle);
+                     this.rootTOC = await this.loadTOC(dirHandle, name);
+                     asyncComplete(true);
+                 },
                  async load(name){
                      // ??? have to delete any existing model
                      console.log(`modelLoad('${name}')`);
@@ -938,17 +940,6 @@
              return result;
          }();
 
-         if(false){
-             console.log("call f.next");
-             f.next();
-             
-             console.log("calling loadTemplates");
-             LP5.views.loadTemplates();
-             console.log("setting callee");
-             LP5.coro.callee = LP5.coro.coHome();
-             //         LP5.coro.callee.next();
-             LP5.coro.eventHandler(null);
-         }
         </script>
     </body>
 </html>
