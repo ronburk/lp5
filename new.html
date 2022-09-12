@@ -304,11 +304,14 @@
                              let ul = document.createElement('ul');
                              ul.remove();
                              let first = model.rootTOC.rootNode.firstElementChild;
-                             first.querySelectorAll('li').forEach((entry, i)=>{
+                             first.querySelectorAll('li').forEach((entry)=>{
                                  let li = document.createElement('li');
                                  li.remove();
-                                 li.innerText = li.getAttribute('id');
+                                 let id = entry.getAttribute('id');
+                                 let res = model.resources.get(id);
+                                 li.innerText = res.rootNode.querySelector('h1').innerText;
                                  ul.appendChild(li);
+                                 console.log("   render toc node ", li);
                              });
                              iView.rootNode.replaceChildren(ul);
                          }
@@ -398,18 +401,6 @@
          async function modelLoadTOC(dirHandle, name){
              const template = await modelLoadTemplate(dirHandle, name);
              
-         }
-         async function openProject(model, name, asyncComplete){
-             console.log("openProject ", name);
-if(false){
-             model.resources = new Map();
-             const {dirHandle} = model.projects[name];
-             console.log("dirHandle ", dirHandle);
-             model.rootTOC = await modelLoadFile(dirHandle, name);
-             model.rootTOC = await modelLoadTOC(dirHandle, name);
-             asyncComplete(true);
-         }
-             model.openProject(name, asyncComplete);
          }
          async function selectParentDir(model, asyncComplete){
              console.log("selectParentDir()");
@@ -928,11 +919,12 @@ if(false){
                      let first = resource.rootNode.firstElementChild;
                      if(first.nodeName == 'UL'){
                          resource.isTOC = true;
-                         first.querySelectorAll('li').forEach(async (li)=>{
+                         const entries = first.querySelectorAll('li');
+                         for(const li of entries){
                              let ID = li.getAttribute('id');
                              let child = await this.loadTOC(dirHandle, ID);
                              resource.children.push(child);
-                         });
+                         }
                      }
                      console.log("loadTOC returns ", resource);
                      return resource;
