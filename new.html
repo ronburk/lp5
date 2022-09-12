@@ -294,11 +294,23 @@
                      function init(){
                          console.log("ha init toc!!!!!!");
                      };
+                     function getTitle(li){
+                         let ID = li.getAttribute('id');
+                     }
                      function render(){
-                         console.log("render toc");
+                         console.log("render toc: ", model.rootTOC);
                          if(model.rootTOC){
                              console.log("render toc nodes");
-                             iView.rootNode.replaceChildren(model.rootTOC);
+                             let ul = document.createElement('ul');
+                             ul.remove();
+                             let first = model.rootTOC.rootNode.firstElementChild;
+                             first.querySelectorAll('li').forEach((entry, i)=>{
+                                 let li = document.createElement('li');
+                                 li.remove();
+                                 li.innerText = li.getAttribute('id');
+                                 ul.appendChild(li);
+                             });
+                             iView.rootNode.replaceChildren(ul);
                          }
                      };
                      let result = {init:init, render:render};
@@ -511,7 +523,7 @@ if(false){
                          console.assert(event.type == 'selectProject');
                          views.pop();
                          controller.state = 'openProject';
-                         asyncSchedule(openProject, model, event.detail);
+                         asyncSchedule(model.openProject.bind(model), event.detail);
                      } else {
                          console.assert(false, event.type);
                      }
@@ -879,11 +891,18 @@ if(false){
                  projects        : {},
                  async loadResource(dirHandle, filename){
                      const result = {
-                         name     : filename,
-                         children : [],
-                         rootNode : null,
-                         text     : null,
+                         name        : filename,
+                         children    : [],
+                         rootNode    : null,
+                         ulNode      : null,
+                         sectionNode : null,
+                         titleNode   : null,
+                         docNode     : null,
+                         codeNode    : null,
+                         text        : null,
+                         isTOC       : false,
                      };
+                     console.log("loadResource ", filename);
                      this.resources.set(filename, result);
                      const fileHandle = await dirHandle.getFileHandle(filename);
                      console.assert(fileHandle);
@@ -904,15 +923,18 @@ if(false){
                  async loadTOC(dirHandle, name){
                      console.log("loadTOC ", name);
                      let resource = await this.loadResource(dirHandle, name);
+                     console.log("loadTOC back from await of loadResource ", name);
                      console.log(resource);
                      let first = resource.rootNode.firstElementChild;
                      if(first.nodeName == 'UL'){
+                         resource.isTOC = true;
                          first.querySelectorAll('li').forEach(async (li)=>{
                              let ID = li.getAttribute('id');
                              let child = await this.loadTOC(dirHandle, ID);
                              resource.children.push(child);
                          });
                      }
+                     console.log("loadTOC returns ", resource);
                      return resource;
                  },
                  async openProject(name, asyncComplete){
@@ -922,6 +944,7 @@ if(false){
                      console.log("dirHandle ", dirHandle);
                      this.rootTOC = await this.loadTOC(dirHandle, name);
                      asyncComplete(true);
+                     console.log("OpenProject returns after scheduling asyncComplete");
                  },
                  async load(name){
                      // ??? have to delete any existing model
