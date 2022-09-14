@@ -15,8 +15,6 @@
         <template data-name="SelectParent">
             <div>
                 <style>
-                 p { background-color: #faa;
-                 }
                 </style>
                 <dialog id="SelectParentDialog">
                     <center>
@@ -26,21 +24,35 @@
                             <span style="background-color:#ffffa0; border-radius:50%; cursor:help;" title="I need access to the parent directory to place generated files there.&#10;A user click is required by Chrome for me to ask for this permission.">&#9432</span>
                         </p>
                         <input id="SelectParentDirButton"
-                               autofocus type="button" value="Select" data-id="selectButton" >
+                               autofocus type="button" value="Select"
+                               data-id="selectButton" >
+                        <div data-id="auxDiv">
+                            <p>or select previous parent directory:</p>
+                            <input id="SelectParentDirPreviousButton"
+                                   data-id="previousDir" type="button">
+                        </div>
                     </center>
                 </dialog>
             </div>
             <script>
-             //selectParentDialog
+             const model = require('model');
              const iView = require('iView');
-             const {selectButton} = iView.dataID;
+             const {auxDiv, selectButton, previousDir} = iView.dataID;
 
              function init(){
-                 console.log("SelectParent page script init!!!!!!");
+                 console.log("SelectParentDialog page script init!!!!!!");
+                 auxDiv.style.display = 'none';
              }
 
              function render(){
-                 console.log("SelectParent page script change!!!!!!");
+                 console.log("SelectParentDialog render!!!!!!");
+                 if(model.dirParentHandle){
+                     console.log("Show button ", model.dirParentHandle.name);
+                     auxDiv.style.display = 'block';
+                     previousDir.value    = model.dirParentHandle.name;
+                 } else {
+                     auxDiv.style.display = 'none';
+                 }
              }
              let result = { init: init, render: render };
              return result;
@@ -292,7 +304,6 @@
                      const iView = require('iView');
                      const model = require('model');
                      function init(){
-                         console.log("ha init toc!!!!!!");
                      };
                      function getTitle(li){
                          let ID = li.getAttribute('id');
@@ -320,8 +331,39 @@
                      return result;
                     </script>
                 </template>
-                <div id="LP5-Source">
-                </div>
+                <template>
+                    <div id="LP5-Source" data-id="outerDiv">
+                    </div>
+                    <script>
+                     const iView = require('iView');
+                     const {outerDiv} = iView.dataID;
+                     const model = require('model');
+                     function init(){
+                     };
+                     function renderSection(res){
+                         let section = res.rootNode.querySelector('section');
+                         if(section){
+                             outerDiv.appendChild(section.cloneNode(true));
+                         }
+                         let ul = res.rootNode.querySelector('ul');
+                         if(ul){
+                             ul.querySelectorAll('li').forEach((li)=>{
+                                 let id = li.getAttribute('id');
+                                 renderSection(model.resources.get(id));
+                             });
+                         }
+                     }
+                     function render(){
+                         console.log("render source: ", model.rootTOC);
+                         if(model.rootTOC){
+                             outerDiv.replaceChildren();
+                             renderSection(model.rootTOC);
+                         }
+                     };
+                     let result = {init:init, render:render};
+                     return result;
+                    </script>
+                </template>
                 <div id="LP5-Output">
                     Here be some output!
                     <template>
@@ -331,10 +373,8 @@
                          // LP5-Output
                          console.log("hahahahaha");
                          function init(iView){
-                             console.log("ha init output!!!!!!");
                          }
                          function render(){
-                             console.log("ha change!!!!!!");
                          }
                          let result = {init:init, render:render};
                          return result;
@@ -377,6 +417,73 @@
         <script>
          "use strict";
 
+         async function openDB(){
+             return new Promise((resolve, reject) => {
+                 console.log("indexedDB.open");
+                 const request = window.indexedDB.open("lp5-001", 2);
+                 request.onerror   = (event) => { console.log("dberror");reject("db error!" + event.target.errorCode); }
+                 request.onsuccess = (event) => { resolve(request.result);  };
+                 request.onupgradeneeded = (event) => {
+                     console.log("upgrade needed.");
+                     const db = event.target.result;
+                     db.deleteObjectStore("handles");
+                     const objectStore = db.createObjectStore("handles");
+                 };
+             });
+         }
+         async function putDB(db, key, value){
+             console.log("putDB: ", key, value);
+             return new Promise((resolve, reject) => {
+                 let txn = db.transaction(["handles"], "readwrite");
+                 txn.objectStore("handles")
+                    .add(value, key)
+                 ;
+
+                 txn.oncomplete = (event) => { resolve(txn.result); };
+             });
+         }
+
+         async function getDB(db, key){
+             return new Promise((resolve, reject) => {
+                 console.log("getDB: ", key);
+                 console.log(db);
+                 let txn = db.transaction(["handles"], "readwrite");
+                 let get = txn.objectStore("handles")
+                    .get(key)
+                 ;
+
+                 txn.oncomplete = (event) => { console.log("!");resolve(get.result); };
+                 txn.onerror    = (event) => { console.log("getDB error!");reject(); }
+                 console.log("getDB() end of function");
+             });
+         }
+
+         async function loadHandles(model, asyncComplete){
+             console.log("loadHandle()");
+             let db = await openDB();
+             console.log("loadHandle() back from openDB");
+             let handle = await getDB(db, "handle");
+             console.log("loadHandle() after await getDB");
+             console.log(handle);
+             if(false){
+                 let option = {mode:'readwrite'};
+                 let perms = await handle.queryPermission(option);
+                 console.log("perms = ", perms);
+                 if(perms != 'granted'){
+                     perms = handle.requestPermission(option);
+                     if(perms != 'granted'){
+                         console.log("Well hell");
+                     }
+                     else
+                         model.dirParentHandle = handle;
+                 }
+             }else{
+                 model.dirParentHandle = handle;
+             }
+             asyncComplete(true);
+             console.log("loadHandle() after asyncComplete");
+         }
+
          async function modelLoadFile(dirHandle, fileName){
              const fileHandle = await dirHandle.getFileHandle(fileName);
              console.assert(fileHandle);
@@ -402,12 +509,35 @@
              const template = await modelLoadTemplate(dirHandle, name);
              
          }
-         async function selectParentDir(model, asyncComplete){
+         async function selectParentDir(model, event, asyncComplete){
              console.log("selectParentDir()");
 
+             let handle = model.dirParentHandle;
              let options = {mode:'readwrite'};
              try {
-                 model.dirParentHandle = await window.showDirectoryPicker(options);
+                 if(event.target.id == 'SelectParentDirPreviousButton'){
+                     console.log("    It was the previousDir button");
+                     let option = {mode:'readwrite'};
+                     let perms = await handle.queryPermission(option);
+                     console.log("    perms = ", perms);
+                     if(perms != 'granted'){
+                         perms = await handle.requestPermission(option);
+                         console.log("    now perms = ", perms);
+                         if(perms == 'granted'){
+                             console.log("selectParentDir: reusing existing handle.");
+                         }
+                         else{
+                             model.dirParentHandle = undefined;
+                         }
+                     }
+                 }else{
+                     model.dirParentHandle = await window.showDirectoryPicker(options);
+                     if(model.dirParentHandle){
+                         let db = await openDB();
+                         await putDB(db, "handle", model.dirParentHandle);
+                         console.log("Stored handle!!!!");
+                     }
+                 }
              } catch (error) {
                  //
                  console.log(typeof error);
@@ -429,7 +559,7 @@
                          console.log("looks like a project: ", handle);
                          model.projects[name] = { dirHandle: handle };
                          model.projectName = name;
-            ++projectCount;
+                         ++projectCount;
                      }
                  }
              } catch(error) {
@@ -461,17 +591,22 @@
              switch(controller.state){
                  case 'load' :
                      console.assert(event.type == 'load', event);
+                     asyncSchedule(loadHandles, model);
                      views.loadTemplates();
                      views.change('home');
+                     controller.state = 'AwaitDirHandleLoad';
+                     break;
+                 case 'AwaitDirHandleLoad' :
+                     console.assert(event.type == 'asyncComplete');
                      views.push('SelectParent');
                      controller.state = 'SelectParent';
                      break;
                  case 'SelectParent' :
-                     console.assert(currentViewName == 'SelectParent', currentViewName);
-                     if(event.target.id == "SelectParentDirButton"){
+                     if(event.target.id == 'SelectParentDirButton'
+                     || event.target.id == 'SelectParentDirPreviousButton'){
                          console.assert(event.type == 'click');
                          console.log(">>>>>>>>>>>>>asyncSchedule!!!!!!");
-                         asyncSchedule(selectParentDir, model);
+                         asyncSchedule(selectParentDir, model, event);
                          console.log("<<<<<<<<<<<<<asyncSchedule!!!!!!");
 
                          controller.state = 'SelectingParent';
@@ -534,15 +669,15 @@
              console.log("<<<<<<<<<<<<<<<<<<<<<<<<<exit controller: ", controller.state);
          }
          [
-             'asyncComplete',
-             'change',
-             'click',
-             'close',
-             'error',
-             'hashchange',
-             'input',
-             'load',
-             'selectProject',
+                     'asyncComplete',
+                     'change',
+                     'click',
+                     'close',
+                     'error',
+                     'hashchange',
+                     'input',
+                     'load',
+                     'selectProject',
          ].forEach(e=>window.addEventListener(e, e=>controller(e), true));
 
          controller.asyncSchedule = function(func, ...args){
@@ -557,6 +692,7 @@
              setTimeout(f);
          };
          controller.states = new Set([
+             'AwaitDirHandleLoad',
              'home',
              'load',
              'openProject',
@@ -577,10 +713,11 @@
          controller.state  = 'load';
 
          function scopedEval(script, iView){
-             console.log("scopedEval: ", script);
-             //             debugger;
              for(const element of iView.rootNode.querySelectorAll("[data-ID]"))
                  iView.dataID[element.dataset.id] = element;
+             let dataID = iView.rootNode.dataset.id;
+             if(dataID)
+                 iView.dataID[dataID] = iView.rootNode;
 
              iView.dataID = new Proxy(iView.dataID, {
                  get(trapTarget, key, receiver){
@@ -786,13 +923,14 @@
                      iView.children.forEach((i)=>i.notify.render(i));
              },
              push(dialogName) {
-            ++this.inProgress;
+                 ++this.inProgress;
                  console.assert(this.currentView);
                  this.stack.push(this.currentView);
                  const iView = this.views[dialogName];
                  this.setBody(iView);
                  this.currentView = iView;
                  this.init(this.currentView);
+                 this.render(this.currentView);
                  --this.inProgress;
              },
              pop() {
@@ -869,10 +1007,26 @@
 
 
          /* This is really a transaction problem. Don't want any
-          * views accessing model when it's being modified.
+                             * views accessing model when it's being modified.
           */
 
          controller.model = function(views){
+             function parseSectionTemplate(template, filename){
+                 const result = {
+                     name        : filename,
+                     children    : [],
+                     rootNode    : null,
+                     ulNode      : null,
+                     sectionNode : null,
+                     titleNode   : null,
+                     docNode     : null,
+                     codeNode    : null,
+                     text        : null,
+                     isTOC       : false,
+                 };
+                 result.rootNode = template
+                 return result;
+             }
              let result = {
                  dirHandle       : null,
                  dirParentHandle : null,
@@ -908,6 +1062,7 @@
                      console.log("div node is ", node);
                      console.assert(node.firstElementChild.nodeName == 'TEMPLATE');
                      result.rootNode = node.firstElementChild.content;
+                     result = parseSectionTemplate(node);
                      console.log("model.loadResource() returns ", result);
                      return result;
                  },
@@ -950,7 +1105,7 @@
                      console.log(`file = ${file}`);
                      const text = await file.text();
                      console.log(`text = ${text}`);
-                 },
+                     },
              };
              return result;
          }();
