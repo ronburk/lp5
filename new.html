@@ -44,7 +44,7 @@
                  auxDiv.style.display = 'none';
              }
 
-             function render(){
+             function renderSelectParentDialog(){
                  console.log("SelectParentDialog render!!!!!!");
                  if(model.dirParentHandle){
                      console.log("Show button ", model.dirParentHandle.name);
@@ -54,7 +54,7 @@
                      auxDiv.style.display = 'none';
                  }
              }
-             let result = { init: init, render: render };
+             let result = { init: init, render: renderSelectParentDialog };
              return result;
             </script>
         </template>
@@ -291,7 +291,7 @@
                 </style>
                 <div id="LP5-Menu">
                     <ul>
-                        <li id="LP5-Menu-Compile">Compile</li>
+                        <li id="LP5-Menu-Reload">Reload</li>
                         <li>Menu 2</li>
                         <li>Menu 3</li>
                         <li>Menu 4</li>
@@ -308,26 +308,31 @@
                      function getTitle(li){
                          let ID = li.getAttribute('id');
                      }
-                     function render(){
+                     // ??? doesn't yet recurse!!!
+                     function renderTOC(){
                          console.log("render toc: ", model.rootTOC);
                          if(model.rootTOC){
                              console.log("render toc nodes");
                              let ul = document.createElement('ul');
                              ul.remove();
-                             let first = model.rootTOC.rootNode.firstElementChild;
+//                             let first = model.rootTOC.rootNode.firstElementChild;
+                             let first = model.rootTOC.ulNode;
                              first.querySelectorAll('li').forEach((entry)=>{
                                  let li = document.createElement('li');
                                  li.remove();
                                  let id = entry.getAttribute('id');
                                  let res = model.resources.get(id);
-                                 li.innerText = res.rootNode.querySelector('h1').innerText;
+                                 if(res.titleNode)
+                                     li.innerText = res.titleNode.innerText;
+                                 else
+                                     li.innerText = "< no title >";
                                  ul.appendChild(li);
                                  console.log("   render toc node ", li);
                              });
                              iView.rootNode.replaceChildren(ul);
                          }
                      };
-                     let result = {init:init, render:render};
+                     let result = {init:init, render:renderTOC};
                      return result;
                     </script>
                 </template>
@@ -341,26 +346,29 @@
                      function init(){
                      };
                      function renderSection(res){
-                         let section = res.rootNode.querySelector('section');
+                         let section = res.sectionNode
                          if(section){
                              outerDiv.appendChild(section.cloneNode(true));
                          }
-                         let ul = res.rootNode.querySelector('ul');
+                         let ul = res.ulNode;
                          if(ul){
                              ul.querySelectorAll('li').forEach((li)=>{
                                  let id = li.getAttribute('id');
-                                 renderSection(model.resources.get(id));
+                                 console.assert(id, ul);
+                                 let res = model.resources.get(id);
+                                 console.assert(res, id);
+                                 renderSection(res);
                              });
                          }
                      }
-                     function render(){
+                     function renderSource(){
                          console.log("render source: ", model.rootTOC);
                          if(model.rootTOC){
                              outerDiv.replaceChildren();
                              renderSection(model.rootTOC);
                          }
                      };
-                     let result = {init:init, render:render};
+                     let result = {init:init, render:renderSource};
                      return result;
                     </script>
                 </template>
@@ -1005,13 +1013,9 @@
              }
          };
 
-
-         /* This is really a transaction problem. Don't want any
-                             * views accessing model when it's being modified.
-          */
-
          controller.model = function(views){
-             function parseSectionTemplate(template, filename){
+             // ??? this func needs to be rigorous definition of allowable formats
+             function parseSectionTemplate(divContainingTemplate, filename){
                  const result = {
                      name        : filename,
                      children    : [],
@@ -1024,7 +1028,15 @@
                      text        : null,
                      isTOC       : false,
                  };
-                 result.rootNode = template
+                 let template    = divContainingTemplate.firstElementChild;
+                 let rootNode    = template.content;
+                 result.rootNode = rootNode;
+                 let firstChild  = rootNode.firstElementChild;
+                 if(firstChild.tagName == 'UL')
+                     result.ulNode = firstChild;
+                 result.codeNode = rootNode.querySelector('code');
+                 result.titleNode= rootNode.querySelector("h1, h2, h3, h4, h5");
+                 result.sectionNode = rootNode.querySelector('section');
                  return result;
              }
              let result = {
@@ -1035,20 +1047,7 @@
                  rootTOC         : null,
                  projects        : {},
                  async loadResource(dirHandle, filename){
-                     const result = {
-                         name        : filename,
-                         children    : [],
-                         rootNode    : null,
-                         ulNode      : null,
-                         sectionNode : null,
-                         titleNode   : null,
-                         docNode     : null,
-                         codeNode    : null,
-                         text        : null,
-                         isTOC       : false,
-                     };
                      console.log("loadResource ", filename);
-                     this.resources.set(filename, result);
                      const fileHandle = await dirHandle.getFileHandle(filename);
                      console.assert(fileHandle);
                      const file = await fileHandle.getFile();
@@ -1062,7 +1061,8 @@
                      console.log("div node is ", node);
                      console.assert(node.firstElementChild.nodeName == 'TEMPLATE');
                      result.rootNode = node.firstElementChild.content;
-                     result = parseSectionTemplate(node);
+                     result = parseSectionTemplate(node, filename);
+                     this.resources.set(filename, result);
                      console.log("model.loadResource() returns ", result);
                      return result;
                  },
@@ -1073,6 +1073,7 @@
                      console.log(resource);
                      let first = resource.rootNode.firstElementChild;
                      if(first.nodeName == 'UL'){
+                         console.log(`in loadTOC, resource "${name}" has a ul`);
                          resource.isTOC = true;
                          const entries = first.querySelectorAll('li');
                          for(const li of entries){
@@ -1080,8 +1081,9 @@
                              let child = await this.loadTOC(dirHandle, ID);
                              resource.children.push(child);
                          }
-                     }
-                     console.log("loadTOC returns ", resource);
+                     } else
+                         console.log(`in loadTOC, resource "${name}" has NO ul`);
+                     console.log(`loadTOC(${name}) returns `, resource);
                      return resource;
                  },
                  async openProject(name, asyncComplete){
@@ -1090,6 +1092,8 @@
                      const {dirHandle} = this.projects[name];
                      console.log("dirHandle ", dirHandle);
                      this.rootTOC = await this.loadTOC(dirHandle, name);
+                     console.log("openProject got rootTOC of ", this.rootTOC);
+                     console.assert(this.rootTOC.name == name, this.rootTOC);
                      asyncComplete(true);
                      console.log("OpenProject returns after scheduling asyncComplete");
                  },

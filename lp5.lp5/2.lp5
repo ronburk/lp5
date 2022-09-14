@@ -1,0 +1,97 @@
+<template>
+    <style>
+     .epigraph { text-align: end; display: block; }
+    </style>
+    <section>
+        <h2>Appendix I: Literate Programming</h2>
+        <p class="epigraph">
+            Nothing about WEB is really new; I have simply combined a
+            bunch of ideas that have been in the air for a long time.
+            <br>
+            --Donald Knuth, p. 130, "Literate Programming"
+        </p>
+        <div>
+            <p>
+                This appendix is for people familiar with Knuth's
+                Literate Programming who want to know how it is
+                related to lp5.
+                In writing lp5, I adapted concepts from Literate Programming
+                I found crucial and rejected others I deemed downright
+                unhelpful, as enumerated here.
+            </p>
+            <h3>What Does LP5 Take From Literate Programming?</h3>
+            
+            <p>
+                Broadly speaking, there are two key concepts that I
+                took away from Literate Programming.
+                First, lp5 takes the decomposition
+                tools of Literate Programming.
+                It is astonishing how often this is belittled or
+                completely ignored in discussions of Literate Programming.
+                Kibitzers will even claim that this was merely a
+                crutch for ancient programming language restrictions
+                on the ordering of code and has no use in
+                modern languages.
+            </p>
+            <p>
+                Literate Programming and lp5 allow nearly arbitrary degrees
+                of ordering and decomposition of code.
+                Programmers may <q>break a function down</q> into
+                subfunctions merely because it becomes physically long
+                rather than because it lacks cohesion or is not understandable.
+                With all Literate Programming tools for any languages they target,
+                this is completely unnecessary&emdash;&#8212;one breaks functions
+                down textually, and only breaks them down structurally
+                when that actually makes sense for the structure of the code.
+            </p>
+            <p>
+                Likewise, the always annoying problem of too many levels of indentation
+                (or unreadably small indentation to make up for too many levels)
+                pretty much disappears.
+                Long before indentation levels become ungainly,
+                one has generally textually decomposed the code into
+            </p>
+            <p>
+                
+            </p>
+            <h3>What Does LP5 Reject From Literate Programming?</h3>
+            <p>
+                Most importantly, lp5 rejects the core Knuth notion
+                of programs as literature.
+                I remember how excited I was when I first heard about
+                Literate Programming,
+                and how much less excited I was when I actually
+                read his realistic examples.
+                Where were the pictures?
+                Where were the overviews, the architectural
+                rationales, and so on?
+                Much like reading a novel,
+                if you wanted pictures and overviews,
+                you were responsible for creating them yourself
+                after reading the book.
+            </p>
+            <p>
+                Of course, an unavoidable handicap of Knuth's
+                consistent (relentless) push to analogize with
+                literature was that he was trying to create
+                hypertext with ink and paper.
+                In 1984, long before any World Wide Web,
+                Knuth was saying:
+                <blockquote>
+                    [A]fter gaining experience with WEB,
+                    I have come to realize that there is no need to
+                    choose once and for all between top-down and
+                    bottom-up, because a program is best thought
+                    of as a web instead of as a tree.
+                </blockquote>
+            </p>
+            <p>
+                Do I want to read code <q>like a book?</q>
+                No, I do not,
+                no more than I want to traverse Harry Potter like
+                a hyptertext pile of source code.
+            </p>
+
+        </div>
+    </section>
+</template>
