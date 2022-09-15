@@ -19,9 +19,12 @@
                 segments that include:
                 code, documentation, tests, etc.
                 When successful, the result is as you see here:
-                a hypertext system that documents the code,
-                contains the code,
-                and can generate the external files needed to build the code.
+                a hypertext system that
+                <ul>
+                    <li>explains the code</li>
+                    <li>contains the code</li>
+                    <li>can generate the external files needed to build the code</li>
+                </ul>
             </p>
             <p>
                 What is this <q>different style</q> of programming that
@@ -75,7 +78,7 @@
                     </li>
                     <li><b>"Literate Programming":</b>
                         those few
-                        <a href="">experienced with Knuth's work</a>
+                        <a href="#2.lp5">experienced with Knuth's work</a>
                         will
                         quickly note how lp5 is similar but different.
                         For everyone else,
@@ -103,12 +106,12 @@
                 the code,
                 and is independent of the order of the code
                 in the final HTML output
-                (which is produced by asking blitpro to <q>compile</q>).
+                (which is produced by asking lp5 to <q>compile</q>).
                 Most lp5 sections are quite short
                 and often contain not much more than a dozen
                 lines of code.
                 Simple parts, simply related:
-                fundamental to literate programming.
+                fundamental to lp5.
             </p>
             <b>documentation fragments:</b>
             <p>

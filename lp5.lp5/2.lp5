@@ -3,7 +3,7 @@
      .epigraph { text-align: end; display: block; }
     </style>
     <section>
-        <h2>Appendix I: Literate Programming</h2>
+        <h2><a name="#2.lp5"> Appendix I: Literate Programming</a></h2>
         <p class="epigraph">
             Nothing about WEB is really new; I have simply combined a
             bunch of ideas that have been in the air for a long time.
@@ -40,7 +40,7 @@
                 subfunctions merely because it becomes physically long
                 rather than because it lacks cohesion or is not understandable.
                 With all Literate Programming tools for any languages they target,
-                this is completely unnecessary&emdash;&#8212;one breaks functions
+                this is completely unnecessary&mdash;one breaks functions
                 down textually, and only breaks them down structurally
                 when that actually makes sense for the structure of the code.
             </p>
@@ -50,31 +50,9 @@
                 pretty much disappears.
                 Long before indentation levels become ungainly,
                 one has generally textually decomposed the code into
+                smaller sections.
             </p>
             <p>
-                
-            </p>
-            <h3>What Does LP5 Reject From Literate Programming?</h3>
-            <p>
-                Most importantly, lp5 rejects the core Knuth notion
-                of programs as literature.
-                I remember how excited I was when I first heard about
-                Literate Programming,
-                and how much less excited I was when I actually
-                read his realistic examples.
-                Where were the pictures?
-                Where were the overviews, the architectural
-                rationales, and so on?
-                Much like reading a novel,
-                if you wanted pictures and overviews,
-                you were responsible for creating them yourself
-                after reading the book.
-            </p>
-            <p>
-                Of course, an unavoidable handicap of Knuth's
-                consistent (relentless) push to analogize with
-                literature was that he was trying to create
-                hypertext with ink and paper.
                 In 1984, long before any World Wide Web,
                 Knuth was saying:
                 <blockquote>
@@ -84,12 +62,111 @@
                     bottom-up, because a program is best thought
                     of as a web instead of as a tree.
                 </blockquote>
+                
+            </p>
+            <p>
+                Programming inventions like structured programming,
+                object-oriented programming, etc., gave programmers
+                no new computational power (it's Turing machines all the way down,
+                after all), but provided new forms of expressing computation.
+                These new forms of expression required experience to
+                get used to and to evolve idioms that proved beneficial.
+                The decompositional tools that Literate Programming
+                and lp5 provide likewise make possible new forms of
+                expressing computation.
+                There's really not much point in talking about it
+                until you've tried it and glimpsed the possibilities for
+                new forms and styles.
+            </p>
+            <p>
+                The second key concept lp5 takes from Literate Programming is,
+                of course, the primacy of text explanations.
+                Here again, I think most of writing about Literate Programming
+                misses the mark.
+                What all professional writers know that apparently
+                most programmers don't know is this:
+                writing is a form of thinking.
+                Professional writers don't just write down
+                what they're thinking
+                (a whole lot more people would be writers if it was that simple),
+                their writing is a part of their process of thinking.
+                What this means for programmers is essentially this:
+                <b>if you have to write down an explanation of your
+                    code, you will write different code.</b>
+            </p>
+            <p>
+                The typical programmer seems to think writing explanations
+                of code represents a failure to write clear code,
+                or a mindless chore with little value,
+                or a duplication of code that will need to be
+                <q>maintained.</q>
+                They don't understand that writing can be an intimate
+                part of the process of thinking,
+                giving you the ability to see things you would
+                otherwise ignore.
+            </p>
+            <p>
+                Quite apart from the specific techniques of Literate Programming,
+                I can't count the number of times writing documentation
+                for my code has altered the code.
+                Often, this simply takes the form of realizing
+                how overcomplicated things have become.
+                Many times, as I read documentation for some
+                API function that droned on with a seemingly endless
+                list of cautions and special cases,
+                I mightily wished the programmer who invented the API
+                had tried to write an explanation for it first.
+                They might have had the experience that they instead
+                inflicted on all the users of their code:
+                the experience of <q>My God, there has to be a simpler way!</q>
+            </p>
+            <h3>What Does LP5 Reject From Literate Programming?</h3>
+            <p>
+                Most importantly, lp5 rejects the core Knuth notion
+                of programs as literature.
+                I remember how excited I was when
+                Knuth's book <i>Literate Programming</i>
+                came out in 1994.
+                And how much less excited I was when I actually
+                read <i>T<span style="position:relative; top:.2em">E</span>X: The Program</i>.
+                Where were the pictures?
+                Where were the overviews, the architectural
+                rationales, and so on?
+                Much like reading a novel,
+                if you wanted pictures and overviews and
+                other non-linear slices of understanding,
+                you were responsible for creating them yourself
+                after reading the book.
             </p>
             <p>
                 Do I want to read code <q>like a book?</q>
                 No, I do not,
                 no more than I want to traverse Harry Potter like
                 a hyptertext pile of source code.
+                Knuth said:
+                <blockquote>
+                    My experiences have led me to believe that a person
+                    reading a program is, likewise, ready to comprehend it
+                    by learning its various parts in approximately the
+                    order in which it was written.
+                </blockquote>
+                But I do not want to learn the various parts of
+                a good-sized program&mdash;I want to learn just
+                the bits I need to know to do my work,
+                be it finding/fixing a bug, adding a new feature,
+                or whatever.
+                And in the order that saves me the most time&mdash;hypertext
+                order, in other words, jumping around to get
+                to the information I need at that instant in time.
+            </p>
+            <p>
+                Of course, an unavoidable handicap of Knuth's
+                consistent (relentless?) push to analogize with
+                literature was that he was trying to create
+                hypertext with ink and paper.
+            </p>
+            <p>
+                blah
             </p>
 
         </div>

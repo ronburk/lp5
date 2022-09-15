@@ -8,7 +8,7 @@
         <title>lp5</title>
         <script>
         </script>
-        <style>
+        <style id="LP5-Global-Style">
         </style>
     </head>
     <body>
@@ -315,7 +315,7 @@
                              console.log("render toc nodes");
                              let ul = document.createElement('ul');
                              ul.remove();
-//                             let first = model.rootTOC.rootNode.firstElementChild;
+                             //                             let first = model.rootTOC.rootNode.firstElementChild;
                              let first = model.rootTOC.ulNode;
                              first.querySelectorAll('li').forEach((entry)=>{
                                  let li = document.createElement('li');
@@ -457,7 +457,7 @@
                  console.log(db);
                  let txn = db.transaction(["handles"], "readwrite");
                  let get = txn.objectStore("handles")
-                    .get(key)
+                              .get(key)
                  ;
 
                  txn.oncomplete = (event) => { console.log("!");resolve(get.result); };
@@ -501,12 +501,13 @@
              console.log(`text = ${text}`);
              let node = document.createElement('div');
              node.remove();
+             const shadow = node.attachShadow({mode: 'closed'});
              console.log("div node is ", node);
-             node.innerHTML = text;
-             console.log("div node is ", node);
+             shadow.innerHTML = text;
+             console.log("div node is ", shadow);
              console.assert(node.firstElementChild.nodeName == 'TEMPLATE');
              node = node.firstElementChild.content;
-             return node;  // return contents of template (a tree of nodes)
+             return shadow.firstElementChild.content;  // return contents of template (a tree of nodes)
          }
 
          async function modelLoadTemplate(dirHandle, name){
@@ -611,7 +612,7 @@
                      break;
                  case 'SelectParent' :
                      if(event.target.id == 'SelectParentDirButton'
-                     || event.target.id == 'SelectParentDirPreviousButton'){
+                        || event.target.id == 'SelectParentDirPreviousButton'){
                          console.assert(event.type == 'click');
                          console.log(">>>>>>>>>>>>>asyncSchedule!!!!!!");
                          asyncSchedule(selectParentDir, model, event);
@@ -668,6 +669,24 @@
                      views.render();
                      break;
                  case 'home' :
+                     if(event.type == 'click'){
+                         let target = event.target;
+                         if(target.id == 'LP5-Menu-Reload'){
+                             controller.state = 'openProject';
+                             asyncSchedule(model.openProject.bind(model), model.rootTOC.name);
+                         } else if(target.tagName == 'A'){
+                             let href=target.getAttribute("href");
+                             event.preventDefault();
+                             let options = {
+                                 behavior: 'auto',
+                                 block   : 'nearest',
+                                 inline  : 'nearest',
+                             };
+                             console.log(options);
+                             let destination = document.querySelector(`a[name="${href}"]`);
+                             destination.scrollIntoView(true);
+                         }
+                     }
                      break;
                  default:
                      console.log("Can't happen, unknown state: ", controller.state);
@@ -677,15 +696,16 @@
              console.log("<<<<<<<<<<<<<<<<<<<<<<<<<exit controller: ", controller.state);
          }
          [
-                     'asyncComplete',
-                     'change',
-                     'click',
-                     'close',
-                     'error',
-                     'hashchange',
-                     'input',
-                     'load',
-                     'selectProject',
+             'asyncComplete',
+             'change',
+             'click',
+             'close',
+             'error',
+             'hashchange',
+             'input',
+             'load',
+             'reload',
+             'selectProject',
          ].forEach(e=>window.addEventListener(e, e=>controller(e), true));
 
          controller.asyncSchedule = function(func, ...args){
@@ -856,7 +876,7 @@
                      // Removing the open attribute will usually hide the dialog.
                      // However, doing so has strange additional consequences:
                      // https://html.spec.whatwg.org/multipage/interactive-elements.html#the-dialog-element
-//                     let script = templateRoot.querySelector('script');
+                     //                     let script = templateRoot.querySelector('script');
                      if(script){
                          // remove script else it will run when frag inserted into DOM
                          script.remove();
@@ -1046,7 +1066,18 @@
                  resources       : new Map(),
                  rootTOC         : null,
                  projects        : {},
+
                  async loadResource(dirHandle, filename){
+if(false){
+                     const mapHtmlEntities = {
+                         emdash: "",
+                         dog: "goat",
+                         goat: "cat"
+                     };
+
+             //str = str.replace(/\b(?:cat|dog|goat)\b/gi, matched => mapHtmlEntities[matched]);
+         }
+
                      console.log("loadResource ", filename);
                      const fileHandle = await dirHandle.getFileHandle(filename);
                      console.assert(fileHandle);
@@ -1109,7 +1140,7 @@
                      console.log(`file = ${file}`);
                      const text = await file.text();
                      console.log(`text = ${text}`);
-                     },
+                 },
              };
              return result;
          }();
