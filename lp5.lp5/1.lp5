@@ -11,7 +11,7 @@
         </style>
         <div>
             <p>
-                lp5 is a browser-based, hierarchical, text editor and preprocessor
+                lp5 is a browser-based text editor and preprocessor
                 designed to enable a different style of creating
                 software.
                 The programmer uses lp5 to create a <q>web</q>
@@ -29,15 +29,13 @@
             <p>
                 What is this <q>different style</q> of programming that
                 lp5 lets you explore?
-                It is a style in which explanation is
-                a primary goal from the very beginning;
-                having to create code that is easy to explain
-                often results in creating better code.
-                It is a style of small parts, simply related:
+                It is a style in which <em>explanation</em> is
+                a primary goal from the very beginning.
+                It is a style of <b>small parts, simply related</b>:
                 in normal code, the unit of modularity is
                 essentially the function,
-                but lp5 permits modularizing any piece of
-                text, however small, as you will see.
+                but lp5 permits modularizing any piece of code,
+                however small, as you will see.
                 <span hidden="hidden">
                     Whereas normal programming might call for
                     breaking a large function into smaller pieces
@@ -51,10 +49,34 @@
                 </span>
             </p>
             <p>
+                lp5 programming is characterized by two words:
+                decompositional and explanatory.
+                Decomposition is a (perhaps <q>the</q>) fundamental tool
+                for conquering complexity. No matter what your target
+                programming language (HTML5, C++, Python, etc.),
+                the lp5 preprocessor provides a novel
+                additional technique for breaking
+                the problem down:
+                code can be arbitrarily broken down and ordered;
+                an embedded directed graph allows lp5
+                to mechanically reconstruct the order/composition that the
+                target programming language requires.
+            </p>
+            <p>
+                The other half of lp5's impact on coding comes from
+                encouraging and enabling you to explain the code you are writing.
+                This exploits a simple but powerful phenomenon of the
+                human mind:
+                <b>if you focus on explaining your code,
+                    you will write different code.</b>
+            </p>
+            <p>
                 lp5 is <em>not</em>:
                 <ul>
                     <li><b>for beginners:</b>
-                        a preprocessor adds an extra level
+                        a preprocessor
+                        (especially if it deprives you of your favorite IDE)
+                        adds an extra level
                         of separation between the programmer
                         and other programming tools.
                         The extra complexity, e.g., in tracing
@@ -64,30 +86,43 @@
                         extra burden for a beginner.
                     </li>
                     <li><b>for faster coding:</b>
-                        though it may produce better code,
+                        though it may produce <em>better</em> code,
                         and could save time in the long run.
-                        Thinking about how to explain software
+                        Explaining software
                         is a significant extra constraint and takes
                         extra up-front time.
+                        <blockquote>
+                            It is easier to write only a program,
+                            because the programmer can settle for correct
+                            and efficient code even if it is hard to
+                            understand. &mdash;Martin Ruckert,
+                            <a href="https://www.google.com/books/edition/Understanding_MP3/MN34-91z6qAC?hl=en&gbpv=1&pg=PT7&printsec=frontcover">Understanding MP3</a>
+                        </blockquote>
                         We might speculate that lp5 facilitates
                         better
                         <a href="https://dl.acm.org/doi/10.1145/2960310.2960334">
                             self-regulation
                         </a>
                         during the programming process.
+                        Of course, the time cost equation changes when
+                        someone else
+                        (possibly your future self)
+                        has to work on your code and finds
+                        ready coherent explanations rather than
+                        having to reverse-engineer concepts and intent
+                        from weak artifacts like version control commit messages.
                     </li>
                     <li><b>"Literate Programming":</b>
                         those few
                         <a href="#2.lp5">experienced with Knuth's work</a>
                         will
-                        quickly note how lp5 is similar but different.
+                        quickly note how lp5 is related but different.
                         For everyone else,
                         history suggests the phrase "literate programming"
                         has been extremely unhelpful in
-                        promulgating some of the best
-                        ideas hidden behind it,
-                        so you will find that phrase spoken nevermore in
-                        the lp5 documentation.
+                        promulgating the best
+                        ideas hidden behind it (decomposition/explanation),
+                        so we eschew that language here.
                     </li>
                 </ul>
             </p>

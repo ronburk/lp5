@@ -1,3 +1,11 @@
+HTML code annotated via html?
+=============================
+A code section could be in any programming language--including
+HTML. For every programming language but HTML, the obvious
+way to mark up the code section is with... HTML!
+
+
+
 todo
 ====
 not sure data-id works on outermost element

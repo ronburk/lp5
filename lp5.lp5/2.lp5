@@ -1,15 +1,27 @@
 <template>
     <style>
-     .epigraph { text-align: end; display: block; }
+     div.epigraph  {
+         display: flex;
+         justify-content: flex-end;
+         flex-flow: wrap;
+     }
+     div.epigraph > div {
+         max-width: 30em;
+     }
+     div.epigraph  hr { width:100%; size:0;display:none;}
     </style>
     <section>
         <h2><a name="#2.lp5"> Appendix I: Literate Programming</a></h2>
-        <p class="epigraph">
+        <div class="epigraph">
+            <div>
             Nothing about WEB is really new; I have simply combined a
             bunch of ideas that have been in the air for a long time.
-            <br>
-            --Donald Knuth, p. 130, "Literate Programming"
-        </p>
+            </div>
+            <hr>
+            <div>
+            &ndash;Donald Knuth, p. 130, "Literate Programming"
+            </div>
+        </div>
         <div>
             <p>
                 This appendix is for people familiar with Knuth's
@@ -19,8 +31,40 @@
                 I found crucial and rejected others I deemed downright
                 unhelpful, as enumerated here.
             </p>
+            <p>
+                When I say <q>Literate Programming</q> I am referring
+                specifically to the concepts documented and implemented
+                by Knuth.
+                It is necessary to point this out because the
+                generic-sounding nature of the name leads
+                an amazing percentage of programmers who hear
+                it to believe that it refers to nothing very specific at all.
+                A survey of <q>Literate Programming</q> videos on YouTube
+                reveals people who believe it refers to nearly any
+                code which contains any documentation whatsoever!
+                I believe if you polled all the programmers who have
+                heard of Literate Programming,
+                the overwhelming majority would not know,
+                for example,
+                that there is a directed graph at the heart of
+                the techique, or what that is for.
+                If Knuth jokingly took his <q>revenge</q> on
+                <q>structured programming</q> by using similar
+                language to name his new tools,
+                language has had the last laugh,
+                and helped prevent <q>Literate Programming</q>
+                from being understood,
+                let alone taken up,
+                by a significant percentage of programmers.
+            </p>
+            <p>
+                Although lp5 is different than Literate Programming,
+                they share the core structural concepts I see as most important.
+                My attempt to characterize the relevant nature of these
+                tools led me to replace <q>literate</q> with two
+                words: decomposition and explanation.
+            </p>
             <h3>What Does LP5 Take From Literate Programming?</h3>
-            
             <p>
                 Broadly speaking, there are two key concepts that I
                 took away from Literate Programming.
@@ -91,8 +135,8 @@
                 (a whole lot more people would be writers if it was that simple),
                 their writing is a part of their process of thinking.
                 What this means for programmers is essentially this:
-                <b>if you have to write down an explanation of your
-                    code, you will write different code.</b>
+                <b>if you focus on explaining your code,
+                    you will write different code.</b>
             </p>
             <p>
                 The typical programmer seems to think writing explanations
@@ -124,11 +168,12 @@
             <p>
                 Most importantly, lp5 rejects the core Knuth notion
                 of programs as literature.
-                I remember how excited I was when
-                Knuth's book <i>Literate Programming</i>
-                came out in 1994.
+                I remember how excited I was when I
+                read Knuth's paper <i>Literate Programming</i>
+                in 1984.
                 And how much less excited I was when I actually
-                read <i>T<span style="position:relative; top:.2em">E</span>X: The Program</i>.
+                read his
+                <i>T<span style="position:relative; top:.2em">E</span>X: The Program</i>.
                 Where were the pictures?
                 Where were the overviews, the architectural
                 rationales, and so on?
@@ -158,6 +203,37 @@
                 And in the order that saves me the most time&mdash;hypertext
                 order, in other words, jumping around to get
                 to the information I need at that instant in time.
+            </p>
+            <p>
+                However, do not reject all novels just because you
+                did not care for one author's book.
+                As Knuth says,
+                <q>
+                    I imagine that different programmers will converge
+                    to quite different styles.
+                </q>
+                When Martin Ruckert published
+                <a href="https://www.google.com/books/edition/Understanding_MP3/MN34-91z6qAC?hl=en&gbpv=1&pg=PT7&printsec=frontcover">Understanding MP3</a>,
+                a Literate Program that explains the ubiquitous
+                audio coding format,
+                there were wonderful pictures, expositions, rationales,
+                etc.
+                Ruckert explicitly wrote in a style designed to serve
+                different needs,
+                making it easy to dive into exactly the area of
+                the topic you were interested in at the moment.
+                Knuth's Literate Programming provides tools&mdash;what
+                authors can produce with those tools is as varied
+                as the authors themselves.
+            </p>
+            <p>
+                This mostly boils down to differing goals.
+                Knuth is concerned with creating finished, polished works,
+                with the finality of committing ink to paper and paper
+                to book publisher.
+                I live a world where <q>finished</q> software is a mirage.
+                Few programs are ever finished, they're always being maintained,
+                extended, rethought.
             </p>
             <p>
                 Of course, an unavoidable handicap of Knuth's

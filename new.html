@@ -166,7 +166,7 @@
             </div>
         </template>
         <template data-name="home">
-            <div class="lp5-body" onclick="console.log('Whoo hoo');">
+            <div class="lp5-body">
                 <style>
                  .lp5-body {
                      display: grid;
@@ -183,6 +183,15 @@
                  #LP5-Footer{
                      grid-area: footer;
                      background:#d0d0d0;
+                 }
+                 #LP5-Toc li {
+                     list-style-type: none;
+                     padding-left: 0;
+                     white-space:nowrap;
+                     overflow:hidden;
+                 }
+                 #LP5-Toc ul {
+                     padding-inline-start: 0;
                  }
                  #LP5-Toc a {text-decoration: none;}
                  #LP5-Toc a:visited { color: rgb(0,0,238); }
@@ -227,8 +236,10 @@
                      font-family: "Consolas", monospace;
                      white-space: pre;
                      background-color: #FFFFFF;
-                     border-top:2px solid #FFFF00;
-                     margin-left: -4px;
+                     border: 0;
+                     padding: 0;
+                     margin: 0;
+                     border-top: .2em solid #FFFF00;
                      line-height: 100%;
                  }
                  .LP5-Code p {
@@ -312,14 +323,11 @@
                      function renderTOC(){
                          console.log("render toc: ", model.rootTOC);
                          if(model.rootTOC){
-                             console.log("render toc nodes");
-                             let ul = document.createElement('ul');
-                             ul.remove();
+                             let ul = createFreeElement('ul');
                              //                             let first = model.rootTOC.rootNode.firstElementChild;
                              let first = model.rootTOC.ulNode;
                              first.querySelectorAll('li').forEach((entry)=>{
-                                 let li = document.createElement('li');
-                                 li.remove();
+                                 let li = createFreeElement('li');
                                  let id = entry.getAttribute('id');
                                  let res = model.resources.get(id);
                                  if(res.titleNode)
@@ -327,7 +335,6 @@
                                  else
                                      li.innerText = "< no title >";
                                  ul.appendChild(li);
-                                 console.log("   render toc node ", li);
                              });
                              iView.rootNode.replaceChildren(ul);
                          }
@@ -345,16 +352,48 @@
                      const model = require('model');
                      function init(){
                      };
-                     function renderSection(res){
-                         let section = res.sectionNode
-                         if(section){
-                             outerDiv.appendChild(section.cloneNode(true));
+                     function massageCode(text){
+                         console.log("massageCode ", text);
+                         let result = text;
+                         let lines = text.split(/\r?\n/);
+                         let indent = -1;
+                         for(let line of lines){
+                             line = line.replace(/\s+$/,'');
+                             if(line.length){
+                                 let thisIndent = line.search(/\S|$/);
+                                 console.log("this indent ", thisIndent, line);
+                                 if(indent == -1 || thisIndent < indent){
+                                     indent = thisIndent;
+                                     console.log("indent now ", indent, line);
+                                 }
+                             }
                          }
-                         let ul = res.ulNode;
-                         if(ul){
-                             ul.querySelectorAll('li').forEach((li)=>{
+                         if(indent > 0){
+                             let space = " ".repeat(indent);
+                             let regex = new RegExp("^" + space, 'gm');
+                             result = text.replace(regex, '');
+                             console.assert(result != text);
+                         }
+                         return result;
+                     }
+                     function renderSection(res){
+                         let {sectionNode, ulNode} = res;
+                         if(sectionNode){
+                             outerDiv.appendChild(res.divContainer);
+                             
+                             if(res.scriptNode){
+                                 let div = createFreeElement('div');
+                                 div.classList.add('LP5-Code');
+                                 div.innerText = massageCode(
+                                     res.scriptNode.innerText);
+                                 outerDiv.appendChild(div);
+                             }
+                         }
+                         if(ulNode){
+                             ulNode.style.display = 'none';
+                             ulNode.querySelectorAll('li').forEach((li)=>{
                                  let id = li.getAttribute('id');
-                                 console.assert(id, ul);
+                                 console.assert(id, ulNode);
                                  let res = model.resources.get(id);
                                  console.assert(res, id);
                                  renderSection(res);
@@ -425,6 +464,23 @@
         <script>
          "use strict";
 
+         function isLocalHref(anchorNode){
+             let result = false;
+             if(anchorNode.tagName == 'A'){
+                 let href = anchorNode.getAttribute('href');
+                 if(href.startsWith("#"))
+                     result = true;
+             }
+             return result;
+         }
+         function createFreeElement(tagName){
+             let node = document.createElement(tagName);
+             node.remove();
+             return node;
+         }
+
+
+
          async function openDB(){
              return new Promise((resolve, reject) => {
                  console.log("indexedDB.open");
@@ -467,11 +523,9 @@
          }
 
          async function loadHandles(model, asyncComplete){
-             console.log("loadHandle()");
+             console.log("loadHandles()");
              let db = await openDB();
-             console.log("loadHandle() back from openDB");
              let handle = await getDB(db, "handle");
-             console.log("loadHandle() after await getDB");
              console.log(handle);
              if(false){
                  let option = {mode:'readwrite'};
@@ -499,15 +553,17 @@
              console.log(`file = ${file}`);
              const text = await file.text();
              console.log(`text = ${text}`);
-             let node = document.createElement('div');
-             node.remove();
-             const shadow = node.attachShadow({mode: 'closed'});
+             // create detached 'div' with a shadow DOM
+             let node = createFreeElement('div');
+             const shadow = node.attachShadow({mode: 'open'});
              console.log("div node is ", node);
              shadow.innerHTML = text;
              console.log("div node is ", shadow);
              console.assert(node.firstElementChild.nodeName == 'TEMPLATE');
-             node = node.firstElementChild.content;
-             return shadow.firstElementChild.content;  // return contents of template (a tree of nodes)
+             shadow.replaceChildren(shadow.firstElementChild.content);
+//             node = node.firstElementChild.content;
+             //             return shadow.firstElementChild.content;  // return contents of template (a tree of nodes)
+             return node;
          }
 
          async function modelLoadTemplate(dirHandle, name){
@@ -669,22 +725,37 @@
                      views.render();
                      break;
                  case 'home' :
-                     if(event.type == 'click'){
-                         let target = event.target;
+                     if(event.type == 'contextmenu'){
+                         let path   = event.composedPath();
+                         let target = path[0];
+                         console.log(target);
+                     }else if(event.type == 'click'){
+                         let path   = event.composedPath();
+                         console.log(path);
+                         let target = path[0];
+                         console.log(target);
                          if(target.id == 'LP5-Menu-Reload'){
                              controller.state = 'openProject';
                              asyncSchedule(model.openProject.bind(model), model.rootTOC.name);
                          } else if(target.tagName == 'A'){
-                             let href=target.getAttribute("href");
-                             event.preventDefault();
-                             let options = {
-                                 behavior: 'auto',
-                                 block   : 'nearest',
-                                 inline  : 'nearest',
-                             };
-                             console.log(options);
-                             let destination = document.querySelector(`a[name="${href}"]`);
-                             destination.scrollIntoView(true);
+                             const href=target.getAttribute('href');
+                             if(href){
+                                 if(href.startsWith("#")){
+                                     event.preventDefault();
+                                     let options = {
+                                         behavior: 'auto',
+                                         block   : 'nearest',
+                                         inline  : 'nearest',
+                                     };
+                                     console.log(options);
+                                     let destination = model.anchorNameToNode.get(href);
+//                                     let destination = document.querySelector(`a[name="${href}"]`);
+                                     console.assert(destination);
+                                     destination.scrollIntoView(true);
+                                 } else {
+                                     window.open(href, '_blank');
+                                 }
+                             }
                          }
                      }
                      break;
@@ -700,6 +771,7 @@
              'change',
              'click',
              'close',
+             'contextmenu',
              'error',
              'hashchange',
              'input',
@@ -797,7 +869,7 @@
              loadTemplates(rootElement=document, parentView=null){
                  console.log("views.loadTemplates()");
                  
-                 // template most be of form: style? div script?
+                 // template must be of form: style? div script?
                  function parseTemplate(template){
                      let   style = null, div = null, script = null;
                      const root  = template.content;
@@ -823,12 +895,9 @@
                              console.log("malformed template");
                              console.assert(false, children);
                      };
-                     if(style)
-                         console.assert(style.nodeName == 'STYLE');
-                     if(div)
-                         console.assert(div.nodeName == 'DIV');
-                     if(script)
-                         console.assert(script.nodeName == 'SCRIPT');
+                     console.assert(!style  || style.nodeName  == 'STYLE');
+                     console.assert(!div    || div.nodeName    == 'DIV');
+                     console.assert(!script || script.nodeName == 'SCRIPT');
 
                      const result = {style:style, div:div, script:script};
                      console.log(result);
@@ -962,7 +1031,7 @@
                  --this.inProgress;
              },
              pop() {
-            ++this.inProgress;
+                 ++this.inProgress;
                  const currentView = this.currentView;
                  console.assert(currentView.isDialog);
                  console.assert(currentView);
@@ -973,9 +1042,9 @@
                  console.assert(liveDialogNode.nodeName == "DIALOG");
                  liveDialogNode.close();
                  console.log("pop() closes dialog");
-                 //                 currentView.rootNode.replaceChildren(liveRootNode);
                  liveRootNode.remove();
                  this.currentView = this.stack.pop();
+                 history.pushState(null, "", `#${this.currentView.name}`);
                  --this.inProgress;
              },
              onHashChange(event){
@@ -1034,31 +1103,6 @@
          };
 
          controller.model = function(views){
-             // ??? this func needs to be rigorous definition of allowable formats
-             function parseSectionTemplate(divContainingTemplate, filename){
-                 const result = {
-                     name        : filename,
-                     children    : [],
-                     rootNode    : null,
-                     ulNode      : null,
-                     sectionNode : null,
-                     titleNode   : null,
-                     docNode     : null,
-                     codeNode    : null,
-                     text        : null,
-                     isTOC       : false,
-                 };
-                 let template    = divContainingTemplate.firstElementChild;
-                 let rootNode    = template.content;
-                 result.rootNode = rootNode;
-                 let firstChild  = rootNode.firstElementChild;
-                 if(firstChild.tagName == 'UL')
-                     result.ulNode = firstChild;
-                 result.codeNode = rootNode.querySelector('code');
-                 result.titleNode= rootNode.querySelector("h1, h2, h3, h4, h5");
-                 result.sectionNode = rootNode.querySelector('section');
-                 return result;
-             }
              let result = {
                  dirHandle       : null,
                  dirParentHandle : null,
@@ -1066,18 +1110,67 @@
                  resources       : new Map(),
                  rootTOC         : null,
                  projects        : {},
+                 anchorNameToNode: new Map(),
+
+                 // ??? this func needs to be rigorous definition of allowable formats
+                 // Each resource contains an HTML <template>.
+                 // style ? section ? script?
+                 parseSectionTemplate(divContainer, filename){
+                     console.log("parseSectionTemplate ", filename);
+                     const result = {
+                         name        : filename,
+                         children    : [],
+                         divContainer: null,
+                         shadowRoot  : null,
+                         ulNode      : null,
+                         sectionNode : null,
+                         titleNode   : null,
+                         docNode     : null,
+                         codeNode    : null,
+                         templateNode: null,
+                         scriptNode  : null,
+                         text        : null,
+                         isTOC       : false,
+                         namedAnchorNodes: null,
+                     };
+                     let shadowRoot      = divContainer.shadowRoot;
+                     result.divContainer = divContainer;
+                     result.shadowRoot   = shadowRoot;
+                     let firstChild      = shadowRoot.firstElementChild;
+                     if(firstChild.tagName == 'UL')
+                         result.ulNode   = firstChild;
+                     result.templateNode = shadowRoot.querySelector('template');
+                     if(result.templateNode){
+                         console.log("result.templateNode",
+                                     result.templateNode.content);
+                     }
+                     else
+                         console.log("No template for code!");
+                     let scriptNode      = shadowRoot.querySelector('script[type="text/plain"]');
+//                     let scriptNode      = shadowRoot.querySelector('script');
+                     if(scriptNode){
+                         console.log("script found: ", scriptNode);
+                         result.scriptNode = scriptNode;
+                     }
+                     result.codeNode     = shadowRoot.querySelector('code');
+                     result.titleNode    = shadowRoot.querySelector('h1, h2, h3, h4, h5');
+                     result.sectionNode  = shadowRoot.querySelector('section');
+                     result.namedAnchorNodes = shadowRoot.querySelectorAll('a[name]');
+                     for(const anchor of result.namedAnchorNodes){
+                         let name = anchor.getAttribute('name');
+                         console.assert(name, anchor);
+                         if(this.anchorNameToNode.has(name)){
+                             alert("already exists: ", name);
+                         }
+                         this.anchorNameToNode.set(name, anchor);
+                     }
+
+                     console.log("namedAnchorNodes = ", result.namedAnchorNodes);
+                     console.log("parseSectionTemplate returns ", result);
+                     return result;
+                 },
 
                  async loadResource(dirHandle, filename){
-if(false){
-                     const mapHtmlEntities = {
-                         emdash: "",
-                         dog: "goat",
-                         goat: "cat"
-                     };
-
-             //str = str.replace(/\b(?:cat|dog|goat)\b/gi, matched => mapHtmlEntities[matched]);
-         }
-
                      console.log("loadResource ", filename);
                      const fileHandle = await dirHandle.getFileHandle(filename);
                      console.assert(fileHandle);
@@ -1085,14 +1178,25 @@ if(false){
                      console.log(`file = ${file}`);
                      const text = await file.text();
                      console.log(`text = ${text}`);
-                     let node = document.createElement('div');
-                     node.remove();
-                     console.log("div node is ", node);
-                     node.innerHTML = text;
-                     console.log("div node is ", node);
-                     console.assert(node.firstElementChild.nodeName == 'TEMPLATE');
-                     result.rootNode = node.firstElementChild.content;
-                     result = parseSectionTemplate(node, filename);
+                     let parser = new DOMParser();
+                     let html   = parser.parseFromString(text, 'text/html');
+                     console.assert(html);
+                     let template = html.querySelector('template');
+                     console.assert(template, html);
+                     console.assert(template.parentNode.nodeName == 'HEAD');
+                     console.assert(template.parentNode.childElementCount == 1);
+                     console.log("====================================");
+                     console.log(html);
+                     console.log("====================================");
+                     let node   = createFreeElement('div');
+                     let shadow = node.attachShadow({mode:'open'});
+                     shadow.replaceChildren(template.content);
+//                     console.log("div node is ", node);
+//                     shadow.innerHTML = text;
+//                     console.assert(shadow.firstElementChild.nodeName == 'TEMPLATE');
+//                     shadow.replaceChildren(shadow.firstElementChild.content);
+//                     result.rootNode = node.firstElementChild.content;
+                     result = this.parseSectionTemplate(node, filename);
                      this.resources.set(filename, result);
                      console.log("model.loadResource() returns ", result);
                      return result;
@@ -1102,11 +1206,12 @@ if(false){
                      let resource = await this.loadResource(dirHandle, name);
                      console.log("loadTOC back from await of loadResource ", name);
                      console.log(resource);
-                     let first = resource.rootNode.firstElementChild;
-                     if(first.nodeName == 'UL'){
+                     //                     let first = resource.rootNode.firstElementChild;
+                     //                     if(first.nodeName == 'UL'){
+                     if(resource.ulNode){
                          console.log(`in loadTOC, resource "${name}" has a ul`);
                          resource.isTOC = true;
-                         const entries = first.querySelectorAll('li');
+                         const entries = resource.ulNode.querySelectorAll('li');
                          for(const li of entries){
                              let ID = li.getAttribute('id');
                              let child = await this.loadTOC(dirHandle, ID);
