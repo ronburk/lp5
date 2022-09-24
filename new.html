@@ -10,8 +10,64 @@
         </script>
         <style id="LP5-Global-Style">
         </style>
+        <style>
+         div.epigraph  {
+             display: flex;
+             justify-content: flex-end;
+             flex-flow: wrap;
+         }
+         div.epigraph > div {
+             max-width: 30em;
+         }
+         div.epigraph  hr { width:100%; size:0;display:none;}
+        </style>
+        <style>
+         pre code {
+             background-color: #eee;
+             border: 1px solid #999;
+             display: block;
+             padding: 20px;
+         }
+        </style>
+
     </head>
     <body>
+        <template data-name="EditSection">
+            <div>
+                <dialog id="EditSection">
+                    <center>
+                        <input data-id="sectionName" type="text"/>
+                        <textarea data-id="docText" rows="10" cols="80"> stuff </textarea>
+                        <textarea data-id="codeText" rows="10" cols="80"> other </textarea>
+                    </center>
+                </dialog>
+            </div>
+            <script>
+             const model = require('model');
+             const iView = require('iView');
+             const {sectionName, docText, codeText} = iView.dataID;
+
+             function sectionGetTitle(node){
+                 console.log("sectionGetTitle ", node);
+                 console.log("grandpa", node.parentNode.parentNode);
+                 let result = node.querySelector(':scope > h1,h2,h3,h4,h5');
+                 console.log("result =  ", result);
+                 
+             }
+             function init(iView, node){
+                 console.log("EditSection ", node);
+             }
+
+             function renderEditSectionDialog(iView, node){
+                 console.log("EditSection Dialog render!!!!!!");
+                 let title = sectionGetTitle(node);
+                 console.log("Title is ", title);
+                 
+             }
+             let result = { init: init, render: renderEditSectionDialog };
+             return result;
+            </script>
+        </template>
         <template data-name="SelectParent">
             <div>
                 <style>
@@ -302,13 +358,13 @@
                 </style>
                 <div id="LP5-Menu">
                     <ul>
-                        <li id="LP5-Menu-Reload">Reload</li>
+                        <li id="LP5-Menu-Reload" tabindex="0">Reload</li>
                         <li>Menu 2</li>
                         <li>Menu 3</li>
                         <li>Menu 4</li>
                     </ul>
                 </div>
-                <template>
+                <template data-name="tableOfContents">
                     <div id="LP5-Toc">
                     </div>
                     <script>
@@ -343,7 +399,7 @@
                      return result;
                     </script>
                 </template>
-                <template>
+                <template data-name="sourceDiv">
                     <div id="LP5-Source" data-id="outerDiv">
                     </div>
                     <script>
@@ -413,7 +469,7 @@
                 </template>
                 <div id="LP5-Output">
                     Here be some output!
-                    <template>
+                    <template data-name="outputDiv">
                         <div><p> hahahahaha </p>
                         </div>
                         <script>
@@ -431,7 +487,7 @@
                 </div>
                 
                 <div id="LP5-Footer">
-                    <template>
+                    <template data-name="footerDiv" >
                         <style>
                          span { background-color: #f88; }
                         </style>
@@ -561,7 +617,7 @@
              console.log("div node is ", shadow);
              console.assert(node.firstElementChild.nodeName == 'TEMPLATE');
              shadow.replaceChildren(shadow.firstElementChild.content);
-//             node = node.firstElementChild.content;
+             //             node = node.firstElementChild.content;
              //             return shadow.firstElementChild.content;  // return contents of template (a tree of nodes)
              return node;
          }
@@ -673,7 +729,6 @@
                          console.log(">>>>>>>>>>>>>asyncSchedule!!!!!!");
                          asyncSchedule(selectParentDir, model, event);
                          console.log("<<<<<<<<<<<<<asyncSchedule!!!!!!");
-
                          controller.state = 'SelectingParent';
                      } else if(event.type == 'click') {
                          // let the view handle clicks
@@ -732,9 +787,19 @@
                      }else if(event.type == 'click'){
                          let path   = event.composedPath();
                          console.log(path);
+                         let section = path.find((node, index)=>{
+                             return node.tagName == 'DIV'
+                                 && index+1 < path.length
+                                 && path[index+1].id == 'LP5-Source'
+                             ;
+                         });
                          let target = path[0];
                          console.log(target);
-                         if(target.id == 'LP5-Menu-Reload'){
+                         if(section){
+                             console.log("views.push Edit Section ", section);
+                             views.push('EditSection', section);
+                             controller.state = 'EditingSection';
+                         }else if(target.id == 'LP5-Menu-Reload'){
                              controller.state = 'openProject';
                              asyncSchedule(model.openProject.bind(model), model.rootTOC.name);
                          } else if(target.tagName == 'A'){
@@ -749,7 +814,7 @@
                                      };
                                      console.log(options);
                                      let destination = model.anchorNameToNode.get(href);
-//                                     let destination = document.querySelector(`a[name="${href}"]`);
+                                     //                                     let destination = document.querySelector(`a[name="${href}"]`);
                                      console.assert(destination);
                                      destination.scrollIntoView(true);
                                  } else {
@@ -757,6 +822,12 @@
                                  }
                              }
                          }
+                     }
+                     break;
+                 case 'EditingSection' :
+                     if(event.type == 'close') {
+                         console.log("Clse event came in");
+                         controller.state = 'home';
                      }
                      break;
                  default:
@@ -793,6 +864,7 @@
          };
          controller.states = new Set([
              'AwaitDirHandleLoad',
+             'EditingSection',
              'home',
              'load',
              'openProject',
@@ -920,6 +992,9 @@
                      });
 
                      const iView    = structuredClone(viewInterface);
+                     let name = t.dataset.name;
+                     if(!name){
+                     }
                      iView.name     = t.dataset.name; // data-name='xxx'
                      console.log("template named ", iView.name);
 
@@ -1000,34 +1075,36 @@
                  //                 this.currentView.notify.init();
                  this.init(this.currentView);
              },
-             init(iView){
+             init(iView, ...args){
                  console.log("init iView ", iView);
                  if(iView.notify){
                      console.log("    childcount= ", iView.children.length);
-                     iView.notify.init(iView);
+                     iView.notify.init(iView, ...args);
                  } else {
                      console.log("   (no notify function!)");
                  }
-                 iView.children.forEach((i)=>this.init(i));
+                 iView.children.forEach((i)=>this.init(i, ...args));
              },
-             render(iView){
+             render(iView, ...args){
                  if(!iView)
                      iView = this.currentView;
                  console.log("render ", iView);
                  if(iView.notify)
-                     iView.notify.render(iView);
+                     iView.notify.render(iView, ...args);
                  if(iView.children)
-                     iView.children.forEach((i)=>i.notify.render(i));
+                     iView.children.forEach((i)=>i.notify.render(i, ...args));
              },
-             push(dialogName) {
+             push(dialogName, ...args) {
+                 console.log("views.push ", dialogName);
                  ++this.inProgress;
                  console.assert(this.currentView);
                  this.stack.push(this.currentView);
                  const iView = this.views[dialogName];
                  this.setBody(iView);
                  this.currentView = iView;
-                 this.init(this.currentView);
-                 this.render(this.currentView);
+                 console.log("views.push calls init for ", iView);
+                 this.init(this.currentView, ...args);
+                 this.render(this.currentView, ...args);
                  --this.inProgress;
              },
              pop() {
@@ -1102,7 +1179,7 @@
              }
          };
 
-         controller.model = function(views){
+         controller.model = function(){
              let result = {
                  dirHandle       : null,
                  dirParentHandle : null,
@@ -1112,11 +1189,58 @@
                  projects        : {},
                  anchorNameToNode: new Map(),
 
+                 fileToResource(filename){
+                     const result = {
+                         name        : filename,
+                         children    : [],
+                         divContainer: null,
+                         shadowRoot  : null,
+                         ulNode      : null,
+                         sectionNode : null,
+                         titleNode   : null,
+                         docNode     : null,
+                         codeNode    : null,
+                         templateNode: null,
+                         scriptNode  : null,
+                         text        : null,
+                         isTOC       : false,
+                         namedAnchorNodes: null,
+                     };
+                 },
                  // ??? this func needs to be rigorous definition of allowable formats
                  // Each resource contains an HTML <template>.
-                 // style ? section ? script?
+                 // style ? ul ? section ? script?
                  parseSectionTemplate(divContainer, filename){
                      console.log("parseSectionTemplate ", filename);
+
+                     function* parseTemplate(divContainer, result){
+                         result.divContainer = divContainer;
+                         result.shadowRoot   = divContainer.shadowRoot;
+                         console.assert(shadowRoot, divContainer);
+                         
+                         let element = yield true;
+
+                         if(element.tagName == 'STYLE'){
+                             result.styleNode = element;
+                             element = yield true;
+                         }
+                         if(element.tagName == 'UL'){
+                             result.ulNode = element;
+                             element = yield true;
+                         }
+                         if(element.tagName == 'SECTION'){
+                             result.sectionNode = element;
+                             element = yield true;
+                         }
+                         if(element.tagName == 'SCRIPT'){
+                             result.scriptNode = element;
+                             element = yield true;
+                         }
+                         while(true){
+                             console.log("Unexpected element in template: ", element);
+                             element = yield false;
+                         }
+                     }
                      const result = {
                          name        : filename,
                          children    : [],
@@ -1134,6 +1258,16 @@
                          namedAnchorNodes: null,
                      };
                      let shadowRoot      = divContainer.shadowRoot;
+                     console.log("shadowRoot is ", shadowRoot);
+                     console.log("shadowRoot children is ", shadowRoot.children);
+                     let checker = parseTemplate(divContainer, result);
+                     for(const element of shadowRoot.children){
+                         console.log("checker.next of ", element);
+                         console.assert(checker.next(element));
+                     }
+                     let children = shadowRoot.querySelectorAll(':scope > *');
+                     console.log("@@@@@@@@ ", children);
+
                      result.divContainer = divContainer;
                      result.shadowRoot   = shadowRoot;
                      let firstChild      = shadowRoot.firstElementChild;
@@ -1147,7 +1281,7 @@
                      else
                          console.log("No template for code!");
                      let scriptNode      = shadowRoot.querySelector('script[type="text/plain"]');
-//                     let scriptNode      = shadowRoot.querySelector('script');
+                     //                     let scriptNode      = shadowRoot.querySelector('script');
                      if(scriptNode){
                          console.log("script found: ", scriptNode);
                          result.scriptNode = scriptNode;
@@ -1172,6 +1306,60 @@
 
                  async loadResource(dirHandle, filename){
                      console.log("loadResource ", filename);
+                     const result = {
+                         name            : filename,
+                         children        : [],
+                         articleNode     : null,
+                         docSectionNode  : null,
+                         docText         : null,
+                         titleNode       : null,
+                         codeSectionNode : null,
+                         codeText        : null,
+                         codeNameNode    : null,
+                         ulNode          : null,
+                     };
+                     const fileHandle = await dirHandle.getFileHandle(filename);
+                     console.assert(fileHandle);
+                     const file = await fileHandle.getFile();
+                     const text = await file.text();
+                     let html   = new DOMParser().parseFromString(text, 'text/html');
+                     console.assert(html);
+                     let template = html.querySelector('template');
+                     console.assert(template, html);
+                     console.assert(template.parentNode.nodeName == 'HEAD');
+                     console.assert(template.parentNode.childElementCount == 1);
+                     result.articleNode = createFreeElement('article');
+                     let childElements = template.content.children;
+                     let nChild = childElements.length;
+                     let iChild = 0;
+                     let topLevelNode = childElements[iChild];
+                     if(iChild < nChild && topLevelNode.tagName == 'UL'){
+                         topLevelNode.style.display = 'none';
+                         result.ulNode = topLevelNode;
+                         topLevelNode = childElements[++iChild];
+                     }
+                     if(iChild < nChild && topLevelNode.tagName == 'SECTION'
+                        && !topLevelNode.querySelector('script')){
+                         result.titleNode = topLevelNode.querySelector(
+                             ':scope > h2:first-child');
+                         result.docSectionNode = topLevelNode;
+                         topLevelNode = childElements[++iChild];
+                     }
+                     if(iChild < nChild && topLevelNode.tagName == 'SECTION'
+                        && topLevelNode.querySelector(':scope >script:first-child')){
+                         result.codeNameNode = topLevelNode.querySelector(
+                                ':scope > h2:first-child');
+                         result.codeSectionNode = topLevelNode;
+                         topLevelNode = childElements[++iChild];
+                     }
+                     console.assert(iChild == nChild, iChild);
+                     this.resources.set(filename, result);
+                     console.log("model.loadResource() returns ", result);
+                     return result;
+                 },
+
+                 async loadResource2(dirHandle, filename){
+                     console.log("loadResource ", filename);
                      const fileHandle = await dirHandle.getFileHandle(filename);
                      console.assert(fileHandle);
                      const file = await fileHandle.getFile();
@@ -1191,11 +1379,11 @@
                      let node   = createFreeElement('div');
                      let shadow = node.attachShadow({mode:'open'});
                      shadow.replaceChildren(template.content);
-//                     console.log("div node is ", node);
-//                     shadow.innerHTML = text;
-//                     console.assert(shadow.firstElementChild.nodeName == 'TEMPLATE');
-//                     shadow.replaceChildren(shadow.firstElementChild.content);
-//                     result.rootNode = node.firstElementChild.content;
+                     //                     console.log("div node is ", node);
+                     //                     shadow.innerHTML = text;
+                     //                     console.assert(shadow.firstElementChild.nodeName == 'TEMPLATE');
+                     //                     shadow.replaceChildren(shadow.firstElementChild.content);
+                     //                     result.rootNode = node.firstElementChild.content;
                      result = this.parseSectionTemplate(node, filename);
                      this.resources.set(filename, result);
                      console.log("model.loadResource() returns ", result);

@@ -1,14 +1,6 @@
 <template>
     <section>
         <h2>Overview</h2>
-        <style>
-         pre code {
-             background-color: #eee;
-             border: 1px solid #999;
-             display: block;
-             padding: 20px;
-         }
-        </style>
         <div>
             <p>
                 lp5 is a browser-based text editor and preprocessor
@@ -186,15 +178,6 @@
                 CSS declarations, etc.
             </p>
 
-        </div>
-        <div>
-            <pre>
-                <code>
-int main(){
-    foob();
-}
-                </code>
-            </pre>  
         </div>
     </section>
 </template>

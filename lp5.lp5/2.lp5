@@ -1,15 +1,4 @@
 <template>
-    <style>
-     div.epigraph  {
-         display: flex;
-         justify-content: flex-end;
-         flex-flow: wrap;
-     }
-     div.epigraph > div {
-         max-width: 30em;
-     }
-     div.epigraph  hr { width:100%; size:0;display:none;}
-    </style>
     <section>
         <h2><a name="#2.lp5"> Appendix I: Literate Programming</a></h2>
         <div class="epigraph">

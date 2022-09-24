@@ -1,3 +1,33 @@
+Linked Definitions
+==================
+Ability to "define" variable with some hover text that appears
+if you hover over a reference to that variable. Requires ability
+to locate refs/defs correctly that we won't have for a looooong time.
+
+Linked strings
+==============
+Especially in HTML5, one gets strings that all refer to the same
+thing, even though some references are actual strings and others
+are identifiers. Renaming them is a small, but worthwhile part
+of refactoring. As added bonus, sometimes we just want to navigate
+among the other uses of the variable (right-click on variable,
+give menu command that changes working set to articles containing
+instances of that variable).
+
+This would require decorating each instance with some unique
+identifier. Not much different than the work required to manage
+code section names. In fact, this is kind of a code section
+that has a name but no body! Example:
+
+CSS:
+    .LP5Code { blah... };
+HTML:
+    <div class="LP5Code" >...
+JavaScript:
+    let LP5Code = document.querySelectorAll('.LP5Code');
+
+
+
 HTML code annotated via html?
 =============================
 A code section could be in any programming language--including
