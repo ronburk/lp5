@@ -1,11 +1,12 @@
 <template>
     <ul>
-        <li id="1.lp5">
-        <li id ="3.lp5">
-        <li id="2.lp5">
+        <li id="1.lp5"/>
+        <li id ="3.lp5"/>
+        <li id="4.lp5"/>
+        <li id="2.lp5"/>
     </ul>
     <section>
-        <h2>lp5 - decompositional explanatory software development.</h2>
+        <h2>lp5 - decompositional explanatory programming.</h2>
         <div>
         </div>
         <code>

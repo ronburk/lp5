@@ -1,3 +1,12 @@
+No-Edit code references
+=======================
+Suppose our project needs to include codemirror.js.
+It's a big chunk of code, we don't want to look at it
+or edit it. But we do want lp5 to gather it up during code
+generation. Need a style of code section that fulfills those
+needs.
+
+
 Linked Definitions
 ==================
 Ability to "define" variable with some hover text that appears

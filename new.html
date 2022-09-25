@@ -17,7 +17,7 @@
              flex-flow: wrap;
          }
          div.epigraph > div {
-             max-width: 30em;
+             max-width: 27em;
          }
          div.epigraph  hr { width:100%; size:0;display:none;}
         </style>
@@ -36,7 +36,7 @@
             <div>
                 <dialog id="EditSection">
                     <center>
-                        <input data-id="sectionName" type="text"/>
+                        <input data-id="sectionName" type="text"/><br>
                         <textarea data-id="docText" rows="10" cols="80"> stuff </textarea>
                         <textarea data-id="codeText" rows="10" cols="80"> other </textarea>
                     </center>
@@ -359,14 +359,14 @@
                 <div id="LP5-Menu">
                     <ul>
                         <li id="LP5-Menu-Reload" tabindex="0">Reload</li>
-                        <li>Menu 2</li>
+                        <li id="LP5-Menu-Compile">Compile</li>
                         <li>Menu 3</li>
                         <li>Menu 4</li>
                     </ul>
                 </div>
                 <template data-name="tableOfContents">
-                    <div id="LP5-Toc">
-                    </div>
+                    <nav id="LP5-Toc">
+                    </nav>
                     <script>
                      const iView = require('iView');
                      const model = require('model');
@@ -379,8 +379,7 @@
                      function renderTOC(){
                          console.log("render toc: ", model.rootTOC);
                          if(model.rootTOC){
-                             let ul = createFreeElement('ul');
-                             //                             let first = model.rootTOC.rootNode.firstElementChild;
+                             let ul    = createFreeElement('ul');
                              let first = model.rootTOC.ulNode;
                              first.querySelectorAll('li').forEach((entry)=>{
                                  let li = createFreeElement('li');
@@ -410,7 +409,7 @@
                      };
                      function massageCode(text){
                          console.log("massageCode ", text);
-                         let result = text;
+                         let result = text = text.replaceAll(/[&]lt;/g,'<');
                          let lines = text.split(/\r?\n/);
                          let indent = -1;
                          for(let line of lines){
@@ -433,11 +432,14 @@
                          return result;
                      }
                      function renderSection(res){
-                         let {sectionNode, ulNode} = res;
-                         if(sectionNode){
-                             outerDiv.appendChild(res.divContainer);
+                         console.log("renderSection ", res);
+                         let {docSectionNode, ulNode} = res;
+                         if(docSectionNode){
+                             console.log("Appending article node");
+                             outerDiv.appendChild(res.articleNode);
                              
                              if(res.scriptNode){
+                                 console.log("   got script node ");
                                  let div = createFreeElement('div');
                                  div.classList.add('LP5-Code');
                                  div.innerText = massageCode(
@@ -446,6 +448,7 @@
                              }
                          }
                          if(ulNode){
+                             console.log("nested ul node", ulNode);
                              ulNode.style.display = 'none';
                              ulNode.querySelectorAll('li').forEach((li)=>{
                                  let id = li.getAttribute('id');
@@ -780,6 +783,10 @@
                      views.render();
                      break;
                  case 'home' :
+                     console.log("resources in doc order");
+                     for(const res of model.docOrder(model.rootTOC)){
+                         console.log("    res = ", res);
+                     }
                      if(event.type == 'contextmenu'){
                          let path   = event.composedPath();
                          let target = path[0];
@@ -788,7 +795,7 @@
                          let path   = event.composedPath();
                          console.log(path);
                          let section = path.find((node, index)=>{
-                             return node.tagName == 'DIV'
+                             return node.tagName == 'ARTICLE'
                                  && index+1 < path.length
                                  && path[index+1].id == 'LP5-Source'
                              ;
@@ -941,7 +948,7 @@
              loadTemplates(rootElement=document, parentView=null){
                  console.log("views.loadTemplates()");
                  
-                 // template must be of form: style? div script?
+                 // template must be of form: style? div/nav script?
                  function parseTemplate(template){
                      let   style = null, div = null, script = null;
                      const root  = template.content;
@@ -968,7 +975,7 @@
                              console.assert(false, children);
                      };
                      console.assert(!style  || style.nodeName  == 'STYLE');
-                     console.assert(!div    || div.nodeName    == 'DIV');
+                     console.assert(!div    || (div.nodeName    == 'DIV' || div.nodeName == 'NAV'));
                      console.assert(!script || script.nodeName == 'SCRIPT');
 
                      const result = {style:style, div:div, script:script};
@@ -1179,16 +1186,50 @@
              }
          };
 
+         controller.compile = function(resource){
+             let output = '';
+             
+             return output;
+         }
          controller.model = function(){
              let result = {
+                 nextArticleID   : 0,
                  dirHandle       : null,
                  dirParentHandle : null,
                  projectName     : null,
                  resources       : new Map(),
+                 articles        : [],
                  rootTOC         : null,
                  projects        : {},
                  anchorNameToNode: new Map(),
-
+                 articleFromURL(url){
+                     for(const article of this.articles)
+                         if(article.URL == url)
+                             return article;
+                     return null;
+                 },
+                 *docOrder(resource){
+                     console.assert(this.resources); // detect bogus 'this'
+                     yield resource;
+                     let ulNode = resource.ulNode;
+                     if(ulNode)
+                         for(const entry of ulNode.querySelectorAll(':scope > li')){
+                             console.log(entry);
+                             let id     = entry.getAttribute('id');
+                             yield* this.docOrder(this.resources.get(id));
+                         }
+                 },
+                 *codeOrder(queue = null){
+                     if(queue === null){ // if initial iteration
+                         queue = [];
+                         for(const resource of this.docOrder(this.rootTOC))
+                             if(resource.codeNode && !resource.codeNameNode){
+                                 yield resource;
+                                 queue.push(resource);
+                             }
+                     }
+//                     if(queue
+                 },
                  fileToResource(filename){
                      const result = {
                          name        : filename,
@@ -1200,10 +1241,10 @@
                          titleNode   : null,
                          docNode     : null,
                          codeNode    : null,
+                         codeNameNode: null,
                          templateNode: null,
                          scriptNode  : null,
                          text        : null,
-                         isTOC       : false,
                          namedAnchorNodes: null,
                      };
                  },
@@ -1211,7 +1252,7 @@
                  // Each resource contains an HTML <template>.
                  // style ? ul ? section ? script?
                  parseSectionTemplate(divContainer, filename){
-                     console.log("parseSectionTemplate ", filename);
+                     console.log("[]parseSectionTemplate ", filename);
 
                      function* parseTemplate(divContainer, result){
                          result.divContainer = divContainer;
@@ -1254,7 +1295,6 @@
                          templateNode: null,
                          scriptNode  : null,
                          text        : null,
-                         isTOC       : false,
                          namedAnchorNodes: null,
                      };
                      let shadowRoot      = divContainer.shadowRoot;
@@ -1304,54 +1344,110 @@
                      return result;
                  },
 
+                 unindentCode(text){
+                     console.log("unindentCode ", text);
+                     let result = text;
+                     let lines = text.split(/\r?\n/);
+                     let indent = -1;
+                     for(let line of lines){
+                         line = line.replace(/\s+$/,'');
+                         if(line.length){
+                             let thisIndent = line.search(/\S|$/);
+                             console.log("this indent ", thisIndent, line);
+                             if(indent == -1 || thisIndent < indent){
+                                 indent = thisIndent;
+                                 console.log("indent now ", indent, line);
+                             }
+                         }
+                     }
+                     if(indent > 0){
+                         let space = " ".repeat(indent);
+                         let regex = new RegExp("^" + space, 'gm');
+                         result = text.replace(regex, '');
+                         console.assert(result != text);
+                     }
+                     return result;
+                 },
                  async loadResource(dirHandle, filename){
                      console.log("loadResource ", filename);
                      const result = {
                          name            : filename,
-                         children        : [],
+                         children        : [],       // nested resources
                          articleNode     : null,
                          docSectionNode  : null,
                          docText         : null,
                          titleNode       : null,
+                         scriptNode      : null,
                          codeSectionNode : null,
                          codeText        : null,
                          codeNameNode    : null,
                          ulNode          : null,
                      };
+                     function fixScript(text){
+                         let result   = text;
+                         function count(re, text){
+                             return ((text||'').match(re) || []).length;
+                         }
+                         const nBegin = count(/\<script[^a-z0-9]/gi, text);
+                         const nEnd   = count(/\<\/script[^a-z0-9]/gi, text);
+                         console.log(`fixScript nBegin=${nBegin} nEnd=${nEnd}`);
+
+                         return result;
+                     }
+
                      const fileHandle = await dirHandle.getFileHandle(filename);
                      console.assert(fileHandle);
                      const file = await fileHandle.getFile();
-                     const text = await file.text();
+                     let   text = await file.text();
+                     text       = fixScript(text);
                      let html   = new DOMParser().parseFromString(text, 'text/html');
                      console.assert(html);
+                     console.log("html from DOMParser is ", html);
                      let template = html.querySelector('template');
                      console.assert(template, html);
                      console.assert(template.parentNode.nodeName == 'HEAD');
                      console.assert(template.parentNode.childElementCount == 1);
+                     console.log("template content from DOMParser is ", template.content.children);
+                     for(const child of template.content.childNodes){
+                         console.log(child);
+                     }
                      result.articleNode = createFreeElement('article');
-                     let childElements = template.content.children;
+                     const childElements = template.content.children;
                      let nChild = childElements.length;
-                     let iChild = 0;
-                     let topLevelNode = childElements[iChild];
-                     if(iChild < nChild && topLevelNode.tagName == 'UL'){
+                     console.log("nChild = ", nChild);
+                     let   iChild = 0;
+                     let   topLevelNode = childElements[iChild];
+                     console.log("topLevelNode", topLevelNode);
+                     if(nChild && topLevelNode.tagName == 'UL'){
                          topLevelNode.style.display = 'none';
                          result.ulNode = topLevelNode;
-                         topLevelNode = childElements[++iChild];
+                         result.articleNode.appendChild(result.ulNode);
+                         topLevelNode = childElements[0];
+                         --nChild;
                      }
-                     if(iChild < nChild && topLevelNode.tagName == 'SECTION'
+                     console.log("topLevelNode", topLevelNode);
+                     if(nChild && topLevelNode.tagName == 'SECTION'
                         && !topLevelNode.querySelector('script')){
                          result.titleNode = topLevelNode.querySelector(
                              ':scope > h2:first-child');
                          result.docSectionNode = topLevelNode;
-                         topLevelNode = childElements[++iChild];
+                         result.articleNode.appendChild(result.docSectionNode);
+                         topLevelNode = childElements[0];
+                         --nChild
                      }
-                     if(iChild < nChild && topLevelNode.tagName == 'SECTION'
-                        && topLevelNode.querySelector(':scope >script:first-child')){
+                     console.log("topLevelNode", topLevelNode);
+                     if(nChild && topLevelNode.tagName == 'SECTION'
+                        && topLevelNode.querySelector('script')){
                          result.codeNameNode = topLevelNode.querySelector(
-                                ':scope > h2:first-child');
+                             ':scope > h2:first-child');
                          result.codeSectionNode = topLevelNode;
-                         topLevelNode = childElements[++iChild];
+                         result.scriptNode      = topLevelNode
+                             .querySelector(':scope >script:first-child');
+                         result.articleNode.appendChild(result.codeSectionNode);
+                         topLevelNode = childElements[0];
+                         --nChild
                      }
+                     console.log("topLevelNode", topLevelNode);
                      console.assert(iChild == nChild, iChild);
                      this.resources.set(filename, result);
                      console.log("model.loadResource() returns ", result);
@@ -1398,7 +1494,6 @@
                      //                     if(first.nodeName == 'UL'){
                      if(resource.ulNode){
                          console.log(`in loadTOC, resource "${name}" has a ul`);
-                         resource.isTOC = true;
                          const entries = resource.ulNode.querySelectorAll('li');
                          for(const li of entries){
                              let ID = li.getAttribute('id');
