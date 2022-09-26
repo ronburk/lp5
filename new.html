@@ -28,6 +28,18 @@
              display: block;
              padding: 20px;
          }
+
+         .skip {
+             position: absolute;
+             left: -999em;
+             width: 990em;
+         }
+         a.skip:active,  a.skip:focus {
+             left: -8.5em;
+             border: 3px #3399cc solid;
+             background-color: #fff;
+         }
+
         </style>
 
     </head>
@@ -36,7 +48,7 @@
             <div>
                 <dialog id="EditSection">
                     <center>
-                        <input data-id="sectionName" type="text"/><br>
+                        <input data-id="articleTitle" type="text"/><br>
                         <textarea data-id="docText" rows="10" cols="80"> stuff </textarea>
                         <textarea data-id="codeText" rows="10" cols="80"> other </textarea>
                     </center>
@@ -45,14 +57,11 @@
             <script>
              const model = require('model');
              const iView = require('iView');
-             const {sectionName, docText, codeText} = iView.dataID;
+             const {articleTitle, docText, codeText} = iView.dataID;
 
-             function sectionGetTitle(node){
-                 console.log("sectionGetTitle ", node);
-                 console.log("grandpa", node.parentNode.parentNode);
-                 let result = node.querySelector(':scope > h1,h2,h3,h4,h5');
-                 console.log("result =  ", result);
-                 
+             function sectionGetTitle(article){
+                 console.log("sectionGetTitle ", article);
+                 return article.titleNode.innerText;
              }
              function init(iView, node){
                  console.log("EditSection ", node);
@@ -62,7 +71,7 @@
                  console.log("EditSection Dialog render!!!!!!");
                  let title = sectionGetTitle(node);
                  console.log("Title is ", title);
-                 
+                 articleTitle.value = title;
              }
              let result = { init: init, render: renderEditSectionDialog };
              return result;
@@ -384,7 +393,8 @@
                              first.querySelectorAll('li').forEach((entry)=>{
                                  let li = createFreeElement('li');
                                  let id = entry.getAttribute('id');
-                                 let res = model.resources.get(id);
+//                                 let res = model.resources.get(id);
+                                 let res = model.articleFromURL(id);
                                  if(res.titleNode)
                                      li.innerText = res.titleNode.innerText;
                                  else
@@ -440,11 +450,10 @@
                              
                              if(res.scriptNode){
                                  console.log("   got script node ");
-                                 let div = createFreeElement('div');
-                                 div.classList.add('LP5-Code');
-                                 div.innerText = massageCode(
+                                 res.codeTextNode.innerText = massageCode(
                                      res.scriptNode.innerText);
-                                 outerDiv.appendChild(div);
+//                                 outerDiv.appendChild(div);
+                                 
                              }
                          }
                          if(ulNode){
@@ -453,7 +462,8 @@
                              ulNode.querySelectorAll('li').forEach((li)=>{
                                  let id = li.getAttribute('id');
                                  console.assert(id, ulNode);
-                                 let res = model.resources.get(id);
+//                                 let res = model.resources.get(id);
+                                 let res = model.articleFromURL(id);
                                  console.assert(res, id);
                                  renderSection(res);
                              });
@@ -523,6 +533,9 @@
         <script>
          "use strict";
 
+         function isTest(){
+             return !!navigator.webdriver;
+         }
          function isLocalHref(anchorNode){
              let result = false;
              if(anchorNode.tagName == 'A'){
@@ -804,7 +817,7 @@
                          console.log(target);
                          if(section){
                              console.log("views.push Edit Section ", section);
-                             views.push('EditSection', section);
+                             views.push('EditSection', model.articleFromID(section));
                              controller.state = 'EditingSection';
                          }else if(target.id == 'LP5-Menu-Reload'){
                              controller.state = 'openProject';
@@ -1197,26 +1210,32 @@
                  dirHandle       : null,
                  dirParentHandle : null,
                  projectName     : null,
-                 resources       : new Map(),
+//                 resources       : new Map(),
                  articles        : [],
                  rootTOC         : null,
                  projects        : {},
                  anchorNameToNode: new Map(),
+                 articleFromID(node){
+                     let id = node.id.replace(/^article-/,'');
+                     console.assert(id >= 0);
+                     console.assert(id < this.articles.length);
+                     return this.articles[id];
+                 },
                  articleFromURL(url){
                      for(const article of this.articles)
                          if(article.URL == url)
                              return article;
                      return null;
                  },
-                 *docOrder(resource){
-                     console.assert(this.resources); // detect bogus 'this'
-                     yield resource;
-                     let ulNode = resource.ulNode;
+                 *docOrder(article){
+                     console.assert(this.articles); // detect bogus 'this'
+                     yield article;
+                     let ulNode = article.ulNode;
                      if(ulNode)
                          for(const entry of ulNode.querySelectorAll(':scope > li')){
                              console.log(entry);
                              let id     = entry.getAttribute('id');
-                             yield* this.docOrder(this.resources.get(id));
+                             yield* this.docOrder(this.articleFromURL(id));
                          }
                  },
                  *codeOrder(queue = null){
@@ -1248,101 +1267,6 @@
                          namedAnchorNodes: null,
                      };
                  },
-                 // ??? this func needs to be rigorous definition of allowable formats
-                 // Each resource contains an HTML <template>.
-                 // style ? ul ? section ? script?
-                 parseSectionTemplate(divContainer, filename){
-                     console.log("[]parseSectionTemplate ", filename);
-
-                     function* parseTemplate(divContainer, result){
-                         result.divContainer = divContainer;
-                         result.shadowRoot   = divContainer.shadowRoot;
-                         console.assert(shadowRoot, divContainer);
-                         
-                         let element = yield true;
-
-                         if(element.tagName == 'STYLE'){
-                             result.styleNode = element;
-                             element = yield true;
-                         }
-                         if(element.tagName == 'UL'){
-                             result.ulNode = element;
-                             element = yield true;
-                         }
-                         if(element.tagName == 'SECTION'){
-                             result.sectionNode = element;
-                             element = yield true;
-                         }
-                         if(element.tagName == 'SCRIPT'){
-                             result.scriptNode = element;
-                             element = yield true;
-                         }
-                         while(true){
-                             console.log("Unexpected element in template: ", element);
-                             element = yield false;
-                         }
-                     }
-                     const result = {
-                         name        : filename,
-                         children    : [],
-                         divContainer: null,
-                         shadowRoot  : null,
-                         ulNode      : null,
-                         sectionNode : null,
-                         titleNode   : null,
-                         docNode     : null,
-                         codeNode    : null,
-                         templateNode: null,
-                         scriptNode  : null,
-                         text        : null,
-                         namedAnchorNodes: null,
-                     };
-                     let shadowRoot      = divContainer.shadowRoot;
-                     console.log("shadowRoot is ", shadowRoot);
-                     console.log("shadowRoot children is ", shadowRoot.children);
-                     let checker = parseTemplate(divContainer, result);
-                     for(const element of shadowRoot.children){
-                         console.log("checker.next of ", element);
-                         console.assert(checker.next(element));
-                     }
-                     let children = shadowRoot.querySelectorAll(':scope > *');
-                     console.log("@@@@@@@@ ", children);
-
-                     result.divContainer = divContainer;
-                     result.shadowRoot   = shadowRoot;
-                     let firstChild      = shadowRoot.firstElementChild;
-                     if(firstChild.tagName == 'UL')
-                         result.ulNode   = firstChild;
-                     result.templateNode = shadowRoot.querySelector('template');
-                     if(result.templateNode){
-                         console.log("result.templateNode",
-                                     result.templateNode.content);
-                     }
-                     else
-                         console.log("No template for code!");
-                     let scriptNode      = shadowRoot.querySelector('script[type="text/plain"]');
-                     //                     let scriptNode      = shadowRoot.querySelector('script');
-                     if(scriptNode){
-                         console.log("script found: ", scriptNode);
-                         result.scriptNode = scriptNode;
-                     }
-                     result.codeNode     = shadowRoot.querySelector('code');
-                     result.titleNode    = shadowRoot.querySelector('h1, h2, h3, h4, h5');
-                     result.sectionNode  = shadowRoot.querySelector('section');
-                     result.namedAnchorNodes = shadowRoot.querySelectorAll('a[name]');
-                     for(const anchor of result.namedAnchorNodes){
-                         let name = anchor.getAttribute('name');
-                         console.assert(name, anchor);
-                         if(this.anchorNameToNode.has(name)){
-                             alert("already exists: ", name);
-                         }
-                         this.anchorNameToNode.set(name, anchor);
-                     }
-
-                     console.log("namedAnchorNodes = ", result.namedAnchorNodes);
-                     console.log("parseSectionTemplate returns ", result);
-                     return result;
-                 },
 
                  unindentCode(text){
                      console.log("unindentCode ", text);
@@ -1371,6 +1295,7 @@
                  async loadResource(dirHandle, filename){
                      console.log("loadResource ", filename);
                      const result = {
+                         URL             : filename,
                          name            : filename,
                          children        : [],       // nested resources
                          articleNode     : null,
@@ -1379,7 +1304,7 @@
                          titleNode       : null,
                          scriptNode      : null,
                          codeSectionNode : null,
-                         codeText        : null,
+                         codeTextNode    : null,
                          codeNameNode    : null,
                          ulNode          : null,
                      };
@@ -1412,6 +1337,7 @@
                          console.log(child);
                      }
                      result.articleNode = createFreeElement('article');
+                     result.articleNode.id = `article-${this.articles.length}`;
                      const childElements = template.content.children;
                      let nChild = childElements.length;
                      console.log("nChild = ", nChild);
@@ -1443,48 +1369,21 @@
                          result.codeSectionNode = topLevelNode;
                          result.scriptNode      = topLevelNode
                              .querySelector(':scope >script:first-child');
+                         result.codeTextNode = createFreeElement('div');
+                         result.codeTextNode.classList.add('LP5-Code');
+                         result.codeSectionNode.appendChild(result.codeTextNode);
                          result.articleNode.appendChild(result.codeSectionNode);
                          topLevelNode = childElements[0];
                          --nChild
                      }
                      console.log("topLevelNode", topLevelNode);
                      console.assert(iChild == nChild, iChild);
-                     this.resources.set(filename, result);
+//                     this.resources.set(filename, result);
+                     this.articles.push(result);
                      console.log("model.loadResource() returns ", result);
                      return result;
                  },
 
-                 async loadResource2(dirHandle, filename){
-                     console.log("loadResource ", filename);
-                     const fileHandle = await dirHandle.getFileHandle(filename);
-                     console.assert(fileHandle);
-                     const file = await fileHandle.getFile();
-                     console.log(`file = ${file}`);
-                     const text = await file.text();
-                     console.log(`text = ${text}`);
-                     let parser = new DOMParser();
-                     let html   = parser.parseFromString(text, 'text/html');
-                     console.assert(html);
-                     let template = html.querySelector('template');
-                     console.assert(template, html);
-                     console.assert(template.parentNode.nodeName == 'HEAD');
-                     console.assert(template.parentNode.childElementCount == 1);
-                     console.log("====================================");
-                     console.log(html);
-                     console.log("====================================");
-                     let node   = createFreeElement('div');
-                     let shadow = node.attachShadow({mode:'open'});
-                     shadow.replaceChildren(template.content);
-                     //                     console.log("div node is ", node);
-                     //                     shadow.innerHTML = text;
-                     //                     console.assert(shadow.firstElementChild.nodeName == 'TEMPLATE');
-                     //                     shadow.replaceChildren(shadow.firstElementChild.content);
-                     //                     result.rootNode = node.firstElementChild.content;
-                     result = this.parseSectionTemplate(node, filename);
-                     this.resources.set(filename, result);
-                     console.log("model.loadResource() returns ", result);
-                     return result;
-                 },
                  async loadTOC(dirHandle, name){
                      console.log("loadTOC ", name);
                      let resource = await this.loadResource(dirHandle, name);
@@ -1507,7 +1406,6 @@
                  },
                  async openProject(name, asyncComplete){
                      console.log("openProject ", name);
-                     this.resources = new Map();
                      const {dirHandle} = this.projects[name];
                      console.log("dirHandle ", dirHandle);
                      this.rootTOC = await this.loadTOC(dirHandle, name);
