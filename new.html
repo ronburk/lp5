@@ -48,7 +48,10 @@
             <div>
                 <dialog id="EditSection">
                     <center>
-                        <input data-id="articleTitle" type="text"/><br>
+                        <input data-id="articleTitle" type="text"/>
+                        <button data-id="save">Save</button>
+                        <button data-id="cancel">Cancel</button>
+                        <br>
                         <textarea data-id="docText" rows="10" cols="80"> stuff </textarea>
                         <textarea data-id="codeText" rows="10" cols="80"> other </textarea>
                     </center>
@@ -57,7 +60,7 @@
             <script>
              const model = require('model');
              const iView = require('iView');
-             const {articleTitle, docText, codeText} = iView.dataID;
+             const {save, cancel, articleTitle, docText, codeText} = iView.dataID;
 
              function sectionGetTitle(article){
                  console.log("sectionGetTitle ", article);
@@ -66,14 +69,35 @@
              function init(iView, node){
                  console.log("EditSection ", node);
              }
-
-             function renderEditSectionDialog(iView, node){
+             function renderEditSectionDialog(iView, article){
                  console.log("EditSection Dialog render!!!!!!");
-                 let title = sectionGetTitle(node);
+                 let title = sectionGetTitle(article);
                  console.log("Title is ", title);
                  articleTitle.value = title;
+                 let value = "";
+                 if(article.docSectionNode){
+                     value = article.docSectionNode.innerHTML;
+                     value = value.replace(/^\s*<h2[^<]+[^>]+>/,'');
+                     docText.value = model.unindentCode(value);
+                 }
+                 if(article.codeSectionNode){
+                     value = article.scriptNode.childNodes[0].textContent;
+                     codeText.value = model.unindentCode(value);
+                 }
              }
-             let result = { init: init, render: renderEditSectionDialog };
+             function respond(iView, event){
+                 console.log("EditSection responds to event ", event);
+                 if(event.target == cancel){
+                     console.log("Got cancel!");
+                 } else if(event.target == save){
+                     console.log("Got save!");
+                 }
+             }
+             let result = {
+                 init   : init,
+                 render : renderEditSectionDialog,
+                 respond: respond
+             };
              return result;
             </script>
         </template>
@@ -848,6 +872,9 @@
                      if(event.type == 'close') {
                          console.log("Clse event came in");
                          controller.state = 'home';
+                     } else {
+                         console.log("controller calls respond!");
+                         views.respond(event);
                      }
                      break;
                  default:
@@ -1105,6 +1132,14 @@
                  }
                  iView.children.forEach((i)=>this.init(i, ...args));
              },
+             respond(...args){
+                 let iView = this.currentView;
+
+                 if(iView.notify && iView.notify.respond)
+                     iView.notify.respond(iView, ...args);
+                 else
+                     console.log("respond not forwarded for ", iView);
+             },
              render(iView, ...args){
                  if(!iView)
                      iView = this.currentView;
@@ -1270,6 +1305,8 @@
 
                  unindentCode(text){
                      console.log("unindentCode ", text);
+                     text = text.replace(/^\s*[\r\n]+/,'');
+                     text = text.replace(/\s*$/,'') + '\n';
                      let result = text;
                      let lines = text.split(/\r?\n/);
                      let indent = -1;
