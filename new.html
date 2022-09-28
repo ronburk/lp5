@@ -1,7 +1,4 @@
 <!doctype html>
-<!--
-
--->
 <html lang="en">
     <head>
         <meta charset="utf-8" >
@@ -61,16 +58,43 @@
              const model = require('model');
              const iView = require('iView');
              const {save, cancel, articleTitle, docText, codeText} = iView.dataID;
+             let   thisArticle = null;
 
              function sectionGetTitle(article){
                  console.log("sectionGetTitle ", article);
                  return article.titleNode.innerText;
              }
+             function clickSave(event){
+                 console.log("clickSave!!!");
+                 // serialize contents of dialog
+                 let startScript='<script type="text/plain"';
+                 let endScript='<' + '/script>';
+                 let serial = `
+<template>
+    <section>
+        <h2>${articleTitle.value}</h2>
+${docText.value}
+    </section>
+    <section>
+        <h2>${articleTitle.value}</h2>
+        ${startScript}
+${codeText.value}
+        ${endScript}
+    </section>
+</template>
+                 `;
+                 document.dispatchEvent(
+                     new CustomEvent('saveArticle', {
+                         detail : serial,
+                 }));
+             }
              function init(iView, node){
                  console.log("EditSection ", node);
+                 save.addEventListener('click', clickSave);
              }
              function renderEditSectionDialog(iView, article){
                  console.log("EditSection Dialog render!!!!!!");
+                 thisArticle = article; // remember for future use
                  let title = sectionGetTitle(article);
                  console.log("Title is ", title);
                  articleTitle.value = title;
@@ -91,6 +115,8 @@
                      console.log("Got cancel!");
                  } else if(event.target == save){
                      console.log("Got save!");
+                     let article = thisArticle;
+                     article.titleNode.innerText = articleTitle.value;
                  }
              }
              let result = {
@@ -417,7 +443,7 @@
                              first.querySelectorAll('li').forEach((entry)=>{
                                  let li = createFreeElement('li');
                                  let id = entry.getAttribute('id');
-//                                 let res = model.resources.get(id);
+                                 //                                 let res = model.resources.get(id);
                                  let res = model.articleFromURL(id);
                                  if(res.titleNode)
                                      li.innerText = res.titleNode.innerText;
@@ -476,7 +502,7 @@
                                  console.log("   got script node ");
                                  res.codeTextNode.innerText = massageCode(
                                      res.scriptNode.innerText);
-//                                 outerDiv.appendChild(div);
+                                 //                                 outerDiv.appendChild(div);
                                  
                              }
                          }
@@ -486,7 +512,7 @@
                              ulNode.querySelectorAll('li').forEach((li)=>{
                                  let id = li.getAttribute('id');
                                  console.assert(id, ulNode);
-//                                 let res = model.resources.get(id);
+                                 //                                 let res = model.resources.get(id);
                                  let res = model.articleFromURL(id);
                                  console.assert(res, id);
                                  renderSection(res);
@@ -642,34 +668,6 @@
              console.log("loadHandle() after asyncComplete");
          }
 
-         async function modelLoadFile(dirHandle, fileName){
-             const fileHandle = await dirHandle.getFileHandle(fileName);
-             console.assert(fileHandle);
-             const file = await fileHandle.getFile();
-             console.log(`file = ${file}`);
-             const text = await file.text();
-             console.log(`text = ${text}`);
-             // create detached 'div' with a shadow DOM
-             let node = createFreeElement('div');
-             const shadow = node.attachShadow({mode: 'open'});
-             console.log("div node is ", node);
-             shadow.innerHTML = text;
-             console.log("div node is ", shadow);
-             console.assert(node.firstElementChild.nodeName == 'TEMPLATE');
-             shadow.replaceChildren(shadow.firstElementChild.content);
-             //             node = node.firstElementChild.content;
-             //             return shadow.firstElementChild.content;  // return contents of template (a tree of nodes)
-             return node;
-         }
-
-         async function modelLoadTemplate(dirHandle, name){
-             
-         }
-
-         async function modelLoadTOC(dirHandle, name){
-             const template = await modelLoadTemplate(dirHandle, name);
-             
-         }
          async function selectParentDir(model, event, asyncComplete){
              console.log("selectParentDir()");
 
@@ -843,6 +841,7 @@
                              console.log("views.push Edit Section ", section);
                              views.push('EditSection', model.articleFromID(section));
                              controller.state = 'EditingSection';
+                             controller.currentArticle = section;
                          }else if(target.id == 'LP5-Menu-Reload'){
                              controller.state = 'openProject';
                              asyncSchedule(model.openProject.bind(model), model.rootTOC.name);
@@ -872,6 +871,11 @@
                      if(event.type == 'close') {
                          console.log("Clse event came in");
                          controller.state = 'home';
+                     } else if(event.type == 'saveArticle'){
+                         views.respond(event);
+                         console.log("now call asyncSchedule ", controller.currentArticle);
+                         asyncSchedule(model.storeResource.bind(model),
+                                       controller.currentArticle, event.detail);
                      } else {
                          console.log("controller calls respond!");
                          views.respond(event);
@@ -895,6 +899,7 @@
              'input',
              'load',
              'reload',
+             'saveArticle',
              'selectProject',
          ].forEach(e=>window.addEventListener(e, e=>controller(e), true));
 
@@ -1244,8 +1249,8 @@
                  nextArticleID   : 0,
                  dirHandle       : null,
                  dirParentHandle : null,
-                 projectName     : null,
-//                 resources       : new Map(),
+                 projectName     : new Map,
+                 urlToResource   : null,
                  articles        : [],
                  rootTOC         : null,
                  projects        : {},
@@ -1282,7 +1287,7 @@
                                  queue.push(resource);
                              }
                      }
-//                     if(queue
+                     //                     if(queue
                  },
                  fileToResource(filename){
                      const result = {
@@ -1329,35 +1334,15 @@
                      }
                      return result;
                  },
-                 async loadResource(dirHandle, filename){
-                     console.log("loadResource ", filename);
-                     const result = {
-                         URL             : filename,
-                         name            : filename,
-                         children        : [],       // nested resources
-                         articleNode     : null,
-                         docSectionNode  : null,
-                         docText         : null,
-                         titleNode       : null,
-                         scriptNode      : null,
-                         codeSectionNode : null,
-                         codeTextNode    : null,
-                         codeNameNode    : null,
-                         ulNode          : null,
-                     };
-                     function fixScript(text){
-                         let result   = text;
-                         function count(re, text){
-                             return ((text||'').match(re) || []).length;
-                         }
-                         const nBegin = count(/\<script[^a-z0-9]/gi, text);
-                         const nEnd   = count(/\<\/script[^a-z0-9]/gi, text);
-                         console.log(`fixScript nBegin=${nBegin} nEnd=${nEnd}`);
-
-                         return result;
-                     }
-
-                     const fileHandle = await dirHandle.getFileHandle(filename);
+                 resourceFromArticle(article){
+                     console.log("resourceFromArticle ", article);
+                 }
+                 ,
+                 async storeResource(article, serial){
+                     console.log("storeResource ", article, serial);
+                     this.resourceFromArticle(article);
+                     return;
+                     const fileHandle = await dirHandle.getFileHandle(article.URL);
                      console.assert(fileHandle);
                      const file = await fileHandle.getFile();
                      let   text = await file.text();
@@ -1415,16 +1400,122 @@
                      }
                      console.log("topLevelNode", topLevelNode);
                      console.assert(iChild == nChild, iChild);
-//                     this.resources.set(filename, result);
+                     //                     this.resources.set(filename, result);
                      this.articles.push(result);
                      console.log("model.loadResource() returns ", result);
+                     return result;
+                 },
+                 async loadResource(url){
+                     let text = null;
+                     try {
+                         const fileHandle = await this.dirHandle.getFileHandle(url);
+                         console.assert(fileHandle);
+                         const file = await fileHandle.getFile();
+                         text = await file.text();
+                     } catch (e) {
+                         console.log("loadResource failed ", e);
+                     }
+                     return text;
+                 },
+                 async loadArticle(dirHandle, filename){
+                     console.log("loadResource ", filename);
+                     const result = {
+                         URL             : filename,
+                         name            : filename,
+                         children        : [],       // nested resources
+                         articleNode     : null,
+                         docSectionNode  : null,
+                         docText         : null,
+                         titleNode       : null,
+                         scriptNode      : null,
+                         codeSectionNode : null,
+                         codeTextNode    : null,
+                         codeNameNode    : null,
+                         ulNode          : null,
+                     };
+                     function fixScript(text){
+                         let result   = text;
+                         function count(re, text){
+                             return ((text||'').match(re) || []).length;
+                         }
+                         const nBegin = count(/\<script[^a-z0-9]/gi, text);
+                         const nEnd   = count(/\<\/script[^a-z0-9]/gi, text);
+                         console.log(`fixScript nBegin=${nBegin} nEnd=${nEnd}`);
+
+                         return result;
+                     }
+
+                     let text = await this.loadResource(filename);
+                     if(false){
+                         const fileHandle = await dirHandle.getFileHandle(filename);
+                         console.assert(fileHandle);
+                         const file = await fileHandle.getFile();
+                         let   text = await file.text();
+                     }
+                     text       = fixScript(text);
+                     let html   = new DOMParser().parseFromString(text, 'text/html');
+                     console.assert(html);
+                     console.log("html from DOMParser is ", html);
+                     let template = html.querySelector('template');
+                     console.assert(template, html);
+                     console.assert(template.parentNode.nodeName == 'HEAD');
+                     console.assert(template.parentNode.childElementCount == 1);
+                     console.log("template content from DOMParser is ", template.content.children);
+                     for(const child of template.content.childNodes){
+                         console.log(child);
+                     }
+                     result.articleNode = createFreeElement('article');
+                     result.articleNode.id = `article-${this.articles.length}`;
+                     const childElements = template.content.children;
+                     let nChild = childElements.length;
+                     console.log("nChild = ", nChild);
+                     let   iChild = 0;
+                     let   topLevelNode = childElements[iChild];
+                     console.log("topLevelNode", topLevelNode);
+                     if(nChild && topLevelNode.tagName == 'UL'){
+                         topLevelNode.style.display = 'none';
+                         result.ulNode = topLevelNode;
+                         result.articleNode.appendChild(result.ulNode);
+                         topLevelNode = childElements[0];
+                         --nChild;
+                     }
+                     console.log("topLevelNode", topLevelNode);
+                     if(nChild && topLevelNode.tagName == 'SECTION'
+                        && !topLevelNode.querySelector('script')){
+                         result.titleNode = topLevelNode.querySelector(
+                             ':scope > h2:first-child');
+                         result.docSectionNode = topLevelNode;
+                         result.articleNode.appendChild(result.docSectionNode);
+                         topLevelNode = childElements[0];
+                         --nChild
+                     }
+                     console.log("topLevelNode", topLevelNode);
+                     if(nChild && topLevelNode.tagName == 'SECTION'
+                        && topLevelNode.querySelector('script')){
+                         result.codeNameNode = topLevelNode.querySelector(
+                             ':scope > h2:first-child');
+                         result.codeSectionNode = topLevelNode;
+                         result.scriptNode      = topLevelNode
+                             .querySelector(':scope >script:first-child');
+                         result.codeTextNode = createFreeElement('div');
+                         result.codeTextNode.classList.add('LP5-Code');
+                         result.codeSectionNode.appendChild(result.codeTextNode);
+                         result.articleNode.appendChild(result.codeSectionNode);
+                         topLevelNode = childElements[0];
+                         --nChild
+                     }
+                     console.log("topLevelNode", topLevelNode);
+                     console.assert(iChild == nChild, iChild);
+                     //                     this.resources.set(filename, result);
+                     this.articles.push(result);
+                     console.log("model.loadArticle() returns ", result);
                      return result;
                  },
 
                  async loadTOC(dirHandle, name){
                      console.log("loadTOC ", name);
-                     let resource = await this.loadResource(dirHandle, name);
-                     console.log("loadTOC back from await of loadResource ", name);
+                     let resource = await this.loadArticle(dirHandle, name);
+                     console.log("loadTOC back from await of loadArticle ", name);
                      console.log(resource);
                      //                     let first = resource.rootNode.firstElementChild;
                      //                     if(first.nodeName == 'UL'){
@@ -1445,6 +1536,7 @@
                      console.log("openProject ", name);
                      const {dirHandle} = this.projects[name];
                      console.log("dirHandle ", dirHandle);
+                     this.dirHandle = dirHandle;
                      this.rootTOC = await this.loadTOC(dirHandle, name);
                      console.log("openProject got rootTOC of ", this.rootTOC);
                      console.assert(this.rootTOC.name == name, this.rootTOC);
