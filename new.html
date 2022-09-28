@@ -839,7 +839,7 @@ ${codeText.value}
                          console.log(target);
                          if(section){
                              console.log("views.push Edit Section ", section);
-                             views.push('EditSection', model.articleFromID(section));
+                             views.push('EditSection', model.articleFromArticleNode(section));
                              controller.state = 'EditingSection';
                              controller.currentArticle = section;
                          }else if(target.id == 'LP5-Menu-Reload'){
@@ -1255,7 +1255,7 @@ ${codeText.value}
                  rootTOC         : null,
                  projects        : {},
                  anchorNameToNode: new Map(),
-                 articleFromID(node){
+                 articleFromArticleNode(node){
                      let id = node.id.replace(/^article-/,'');
                      console.assert(id >= 0);
                      console.assert(id < this.articles.length);
@@ -1338,15 +1338,37 @@ ${codeText.value}
                      console.log("resourceFromArticle ", article);
                  }
                  ,
-                 async storeResource(article, serial){
-                     console.log("storeResource ", article, serial);
-                     this.resourceFromArticle(article);
+                 async storeResource(articleNode, serial, asyncComplete){
+                     console.log("storeResource ", articleNode, serial);
+                     let article = this.articleFromArticleNode(articleNode);
+                     let fileHandle = null;
+                     let writable   = null;
+                     try {
+                         fileHandle = await this.dirHandle.getFileHandle(article.URL);
+                         console.log("Got fileHandle ", fileHandle);
+                     } catch(err) {
+                         console.log(`getFileHandle(${article.URL}) `, err);
+                     }
+                     try {
+                         writable = await fileHandle.createWritable();
+                     } catch(err) {
+                         console.log("createWritable ", err);
+                     }
+                     try {
+                         await writable.write(serial);
+                     } catch(err) {
+                         console.log("writable.write ", err);
+                     }
+                     try {
+                         await writable.close();
+                     } catch(err) {
+                         console.log("writable.close ", err);
+                     }
+
+                 //                     let   text = await file.text();
+                 //                     text       = fixScript(text);
+                     asyncComplete(true);
                      return;
-                     const fileHandle = await dirHandle.getFileHandle(article.URL);
-                     console.assert(fileHandle);
-                     const file = await fileHandle.getFile();
-                     let   text = await file.text();
-                     text       = fixScript(text);
                      let html   = new DOMParser().parseFromString(text, 'text/html');
                      console.assert(html);
                      console.log("html from DOMParser is ", html);
@@ -1492,11 +1514,14 @@ ${codeText.value}
                      console.log("topLevelNode", topLevelNode);
                      if(nChild && topLevelNode.tagName == 'SECTION'
                         && topLevelNode.querySelector('script')){
+                         let nth = 1;
                          result.codeNameNode = topLevelNode.querySelector(
-                             ':scope > h2:first-child');
+                             `:scope > h2:nth-child(${nth})`);
+                         if(result.codeNameNode)
+                             ++nth;
                          result.codeSectionNode = topLevelNode;
                          result.scriptNode      = topLevelNode
-                             .querySelector(':scope >script:first-child');
+                             .querySelector(`:scope >script:nth-child(${nth})`);
                          result.codeTextNode = createFreeElement('div');
                          result.codeTextNode.classList.add('LP5-Code');
                          result.codeSectionNode.appendChild(result.codeTextNode);
@@ -1517,8 +1542,6 @@ ${codeText.value}
                      let resource = await this.loadArticle(dirHandle, name);
                      console.log("loadTOC back from await of loadArticle ", name);
                      console.log(resource);
-                     //                     let first = resource.rootNode.firstElementChild;
-                     //                     if(first.nodeName == 'UL'){
                      if(resource.ulNode){
                          console.log(`in loadTOC, resource "${name}" has a ul`);
                          const entries = resource.ulNode.querySelectorAll('li');
