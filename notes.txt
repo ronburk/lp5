@@ -1,3 +1,37 @@
+Active Macros
+=============
+Consider the case of menu commands. Each command-name appears
+in an HTML element that can be clicked to initiate the command.
+That same name must then appear in the list of event names that
+the controller is registered listener for. I want meta-code that
+acts like this:
+
+(in HTML code section)
+    <li data-cmd="<@ cmds.ref('cmdBlah') @>">blah</li>
+(in JavaScript code section)
+    <@ cmds.defs() @>
+
+But how do you specify that the .defs() must not be called until after
+all the .ref()s are called? Default would presumably be they get
+invoked in code order. Could at least code .ref() so that it objects
+if it sees .defs() has already been called.
+
+No, just need ability for code to write output to a "destination".
+(Append to a named code segment.) This works because we don't care
+what order the refs are output into the defs code section.
+
+Could also give "hook" for getting invoked after output is constructed
+that lets code still append to or rewrite individual code sections.
+
+Way to do this is basically a "macro" can be live JavaScript code.
+We could allow the "macro" section to have a different "name" than
+the code section. This would allow them a separate directed graph
+to control the order they are put together. Probably not worth it.
+
+Once we have a syntax for setting an output file, we can have reserved
+name destinations for runtime JavaScript and CSS.
+
+
 No-Edit code references
 =======================
 Suppose our project needs to include codemirror.js.
@@ -18,15 +52,18 @@ Linked strings
 Especially in HTML5, one gets strings that all refer to the same
 thing, even though some references are actual strings and others
 are identifiers. Renaming them is a small, but worthwhile part
-of refactoring. As added bonus, sometimes we just want to navigate
-among the other uses of the variable (right-click on variable,
-give menu command that changes working set to articles containing
-instances of that variable).
+of refactoring.
 
-This would require decorating each instance with some unique
+As added bonus, sometimes we just want to navigate among the other
+uses of the variable (right-click on variable, give menu command that
+changes working set to articles containing instances of that
+variable). IOW, right-click on identifier, and "View Uses".
+
+This would require decorating each instance with the same unique
 identifier. Not much different than the work required to manage
 code section names. In fact, this is kind of a code section
-that has a name but no body! Example:
+that has a name but no body! (maybe that's just a macro)
+Example:
 
 CSS:
     .LP5Code { blah... };
@@ -34,6 +71,7 @@ HTML:
     <div class="LP5Code" >...
 JavaScript:
     let LP5Code = document.querySelectorAll('.LP5Code');
+
 
 
 

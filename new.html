@@ -6,6 +6,32 @@
         <script>
         </script>
         <style id="LP5-Global-Style">
+         dialog:has(> ul > li) { padding:0; }
+         .lp5-context {
+             position:absolute;
+             border: 1px solid blue;
+             cursor: pointer;
+         }
+         .lp5-context ul {
+             list-style: none;
+             margin: 0;
+             padding: 0;
+         }
+         .lp5-context ul li {
+             text-transform: uppercase;
+             font-family: sans-serif;
+             display: flex;
+             justify-content: space-between;
+             border-bottom: solid 1px #dfdfdf;
+             padding: .1em;
+             margin: 0;
+         }
+         .lp5-context ul li:hover {
+             background-color: #eee;
+         }
+         .lp5-context ul li:last-child {
+             border-bottom: none;
+         }
         </style>
         <style>
          div.epigraph  {
@@ -41,6 +67,44 @@
 
     </head>
     <body>
+        <template data-name="ArticleContextMenu">
+            <div>
+                <dialog id="ArticleContextMenu" class="lp5-context">
+                    <ul data-id="ul">
+                        <li data-cmd="insertArticle">Insert New Article Before</li>
+                        <li data-cmd="appendArticle">Append New Article After</li>
+                        <li data-id="childOption" data-cmd="appendChildArticle">Create First Child Article</li>
+                    </ul>
+                </dialog>
+            </div>
+            <script>
+             const iView = require('iView');
+             const {ul, childOption} = iView.dataID;
+
+             function clickHandler(event){
+                 console.log("clickHandler ", event);
+                 const target = event.target;
+                 console.log("cmd ", target.dataset.cmd);
+                 if(target.dataset.cmd){
+                     document.dispatchEvent(
+                         new CustomEvent(target.dataset.cmd, {
+                             detail : null,
+                         }));
+                 }
+             }
+             function init(iView, article){
+                 ul.addEventListener('click', clickHandler);
+             }
+             function render(iView, article){
+                 if(article.ulNode){
+                     childOption.style.display = 'none';
+                 } else {
+                     childOption.style.display = 'block';
+                 }
+             }
+             return {init:init, render:render};
+            </script>
+        </template>
         <template data-name="EditSection">
             <div>
                 <dialog id="EditSection">
@@ -67,7 +131,7 @@
              function clickSave(event){
                  console.log("clickSave!!!");
                  // serialize contents of dialog
-                 let startScript='<script type="text/plain"';
+                 let startScript='<script type="text/plain">';
                  let endScript='<' + '/script>';
                  let serial = `
 <template>
@@ -331,7 +395,16 @@ ${codeText.value}
                      cursor: pointer;
                      font-size: 15px;
                  }
+                 #LP5-Source div.wdrag {
+                     position: absolute;
+                     left: -4px;
+                     top: 0;
+                     bottom: 0;
+                     width: 8px;
+                     cursor: w-resize;
+                 }
                  #LP5-Source{
+                     position: relative;
                      background-color: #FFFFEB;
                      grid-area: source;
                      overflow: auto;
@@ -420,7 +493,7 @@ ${codeText.value}
                         <li id="LP5-Menu-Reload" tabindex="0">Reload</li>
                         <li id="LP5-Menu-Compile">Compile</li>
                         <li>Menu 3</li>
-                        <li>Menu 4</li>
+                        <li id="LP5-Menu-Test">Test</li>
                     </ul>
                 </div>
                 <template data-name="tableOfContents">
@@ -460,10 +533,11 @@ ${codeText.value}
                 </template>
                 <template data-name="sourceDiv">
                     <div id="LP5-Source" data-id="outerDiv">
+                        <div class="wdrag" data-id="drag" ></div>
                     </div>
                     <script>
                      const iView = require('iView');
-                     const {outerDiv} = iView.dataID;
+                     const {drag, outerDiv} = iView.dataID;
                      const model = require('model');
                      function init(){
                      };
@@ -523,6 +597,7 @@ ${codeText.value}
                          console.log("render source: ", model.rootTOC);
                          if(model.rootTOC){
                              outerDiv.replaceChildren();
+                             outerDiv.appendChild(drag);
                              renderSection(model.rootTOC);
                          }
                      };
@@ -583,1006 +658,1119 @@ ${codeText.value}
         <script>
          "use strict";
 
-         function isTest(){
-             return !!navigator.webdriver;
-         }
-         function isLocalHref(anchorNode){
-             let result = false;
-             if(anchorNode.tagName == 'A'){
-                 let href = anchorNode.getAttribute('href');
-                 if(href.startsWith("#"))
-                     result = true;
+         (function () {
+             let storage = {
+                 
+             };
+
+             function isTest(){
+                 return !!navigator.webdriver;
              }
-             return result;
-         }
-         function createFreeElement(tagName){
-             let node = document.createElement(tagName);
-             node.remove();
-             return node;
-         }
-
-
-
-         async function openDB(){
-             return new Promise((resolve, reject) => {
-                 console.log("indexedDB.open");
-                 const request = window.indexedDB.open("lp5-001", 2);
-                 request.onerror   = (event) => { console.log("dberror");reject("db error!" + event.target.errorCode); }
-                 request.onsuccess = (event) => { resolve(request.result);  };
-                 request.onupgradeneeded = (event) => {
-                     console.log("upgrade needed.");
-                     const db = event.target.result;
-                     db.deleteObjectStore("handles");
-                     const objectStore = db.createObjectStore("handles");
-                 };
-             });
-         }
-         async function putDB(db, key, value){
-             console.log("putDB: ", key, value);
-             return new Promise((resolve, reject) => {
-                 let txn = db.transaction(["handles"], "readwrite");
-                 txn.objectStore("handles")
-                    .add(value, key)
-                 ;
-
-                 txn.oncomplete = (event) => { resolve(txn.result); };
-             });
-         }
-
-         async function getDB(db, key){
-             return new Promise((resolve, reject) => {
-                 console.log("getDB: ", key);
-                 console.log(db);
-                 let txn = db.transaction(["handles"], "readwrite");
-                 let get = txn.objectStore("handles")
-                              .get(key)
-                 ;
-
-                 txn.oncomplete = (event) => { console.log("!");resolve(get.result); };
-                 txn.onerror    = (event) => { console.log("getDB error!");reject(); }
-                 console.log("getDB() end of function");
-             });
-         }
-
-         async function loadHandles(model, asyncComplete){
-             console.log("loadHandles()");
-             let db = await openDB();
-             let handle = await getDB(db, "handle");
-             console.log(handle);
-             if(false){
-                 let option = {mode:'readwrite'};
-                 let perms = await handle.queryPermission(option);
-                 console.log("perms = ", perms);
-                 if(perms != 'granted'){
-                     perms = handle.requestPermission(option);
-                     if(perms != 'granted'){
-                         console.log("Well hell");
-                     }
-                     else
-                         model.dirParentHandle = handle;
+             function isLocalHref(anchorNode){
+                 let result = false;
+                 if(anchorNode.tagName == 'A'){
+                     let href = anchorNode.getAttribute('href');
+                     if(href.startsWith("#"))
+                         result = true;
                  }
-             }else{
-                 model.dirParentHandle = handle;
+                 return result;
              }
-             asyncComplete(true);
-             console.log("loadHandle() after asyncComplete");
-         }
+             function createFreeElement(tagName){
+                 let node = document.createElement(tagName);
+                 node.remove();
+                 return node;
+             }
 
-         async function selectParentDir(model, event, asyncComplete){
-             console.log("selectParentDir()");
 
-             let handle = model.dirParentHandle;
-             let options = {mode:'readwrite'};
-             try {
-                 if(event.target.id == 'SelectParentDirPreviousButton'){
-                     console.log("    It was the previousDir button");
+
+             async function openDB(){
+                 return new Promise((resolve, reject) => {
+                     console.log("indexedDB.open");
+                     const request = window.indexedDB.open("lp5-001", 2);
+                     request.onerror   = (event) => { console.log("dberror");reject("db error!" + event.target.errorCode); }
+                     request.onsuccess = (event) => { resolve(request.result);  };
+                     request.onupgradeneeded = (event) => {
+                         console.log("upgrade needed.");
+                         const db = event.target.result;
+                         try {
+                             db.deleteObjectStore("handles");
+                         } catch(error) {
+                             // let's assume it failed because it didn't exist.
+                         }
+                         const objectStore = db.createObjectStore("handles");
+                     };
+                 });
+             }
+             async function putDB(db, key, value){
+                 console.log("putDB: ", key, value);
+                 return new Promise((resolve, reject) => {
+                     let txn = db.transaction(["handles"], "readwrite");
+                     txn.objectStore("handles")
+                        .add(value, key)
+                     ;
+
+                     txn.oncomplete = (event) => { resolve(txn.result); };
+                 });
+             }
+
+             async function getDB(db, key){
+                 return new Promise((resolve, reject) => {
+                     console.log("getDB: ", key);
+                     console.log(db);
+                     let txn = db.transaction(["handles"], "readwrite");
+                     let get = txn.objectStore("handles")
+                                  .get(key)
+                     ;
+
+                     txn.oncomplete = (event) => { console.log("!");resolve(get.result); };
+                     txn.onerror    = (event) => { console.log("getDB error!");reject(); }
+                     console.log("getDB() end of function");
+                 });
+             }
+
+             async function loadHandles(model, asyncComplete){
+                 console.log("loadHandles()");
+                 let db = await openDB();
+                 let handle = await getDB(db, "handle");
+                 console.log(handle);
+                 if(false){
                      let option = {mode:'readwrite'};
                      let perms = await handle.queryPermission(option);
-                     console.log("    perms = ", perms);
+                     console.log("perms = ", perms);
                      if(perms != 'granted'){
-                         perms = await handle.requestPermission(option);
-                         console.log("    now perms = ", perms);
-                         if(perms == 'granted'){
-                             console.log("selectParentDir: reusing existing handle.");
+                         perms = handle.requestPermission(option);
+                         if(perms != 'granted'){
+                             console.log("Well hell");
                          }
-                         else{
-                             model.dirParentHandle = undefined;
-                         }
+                         else
+                             model.dirParentHandle = handle;
                      }
                  }else{
-                     model.dirParentHandle = await window.showDirectoryPicker(options);
-                     if(model.dirParentHandle){
-                         let db = await openDB();
-                         await putDB(db, "handle", model.dirParentHandle);
-                         console.log("Stored handle!!!!");
-                     }
+                     model.dirParentHandle = handle;
                  }
-             } catch (error) {
-                 //
-                 console.log(typeof error);
-                 console.log(error);
-             } finally {
-                 if(!model.dirParentHandle){
-                     asyncComplete(false);
-                     console.log("selectParentDir() returns early");
-                     return;
-                 }                     
+//                 asyncComplete(true);
+                 console.log("loadHandle() after asyncComplete");
+                 return true;
              }
-             console.assert(model.dirParentHandle);
-             // now we have a handle to the parent directory
-             try {
-                 console.log(model.dirParentHandle);
-                 let projectCount = 0;
-                 for await (let [name, handle] of model.dirParentHandle) {
-                     if(name.endsWith('.lp5') && handle.kind == 'directory'){
-                         console.log("looks like a project: ", handle);
-                         model.projects[name] = { dirHandle: handle };
-                         model.projectName = name;
-                         ++projectCount;
-                     }
-                 }
-             } catch(error) {
-                 console.log("What is this error? Filesystem problem?");
-                 console.log(error);
-                 asyncComplete(false);
-                 return;
-             }
-             if(model.dirParentHandle){
-                 console.log("coSelectParent got a dirParentHandle");
-             }
-             console.log("selectParentDir() returns");
-             asyncComplete(true);
-         }
 
-         function controller(event){
-             const { model, views, asyncSchedule } = controller;
-             const currentViewName = views.currentView
-                                   ? views.currentView.name : "";
+             async function selectParentDir(model, event, asyncComplete){
+                 console.log("selectParentDir()");
 
-             console.log(">>>>>>>>>>>>>>>>>>>>>>>>>enter controller ", controller.state);
-             console.log(event);
-             console.assert(!controller.inSync);
-             if(event.type == 'error'){
-                 console.log("Oh oh, got error!");
-                 console.assert(false);
-             }
-             controller.inSync = true;
-             switch(controller.state){
-                 case 'load' :
-                     console.assert(event.type == 'load', event);
-                     asyncSchedule(loadHandles, model);
-                     views.loadTemplates();
-                     views.change('home');
-                     controller.state = 'AwaitDirHandleLoad';
-                     break;
-                 case 'AwaitDirHandleLoad' :
-                     console.assert(event.type == 'asyncComplete');
-                     views.push('SelectParent');
-                     controller.state = 'SelectParent';
-                     break;
-                 case 'SelectParent' :
-                     if(event.target.id == 'SelectParentDirButton'
-                        || event.target.id == 'SelectParentDirPreviousButton'){
-                         console.assert(event.type == 'click');
-                         console.log(">>>>>>>>>>>>>asyncSchedule!!!!!!");
-                         asyncSchedule(selectParentDir, model, event);
-                         console.log("<<<<<<<<<<<<<asyncSchedule!!!!!!");
-                         controller.state = 'SelectingParent';
-                     } else if(event.type == 'click') {
-                         // let the view handle clicks
-                     } else if(event.type == 'close') {
-                         console.log("Clse event came in");
-                     } else {
-                         console.assert(false, event);
-                     }
-                     break;
-                 case 'SelectingParent':
-                     if(event.type == 'hashchange'){
-                         controller.state = 'SelectingParentHashChanged';
-                         controller.oldURL = event.oldURL;
-                     } else {
-                         console.assert(event.type == 'asyncComplete', event);
-                         views.pop();
-                         if(event.detail){
-                             console.assert(model.dirParentHandle);
-                             controller.state = 'PickOrCreateProject';
-                             views.push('PickOrCreateProject');
-                         } else {
-                             views.push('SelectParent');
-                             controller.state = 'SelectParent';
+                 let handle = model.dirParentHandle;
+                 let options = {mode:'readwrite'};
+                 try {
+                     if(event.target.id == 'SelectParentDirPreviousButton'){
+                         console.log("    It was the previousDir button");
+                         let option = {mode:'readwrite'};
+                         let perms = await handle.queryPermission(option);
+                         console.log("    perms = ", perms);
+                         if(perms != 'granted'){
+                             perms = await handle.requestPermission(option);
+                             console.log("    now perms = ", perms);
+                             if(perms == 'granted'){
+                                 console.log("selectParentDir: reusing existing handle.");
+                             }
+                             else{
+                                 model.dirParentHandle = undefined;
+                             }
+                         }
+                     }else{
+                         model.dirParentHandle = await window.showDirectoryPicker(options);
+                         if(model.dirParentHandle){
+                             let db = await openDB();
+                             await putDB(db, "handle", model.dirParentHandle);
+                             console.log("Stored handle!!!!");
                          }
                      }
-                     break;
-                     // unusual case where user changed hash while sysdialog was up
-                 case 'SelectingParentHashChanged' :
-                     console.assert(event.type == 'asyncComplete');
-                     window.location = controller.oldURL;
-                     views.pop();
-                     views.push('SelectParent');
-                     controller.state = 'SelectParent';
-                     break;
-                 case 'PickOrCreateProject' :
-                     if(event.type == 'click'){
-                     } else if(event.type == 'selectProject'){
-                         console.assert(event.type == 'selectProject');
+                 } catch (error) {
+                     //
+                     console.log(typeof error);
+                     console.log(error);
+                 } finally {
+                     if(!model.dirParentHandle){
+//                         asyncComplete(false);
+                         console.log("selectParentDir() returns early");
+                         return false;
+                     }                     
+                 }
+                 console.assert(model.dirParentHandle);
+                 // now we have a handle to the parent directory
+                 try {
+                     console.log(model.dirParentHandle);
+                     let projectCount = 0;
+                     for await (let [name, handle] of model.dirParentHandle) {
+                         if(name.endsWith('.lp5') && handle.kind == 'directory'){
+                             console.log("looks like a project: ", handle);
+                             model.projects[name] = { dirHandle: handle };
+                             model.projectName = name;
+                         ++projectCount;
+                         }
+                     }
+                 } catch(error) {
+                     console.log("What is this error? Filesystem problem?");
+                     console.log(error);
+//                     asyncComplete(false);
+                     return false;
+                 }
+                 if(model.dirParentHandle){
+                     console.log("coSelectParent got a dirParentHandle");
+                 }
+                 console.log("selectParentDir() returns");
+//                 asyncComplete(true);
+                 return true;
+             }
+
+             async function test(){
+                 console.log("TEST!");
+                 if(!model.dirParentHandle){
+                     console.log("can't run tests, no directory to write to.");
+                     console.assert(false, model);
+                 }
+                 console.log("create scratch project for testing.");
+                 const TEST_DIR = 'lp5test';
+                 for await(let [name,handle] of model.dirParentHandle){
+                     if(name == TEST_DIR){
+                         if(window.confirm(`OK to delete recursively ${name}?`)){
+                             model.dirParentHandle.removeEntry(
+                                 name, { recursive: true });
+                         } else {
+                             console.log("testing halted");
+                             console.assert(false, handle);
+                             return false;
+                         }
+                     }
+                 }
+                 
+                 return true;
+             }
+             function controller(event){
+                 function articleNodeFromClick(event){
+                     let result = null;
+                     let path   = event.composedPath();
+
+                     // has to be article node and direct child of source pane
+                     result = path.find((node, index)=>{
+                         return node.tagName == 'ARTICLE'
+                             && index+1 < path.length
+                             && path[index+1].id == 'LP5-Source'
+                         ;
+                     });
+                     return result;
+                 }
+                 const { model, views, asyncSchedule } = controller;
+                 const currentViewName = views.currentView
+                                       ? views.currentView.name : "";
+
+                 console.log(">>>>>>>>>>>>>>>>>>>>>>>>>enter controller ", controller.state);
+                 console.log(event);
+                 console.assert(!controller.inSync);
+                 if(event.type == 'error'){
+                     console.log("Oh oh, got error!");
+                     console.assert(false);
+                 }
+                 controller.inSync = true;
+                 switch(controller.state){
+                     case 'load' :
+                         console.assert(event.type == 'load', event);
+                         asyncSchedule(loadHandles, model);
+                         views.loadTemplates();
+                         views.change('home');
+                         controller.state = 'AwaitDirHandleLoad';
+                         break;
+                     case 'AwaitDirHandleLoad' :
+                         console.assert(event.type == 'asyncComplete');
+                         views.push('SelectParent');
+                         controller.state = 'SelectParent';
+                         break;
+                     case 'SelectParent' :
+                         if(event.target.id == 'SelectParentDirButton'
+                            || event.target.id == 'SelectParentDirPreviousButton'){
+                             console.assert(event.type == 'click');
+                             console.log(">>>>>>>>>>>>>asyncSchedule!!!!!!");
+                             asyncSchedule(selectParentDir, model, event);
+                             console.log("<<<<<<<<<<<<<asyncSchedule!!!!!!");
+                             controller.state = 'SelectingParent';
+                         } else if(event.type == 'click') {
+                             // let the view handle clicks
+                         } else if(event.type == 'close') {
+                             console.log("Clse event came in");
+                         } else {
+                             console.assert(false, event);
+                         }
+                         break;
+                     case 'SelectingParent':
+                         if(event.type == 'hashchange'){
+                             controller.state = 'SelectingParentHashChanged';
+                             controller.oldURL = event.oldURL;
+                         } else {
+                             console.assert(event.type == 'asyncComplete', event);
+                             views.pop();
+                             if(event.detail){
+                                 console.assert(model.dirParentHandle);
+                                 controller.state = 'PickOrCreateProject';
+                                 views.push('PickOrCreateProject');
+                             } else {
+                                 views.push('SelectParent');
+                                 controller.state = 'SelectParent';
+                             }
+                         }
+                         break;
+                         // unusual case where user changed hash while sysdialog was up
+                     case 'SelectingParentHashChanged' :
+                         console.assert(event.type == 'asyncComplete');
+                         window.location = controller.oldURL;
                          views.pop();
-                         controller.state = 'openProject';
-                         asyncSchedule(model.openProject.bind(model), event.detail);
-                     } else {
-                         console.assert(false, event.type);
-                     }
-                     break;
-                 case 'openProject' :
-                     console.assert(event.type == 'asyncComplete');
-                     controller.state = 'home';
-                     views.render();
-                     break;
-                 case 'home' :
-                     console.log("resources in doc order");
-                     for(const res of model.docOrder(model.rootTOC)){
-                         console.log("    res = ", res);
-                     }
-                     if(event.type == 'contextmenu'){
-                         let path   = event.composedPath();
-                         let target = path[0];
-                         console.log(target);
-                     }else if(event.type == 'click'){
-                         let path   = event.composedPath();
-                         console.log(path);
-                         let section = path.find((node, index)=>{
-                             return node.tagName == 'ARTICLE'
-                                 && index+1 < path.length
-                                 && path[index+1].id == 'LP5-Source'
-                             ;
-                         });
-                         let target = path[0];
-                         console.log(target);
-                         if(section){
-                             console.log("views.push Edit Section ", section);
-                             views.push('EditSection', model.articleFromArticleNode(section));
-                             controller.state = 'EditingSection';
-                             controller.currentArticle = section;
-                         }else if(target.id == 'LP5-Menu-Reload'){
+                         views.push('SelectParent');
+                         controller.state = 'SelectParent';
+                         break;
+                     case 'PickOrCreateProject' :
+                         if(event.type == 'click'){
+                         } else if(event.type == 'selectProject'){
+                             console.assert(event.type == 'selectProject');
+                             views.pop();
                              controller.state = 'openProject';
-                             asyncSchedule(model.openProject.bind(model), model.rootTOC.name);
-                         } else if(target.tagName == 'A'){
-                             const href=target.getAttribute('href');
-                             if(href){
-                                 if(href.startsWith("#")){
-                                     event.preventDefault();
-                                     let options = {
-                                         behavior: 'auto',
-                                         block   : 'nearest',
-                                         inline  : 'nearest',
-                                     };
-                                     console.log(options);
-                                     let destination = model.anchorNameToNode.get(href);
-                                     //                                     let destination = document.querySelector(`a[name="${href}"]`);
-                                     console.assert(destination);
-                                     destination.scrollIntoView(true);
-                                 } else {
-                                     window.open(href, '_blank');
+                             asyncSchedule(model.openProject.bind(model), event.detail);
+                         } else {
+                             console.assert(false, event.type);
+                         }
+                         break;
+                     case 'openProject' :
+                         console.assert(event.type == 'asyncComplete');
+                         controller.state = 'home';
+                         views.render();
+                         break;
+                     case 'ContextMenu' : // handle any context menu
+                         // a click is either a command or a sub-menu
+                         if(event.type == 'click'){
+                             let path   = event.composedPath();
+                             let target = path[0];
+                             console.log(target);
+                         } else if(event.type == 'close'){
+                             console.log("Clse event came in");
+                             controller.state = 'home';
+                         }
+                         break;
+                     case 'home' :
+                         if(event.type == 'contextmenu'){
+                             let articleNode = articleNodeFromClick(event);
+                             if(articleNode){
+                                 views.push(
+                                     'ArticleContextMenu',
+                                     model.articleFromArticleNode(articleNode));
+                                 event.preventDefault();
+                                 controller.state = 'ContextMenu';
+                             }
+                             break;
+                         }else if(event.type == 'click'){
+                             {
+                                 let body = document.getElementsByClassName('lp5-body')[0];
+                                 console.log("drag body ", body);
+                                 let style = getComputedStyle(body);
+                                 let columns = style.gridTemplateColumns;
+                                 console.log("drag style ", style);
+                                 console.log("columns ", columns);
+                                 console.log("type of columns ", typeof columns);
+                                 body.style.gridTemplateColumns = "438px 400px 203.664px";
+                             }
+                             let path   = event.composedPath();
+                             console.log(path);
+                             let section = path.find((node, index)=>{
+                                 return node.tagName == 'ARTICLE'
+                                     && index+1 < path.length
+                                     && path[index+1].id == 'LP5-Source'
+                                 ;
+                             });
+                             let target = path[0];
+                             console.log(target);
+                             if(section){
+                                 console.log("views.push Edit Section ", section);
+                                 views.push('EditSection', model.articleFromArticleNode(section));
+                                 controller.state = 'EditingSection';
+                                 controller.currentArticle = section;
+                             }else if(target.id == 'LP5-Menu-Reload'){
+                                 controller.state = 'openProject';
+                                 asyncSchedule(model.openProject.bind(model), model.rootTOC.name);
+                             } else if(target.id == 'LP5-Menu-Test'){
+                                 controller.state = 'test';
+                                 asyncSchedule(test);
+                             } else if(target.tagName == 'A'){
+                                 const href=target.getAttribute('href');
+                                 if(href){
+                                     if(href.startsWith("#")){
+                                         event.preventDefault();
+                                         let options = {
+                                             behavior: 'auto',
+                                             block   : 'nearest',
+                                             inline  : 'nearest',
+                                         };
+                                         console.log(options);
+                                         let destination = model.anchorNameToNode.get(href);
+                                         //                                     let destination = document.querySelector(`a[name="${href}"]`);
+                                         console.assert(destination);
+                                         destination.scrollIntoView(true);
+                                     } else {
+                                         window.open(href, '_blank');
+                                     }
                                  }
                              }
                          }
-                     }
-                     break;
-                 case 'EditingSection' :
-                     if(event.type == 'close') {
-                         console.log("Clse event came in");
-                         controller.state = 'home';
-                     } else if(event.type == 'saveArticle'){
-                         views.respond(event);
-                         console.log("now call asyncSchedule ", controller.currentArticle);
-                         asyncSchedule(model.storeResource.bind(model),
-                                       controller.currentArticle, event.detail);
-                     } else {
-                         console.log("controller calls respond!");
-                         views.respond(event);
-                     }
-                     break;
-                 default:
-                     console.log("Can't happen, unknown state: ", controller.state);
-                     console.assert(false);
-             }
-             controller.inSync = false;
-             console.log("<<<<<<<<<<<<<<<<<<<<<<<<<exit controller: ", controller.state);
-         }
-         [
-             'asyncComplete',
-             'change',
-             'click',
-             'close',
-             'contextmenu',
-             'error',
-             'hashchange',
-             'input',
-             'load',
-             'reload',
-             'saveArticle',
-             'selectProject',
-         ].forEach(e=>window.addEventListener(e, e=>controller(e), true));
-
-         controller.asyncSchedule = function(func, ...args){
-             setTimeout(()=>func(...args, controller.asyncComplete));
-         }
-         controller.asyncComplete = function(value){
-             function f() {
-                 console.log("inside asyncComplete");
-                 document.dispatchEvent(
-                     new CustomEvent('asyncComplete', { detail:value}));
-             }
-             setTimeout(f);
-         };
-         controller.states = new Set([
-             'AwaitDirHandleLoad',
-             'EditingSection',
-             'home',
-             'load',
-             'openProject',
-             'SelectParent',
-             'SelectingParent',
-             'SelectingParentHashChanged',
-             'PickOrCreateProject',
-         ]);
-         Object.defineProperty(controller, 'state', {
-             get() { return controller.state_; },
-             set(val) {
-                 console.assert(controller.states.has(val));
-                 controller.state_ = val;
-             }
-         });
-         
-         controller.inSync = false;
-         controller.state  = 'load';
-
-         function scopedEval(script, iView){
-             for(const element of iView.rootNode.querySelectorAll("[data-ID]"))
-                 iView.dataID[element.dataset.id] = element;
-             let dataID = iView.rootNode.dataset.id;
-             if(dataID)
-                 iView.dataID[dataID] = iView.rootNode;
-
-             iView.dataID = new Proxy(iView.dataID, {
-                 get(trapTarget, key, receiver){
-                     console.assert(key in receiver, key);
-                     return Reflect.get(trapTarget, key, receiver);
-                 }
-             });
-             function require(thing){
-                 switch(thing){
-                     case 'controller':
-                         return controller;
-                     case 'model':
-                         return controller.model;
-                     case 'views' :
-                         return controller.views;
-                     case 'iView':
-                         return iView;
+                         break;
+                     case 'EditingSection' :
+                         if(event.type == 'close') {
+                             console.log("Clse event came in");
+                             controller.state = 'home';
+                         } else if(event.type == 'saveArticle'){
+                             views.respond(event);
+                             console.log("now call asyncSchedule ", controller.currentArticle);
+                             asyncSchedule(model.storeResource.bind(model),
+                                           controller.currentArticle, event.detail);
+                         } else {
+                             console.log("controller calls respond!");
+                             views.respond(event);
+                         }
+                         break;
+                     case 'test' :
+                         if(event.type == 'asyncComplete')
+                             controller.state = 'home';
+                         break;
                      default:
+                         console.log("Can't happen, unknown state: ", controller.state);
                          console.assert(false);
                  }
+                 controller.inSync = false;
+                 console.log("<<<<<<<<<<<<<<<<<<<<<<<<<exit controller: ", controller.state);
              }
-             return new Function("require", '"use strict";' + script)(require);
-         }
+             [
+                 'asyncComplete',
+                 'change',
+                 'click',
+                 'close',
+                 'contextmenu',
+                 'error',
+                 'hashchange',
+                 'input',
+                 'load',
+                 'reload',
+                 'saveArticle',
+                 'selectProject',
+             ].forEach(e=>window.addEventListener(e, e=>controller(e), true));
 
-         // interface to a view
-         const viewInterface = {
-             name         : "",
-             isDialog     : false,
-             notify       : null,
-             children     : [],
-             rootNode     : null,
-             dataID       : {},
-         };
-         controller.views = {
-             views       : {},
-             listeners   : {},
-             stack       : [],
-             inProgress  : 0,
-             currentView : null,
-             notifyModelChange(info){
-                 Object.keys(listeners).forEach(
-                     function(k){
-                         const func = listeners[k].notify;
-                         if(func)
-                             func(info);
-                     }
-                 );
-             },
-             loadTemplates(rootElement=document, parentView=null){
-                 console.log("views.loadTemplates()");
-                 
-                 // template must be of form: style? div/nav script?
-                 function parseTemplate(template){
-                     let   style = null, div = null, script = null;
-                     const root  = template.content;
-                     console.assert(root);
-                     const children = root.children;
-                     console.assert(children);
-
-                     switch(children.length){
-                         case 1 :
-                             [div] = children;
-                             break;
-                         case 2 :
-                             if(children[0].nodeName == 'STYLE'){
-                                 [style, div] = children;
-                             }else{
-                                 [div, script] = children;
-                             }
-                             break;
-                         case 3:
-                             [style, div, script] = children;
-                             break;
-                         default:
-                             console.log("malformed template");
-                             console.assert(false, children);
-                     };
-                     console.assert(!style  || style.nodeName  == 'STYLE');
-                     console.assert(!div    || (div.nodeName    == 'DIV' || div.nodeName == 'NAV'));
-                     console.assert(!script || script.nodeName == 'SCRIPT');
-
-                     const result = {style:style, div:div, script:script};
-                     console.log(result);
-                     return result;
+             controller.asyncSchedule = function(func, ...args){
+                 async function notifyWhenDone(func, ...args){
+                     const result = await func(...args);
+                     controller.asyncComplete(result);
                  }
-
-                 let scripts = null;
-                 rootElement.querySelectorAll('template').forEach((t)=>{
-                     const template = parseTemplate(t);
-                     // every script inside a template must be direct child of template
-                     scripts   = t.content.querySelectorAll('script');
-                     scripts.forEach(function (s){
-                         if(s.parentNode != t.content){
-                             let name = s.parentNode.nodeName;
-                             if(name != 'TEMPLATE'){
-                                 console.log("Script must be child of template, not ", name);
-                                 console.assert(false, s.parentNode);
-                             }
-                         }
-                     });
-
-                     const iView    = structuredClone(viewInterface);
-                     let name = t.dataset.name;
-                     if(!name){
-                     }
-                     iView.name     = t.dataset.name; // data-name='xxx'
-                     console.log("template named ", iView.name);
-
-                     const templateRoot = template.div;
-                     const script       = template.script;
-                     
-                     // if this is a child template
-                     if(parentView){
-                         iView.rootNode = templateRoot;
-                         t.replaceWith(t.content);
-                     } else {
-                         // clone template, then discard it
-                         iView.rootNode = templateRoot.cloneNode(true);
-                         t.remove();
-                         const dialogNode = iView.rootNode.querySelector('dialog');
-                         if(dialogNode){
-                             iView.isDialog = true;
-                             // do not define dialog 'open' attribute, please
-                             console.assert(!dialogNode.hasAttribute('open'));
-                         }
-                     }
-
-                     // Removing the open attribute will usually hide the dialog.
-                     // However, doing so has strange additional consequences:
-                     // https://html.spec.whatwg.org/multipage/interactive-elements.html#the-dialog-element
-                     //                     let script = templateRoot.querySelector('script');
-                     if(script){
-                         // remove script else it will run when frag inserted into DOM
-                         script.remove();
-                         try {
-                             // run the script to obtain its notification functions
-                             console.log(" eval the script");
-                             iView.notify   = scopedEval(script.innerHTML, iView);
-                         } catch(error){
-                             console.log("Failed on script: ", script.innerHTML);
-                             console.assert(false, error);
-                         }
-                         console.assert(iView.notify.hasOwnProperty('init'));
-                         console.assert(iView.notify.hasOwnProperty('render'));
-                     } else {
-                         iView.notify = null;
-                     }
-                     // two templates with same name is a mistake
-                     //                         console.assert(!LP5.views.views.hasOwnProperty(iView.name));
-                     console.assert(!this.views.hasOwnProperty(iView.name));
-
-                     if(!parentView){ // if this is an outermost template
-                         // recurse to handle any nested children
-                         this.loadTemplates(iView.rootNode, iView);
-                         this.views[iView.name] = iView;
-                     } else {
-                         parentView.children.push(iView);
-                     }
-
-                 });
-
-                 if(!parentView){
-                     // known starting view must be defined
-                     console.assert(this.views.hasOwnProperty('home'));
-                 }
-             },
-             notifyChange(eventName){
-                 //                     eventTarget.dispatchEvent(
-             },
-             exists(viewName) {
-                 return this.views.hasOwnProperty(viewName);
-             },
-             change(viewName) {
-                 console.log(`views.change(${viewName})`);
-                 ++this.inProgress;
-                 // get interface to incoming view
-                 const newView = this.views[viewName];
-                 //                 this.currentView = this.views[viewName];
-                 //                 console.assert(this.currentView);
-                 console.assert(newView);
-                 this.setBody(newView);
-                 --this.inProgress;
-                 //                 this.currentView.notify.init();
-                 this.init(this.currentView);
-             },
-             init(iView, ...args){
-                 console.log("init iView ", iView);
-                 if(iView.notify){
-                     console.log("    childcount= ", iView.children.length);
-                     iView.notify.init(iView, ...args);
-                 } else {
-                     console.log("   (no notify function!)");
-                 }
-                 iView.children.forEach((i)=>this.init(i, ...args));
-             },
-             respond(...args){
-                 let iView = this.currentView;
-
-                 if(iView.notify && iView.notify.respond)
-                     iView.notify.respond(iView, ...args);
-                 else
-                     console.log("respond not forwarded for ", iView);
-             },
-             render(iView, ...args){
-                 if(!iView)
-                     iView = this.currentView;
-                 console.log("render ", iView);
-                 if(iView.notify)
-                     iView.notify.render(iView, ...args);
-                 if(iView.children)
-                     iView.children.forEach((i)=>i.notify.render(i, ...args));
-             },
-             push(dialogName, ...args) {
-                 console.log("views.push ", dialogName);
-                 ++this.inProgress;
-                 console.assert(this.currentView);
-                 this.stack.push(this.currentView);
-                 const iView = this.views[dialogName];
-                 this.setBody(iView);
-                 this.currentView = iView;
-                 console.log("views.push calls init for ", iView);
-                 this.init(this.currentView, ...args);
-                 this.render(this.currentView, ...args);
-                 --this.inProgress;
-             },
-             pop() {
-                 ++this.inProgress;
-                 const currentView = this.currentView;
-                 console.assert(currentView.isDialog);
-                 console.assert(currentView);
-                 console.log("pop() this.current = ", currentView);
-                 // our root is a div containing a dialog
-                 const liveRootNode   = document.body.firstElementChild;
-                 const liveDialogNode = liveRootNode.querySelector("dialog");
-                 console.assert(liveDialogNode.nodeName == "DIALOG");
-                 liveDialogNode.close();
-                 console.log("pop() closes dialog");
-                 liveRootNode.remove();
-                 this.currentView = this.stack.pop();
-                 history.pushState(null, "", `#${this.currentView.name}`);
-                 --this.inProgress;
-             },
-             onHashChange(event){
-                 console.log("onHashChange(): ", event);
-                 // newHash = everything after '#'
-                 let newHash = event.newURL.replace(/^[^#]*#/, '');
-                 // newPage = everthing after '#' and before any '/'
-                 let newPage = newHash.replace(/^([^/]+).*/, '$1');
-                 console.log("newHash = ", newHash, "newPage = ", newPage);
-                 //                 location.replace("#"+newHash);
-                 //                 LP5.setBody(newHash);
-                 if(!LP5.views.exists(newPage)){
-                     alert(`unknown URL: ${newPage}`);
-                     history.back();
-                 }
-                 else if(LP5.views.inProgress <= 0)
-                     LP5.views.change(newPage);
-             },
-             setBody(iView){
-                 const {name}      = iView;
-                 const currentView = this.currentView;
-                 const body        = document.body;
-
-                 console.log(`setBody(${name})`);
-                 history.pushState(null, "", "#" + name);
-                 console.log(`history.pushState("#${name}")`);
-                 // give current view back its nodes
-                 // this only happens when change()ing one non-dialog to another
-                 if(currentView && !iView.isDialog){
-                     currentView.rootNode.replaceChildren(body.firstElementChild);
-                 }
-
-                 //???                 const template = iView.rootNode.cloneNode(true);
-                 const template = iView.rootNode;
-                 let dialog = template.querySelector("dialog");
-                 if(dialog){
-                     if(false){
-                         const div = body.createElement("div");
-                         body.prepend(div);
-                         body.firstElementChild.replaceChildren(template);
-                     }
-                     body.prepend(template);
-                     dialog.showModal();
-                 } else {
-                     document.body.replaceChildren(template);
-                     /* if not showing dialog, autofocus only valid on page load,
-                      * so fix that manually.
-                      * https://html.spec.whatwg.org/multipage/interaction.html#the-autofocus-attribute
-                      */
-                     let focus = document.body.querySelector("input[autofocus]");
-                     if(focus)
-                         focus.focus();
-                 }
-                 this.currentView = iView;
+                 setTimeout(()=>notifyWhenDone(func, ...args));
+//                 setTimeout(()=>func(...args, controller.asyncComplete));
              }
-         };
-
-         controller.compile = function(resource){
-             let output = '';
+             controller.asyncComplete = function(value){
+                 function f() {
+                     console.log("inside asyncComplete");
+                     document.dispatchEvent(
+                         new CustomEvent('asyncComplete', { detail:value}));
+                 }
+                 setTimeout(f);
+             };
+             controller.states = new Set([
+                 'AwaitDirHandleLoad',
+                 'ContextMenu',
+                 'EditingSection',
+                 'home',
+                 'load',
+                 'openProject',
+                 'SelectParent',
+                 'SelectingParent',
+                 'SelectingParentHashChanged',
+                 'test',
+                 'PickOrCreateProject',
+             ]);
+             Object.defineProperty(controller, 'state', {
+                 get() { return controller.state_; },
+                 set(val) {
+                     console.assert(controller.states.has(val), val);
+                     controller.state_ = val;
+                 }
+             });
              
-             return output;
-         }
-         controller.model = function(){
-             let result = {
-                 nextArticleID   : 0,
-                 dirHandle       : null,
-                 dirParentHandle : null,
-                 projectName     : new Map,
-                 urlToResource   : null,
-                 articles        : [],
-                 rootTOC         : null,
-                 projects        : {},
-                 anchorNameToNode: new Map(),
-                 articleFromArticleNode(node){
-                     let id = node.id.replace(/^article-/,'');
-                     console.assert(id >= 0);
-                     console.assert(id < this.articles.length);
-                     return this.articles[id];
-                 },
-                 articleFromURL(url){
-                     for(const article of this.articles)
-                         if(article.URL == url)
-                             return article;
-                     return null;
-                 },
-                 *docOrder(article){
-                     console.assert(this.articles); // detect bogus 'this'
-                     yield article;
-                     let ulNode = article.ulNode;
-                     if(ulNode)
-                         for(const entry of ulNode.querySelectorAll(':scope > li')){
-                             console.log(entry);
-                             let id     = entry.getAttribute('id');
-                             yield* this.docOrder(this.articleFromURL(id));
-                         }
-                 },
-                 *codeOrder(queue = null){
-                     if(queue === null){ // if initial iteration
-                         queue = [];
-                         for(const resource of this.docOrder(this.rootTOC))
-                             if(resource.codeNode && !resource.codeNameNode){
-                                 yield resource;
-                                 queue.push(resource);
-                             }
-                     }
-                     //                     if(queue
-                 },
-                 fileToResource(filename){
-                     const result = {
-                         name        : filename,
-                         children    : [],
-                         divContainer: null,
-                         shadowRoot  : null,
-                         ulNode      : null,
-                         sectionNode : null,
-                         titleNode   : null,
-                         docNode     : null,
-                         codeNode    : null,
-                         codeNameNode: null,
-                         templateNode: null,
-                         scriptNode  : null,
-                         text        : null,
-                         namedAnchorNodes: null,
-                     };
-                 },
+             controller.inSync = false;
+             controller.state  = 'load';
 
-                 unindentCode(text){
-                     console.log("unindentCode ", text);
-                     text = text.replace(/^\s*[\r\n]+/,'');
-                     text = text.replace(/\s*$/,'') + '\n';
-                     let result = text;
-                     let lines = text.split(/\r?\n/);
-                     let indent = -1;
-                     for(let line of lines){
-                         line = line.replace(/\s+$/,'');
-                         if(line.length){
-                             let thisIndent = line.search(/\S|$/);
-                             console.log("this indent ", thisIndent, line);
-                             if(indent == -1 || thisIndent < indent){
-                                 indent = thisIndent;
-                                 console.log("indent now ", indent, line);
-                             }
-                         }
+             function scopedEval(script, iView){
+                 for(const element of iView.rootNode.querySelectorAll("[data-ID]"))
+                     iView.dataID[element.dataset.id] = element;
+                 let dataID = iView.rootNode.dataset.id;
+                 if(dataID)
+                     iView.dataID[dataID] = iView.rootNode;
+
+                 iView.dataID = new Proxy(iView.dataID, {
+                     get(trapTarget, key, receiver){
+                         console.assert(key in receiver, key);
+                         return Reflect.get(trapTarget, key, receiver);
                      }
-                     if(indent > 0){
-                         let space = " ".repeat(indent);
-                         let regex = new RegExp("^" + space, 'gm');
-                         result = text.replace(regex, '');
-                         console.assert(result != text);
+                 });
+                 function require(thing){
+                     switch(thing){
+                         case 'controller':
+                             return controller;
+                         case 'model':
+                             return controller.model;
+                         case 'views' :
+                             return controller.views;
+                         case 'iView':
+                             return iView;
+                         default:
+                             console.assert(false);
                      }
-                     return result;
-                 },
-                 resourceFromArticle(article){
-                     console.log("resourceFromArticle ", article);
                  }
-                 ,
-                 async storeResource(articleNode, serial, asyncComplete){
-                     console.log("storeResource ", articleNode, serial);
-                     let article = this.articleFromArticleNode(articleNode);
-                     let fileHandle = null;
-                     let writable   = null;
-                     try {
-                         fileHandle = await this.dirHandle.getFileHandle(article.URL);
-                         console.log("Got fileHandle ", fileHandle);
-                     } catch(err) {
-                         console.log(`getFileHandle(${article.URL}) `, err);
-                     }
-                     try {
-                         writable = await fileHandle.createWritable();
-                     } catch(err) {
-                         console.log("createWritable ", err);
-                     }
-                     try {
-                         await writable.write(serial);
-                     } catch(err) {
-                         console.log("writable.write ", err);
-                     }
-                     try {
-                         await writable.close();
-                     } catch(err) {
-                         console.log("writable.close ", err);
-                     }
+                 return new Function(
+                     "require", "createFreeElement", '"use strict";' + script)(
+                         require, createFreeElement);
+             }
 
-                 //                     let   text = await file.text();
-                 //                     text       = fixScript(text);
-                     asyncComplete(true);
-                     return;
-                     let html   = new DOMParser().parseFromString(text, 'text/html');
-                     console.assert(html);
-                     console.log("html from DOMParser is ", html);
-                     let template = html.querySelector('template');
-                     console.assert(template, html);
-                     console.assert(template.parentNode.nodeName == 'HEAD');
-                     console.assert(template.parentNode.childElementCount == 1);
-                     console.log("template content from DOMParser is ", template.content.children);
-                     for(const child of template.content.childNodes){
-                         console.log(child);
-                     }
-                     result.articleNode = createFreeElement('article');
-                     result.articleNode.id = `article-${this.articles.length}`;
-                     const childElements = template.content.children;
-                     let nChild = childElements.length;
-                     console.log("nChild = ", nChild);
-                     let   iChild = 0;
-                     let   topLevelNode = childElements[iChild];
-                     console.log("topLevelNode", topLevelNode);
-                     if(nChild && topLevelNode.tagName == 'UL'){
-                         topLevelNode.style.display = 'none';
-                         result.ulNode = topLevelNode;
-                         result.articleNode.appendChild(result.ulNode);
-                         topLevelNode = childElements[0];
-                         --nChild;
-                     }
-                     console.log("topLevelNode", topLevelNode);
-                     if(nChild && topLevelNode.tagName == 'SECTION'
-                        && !topLevelNode.querySelector('script')){
-                         result.titleNode = topLevelNode.querySelector(
-                             ':scope > h2:first-child');
-                         result.docSectionNode = topLevelNode;
-                         result.articleNode.appendChild(result.docSectionNode);
-                         topLevelNode = childElements[0];
-                         --nChild
-                     }
-                     console.log("topLevelNode", topLevelNode);
-                     if(nChild && topLevelNode.tagName == 'SECTION'
-                        && topLevelNode.querySelector('script')){
-                         result.codeNameNode = topLevelNode.querySelector(
-                             ':scope > h2:first-child');
-                         result.codeSectionNode = topLevelNode;
-                         result.scriptNode      = topLevelNode
-                             .querySelector(':scope >script:first-child');
-                         result.codeTextNode = createFreeElement('div');
-                         result.codeTextNode.classList.add('LP5-Code');
-                         result.codeSectionNode.appendChild(result.codeTextNode);
-                         result.articleNode.appendChild(result.codeSectionNode);
-                         topLevelNode = childElements[0];
-                         --nChild
-                     }
-                     console.log("topLevelNode", topLevelNode);
-                     console.assert(iChild == nChild, iChild);
-                     //                     this.resources.set(filename, result);
-                     this.articles.push(result);
-                     console.log("model.loadResource() returns ", result);
-                     return result;
-                 },
-                 async loadResource(url){
-                     let text = null;
-                     try {
-                         const fileHandle = await this.dirHandle.getFileHandle(url);
-                         console.assert(fileHandle);
-                         const file = await fileHandle.getFile();
-                         text = await file.text();
-                     } catch (e) {
-                         console.log("loadResource failed ", e);
-                     }
-                     return text;
-                 },
-                 async loadArticle(dirHandle, filename){
-                     console.log("loadResource ", filename);
-                     const result = {
-                         URL             : filename,
-                         name            : filename,
-                         children        : [],       // nested resources
-                         articleNode     : null,
-                         docSectionNode  : null,
-                         docText         : null,
-                         titleNode       : null,
-                         scriptNode      : null,
-                         codeSectionNode : null,
-                         codeTextNode    : null,
-                         codeNameNode    : null,
-                         ulNode          : null,
-                     };
-                     function fixScript(text){
-                         let result   = text;
-                         function count(re, text){
-                             return ((text||'').match(re) || []).length;
+             // interface to a view
+             const viewInterface = {
+                 name         : "",
+                 isDialog     : false,
+                 notify       : null,
+                 children     : [],
+                 rootNode     : null,
+                 dataID       : {},
+             };
+             controller.views = {
+                 views       : {},
+                 listeners   : {},
+                 stack       : [],
+                 inProgress  : 0,
+                 currentView : null,
+                 notifyModelChange(info){
+                     Object.keys(listeners).forEach(
+                         function(k){
+                             const func = listeners[k].notify;
+                             if(func)
+                                 func(info);
                          }
-                         const nBegin = count(/\<script[^a-z0-9]/gi, text);
-                         const nEnd   = count(/\<\/script[^a-z0-9]/gi, text);
-                         console.log(`fixScript nBegin=${nBegin} nEnd=${nEnd}`);
+                     );
+                 },
+                 loadTemplates(rootElement=document, parentView=null){
+                     console.log("views.loadTemplates()");
+                     
+                     // template must be of form: style? div/nav script?
+                     function parseTemplate(template){
+                         let   style = null, div = null, script = null;
+                         const root  = template.content;
+                         console.assert(root);
+                         const children = root.children;
+                         console.assert(children);
 
+                         switch(children.length){
+                             case 1 :
+                                 [div] = children;
+                                 break;
+                             case 2 :
+                                 if(children[0].nodeName == 'STYLE'){
+                                     [style, div] = children;
+                                 }else{
+                                     [div, script] = children;
+                                 }
+                                 break;
+                             case 3:
+                                 [style, div, script] = children;
+                                 break;
+                             default:
+                                 console.log("malformed template", template);
+                                 console.assert(false, children);
+                         };
+                         console.assert(!style  || style.nodeName  == 'STYLE');
+                         console.assert(!div    || (div.nodeName    == 'DIV' || div.nodeName == 'NAV'));
+                         console.assert(!script || script.nodeName == 'SCRIPT');
+
+                         const result = {style:style, div:div, script:script};
+                         console.log(result);
                          return result;
                      }
 
-                     let text = await this.loadResource(filename);
-                     if(false){
-                         const fileHandle = await dirHandle.getFileHandle(filename);
+                     let scripts = null;
+                     rootElement.querySelectorAll('template').forEach((t)=>{
+                         const template = parseTemplate(t);
+                         // every script inside a template must be direct child of template
+                         scripts   = t.content.querySelectorAll('script');
+                         scripts.forEach(function (s){
+                             if(s.parentNode != t.content){
+                                 let name = s.parentNode.nodeName;
+                                 if(name != 'TEMPLATE'){
+                                     console.log("Script must be child of template, not ", name);
+                                     console.assert(false, s.parentNode);
+                                 }
+                             }
+                         });
+
+                         const iView    = structuredClone(viewInterface);
+                         let name = t.dataset.name;
+                         if(!name){
+                         }
+                         iView.name     = t.dataset.name; // data-name='xxx'
+                         console.log("template named ", iView.name);
+
+                         const templateRoot = template.div;
+                         const script       = template.script;
+                         
+                         // if this is a child template
+                         if(parentView){
+                             iView.rootNode = templateRoot;
+                             t.replaceWith(t.content);
+                         } else {
+                             // clone template, then discard it
+                             iView.rootNode = templateRoot.cloneNode(true);
+                             t.remove();
+                             const dialogNode = iView.rootNode.querySelector('dialog');
+                             if(dialogNode){
+                                 iView.isDialog = true;
+                                 // do not define dialog 'open' attribute, please
+                                 console.assert(!dialogNode.hasAttribute('open'));
+                             }
+                         }
+
+                         // Removing the open attribute will usually hide the dialog.
+                         // However, doing so has strange additional consequences:
+                         // https://html.spec.whatwg.org/multipage/interactive-elements.html#the-dialog-element
+                         //                     let script = templateRoot.querySelector('script');
+                         if(script){
+                             // remove script else it will run when frag inserted into DOM
+                             script.remove();
+                             try {
+                                 // run the script to obtain its notification functions
+                                 console.log(" eval the script");
+                                 iView.notify   = scopedEval(script.innerHTML, iView);
+                             } catch(error){
+                                 console.log("Failed on script: ", script.innerHTML);
+                                 console.assert(false, error);
+                             }
+                             console.assert(iView.notify.hasOwnProperty('init'));
+                             console.assert(iView.notify.hasOwnProperty('render'));
+                         } else {
+                             iView.notify = null;
+                         }
+                         // two templates with same name is a mistake
+                         //                         console.assert(!LP5.views.views.hasOwnProperty(iView.name));
+                         console.assert(!this.views.hasOwnProperty(iView.name));
+
+                         if(!parentView){ // if this is an outermost template
+                             // recurse to handle any nested children
+                             this.loadTemplates(iView.rootNode, iView);
+                             this.views[iView.name] = iView;
+                         } else {
+                             parentView.children.push(iView);
+                         }
+
+                     });
+
+                     if(!parentView){
+                         // known starting view must be defined
+                         console.assert(this.views.hasOwnProperty('home'));
+                     }
+                 },
+                 notifyChange(eventName){
+                     //                     eventTarget.dispatchEvent(
+                 },
+                 exists(viewName) {
+                     return this.views.hasOwnProperty(viewName);
+                 },
+                 change(viewName) {
+                     console.log(`views.change(${viewName})`);
+                 ++this.inProgress;
+                     // get interface to incoming view
+                     const newView = this.views[viewName];
+                     //                 this.currentView = this.views[viewName];
+                     //                 console.assert(this.currentView);
+                     console.assert(newView);
+                     this.setBody(newView);
+                     --this.inProgress;
+                     //                 this.currentView.notify.init();
+                     this.init(this.currentView);
+                 },
+                 init(iView, ...args){
+                     console.log("init iView ", iView);
+                     if(iView.notify){
+                         console.log("    childcount= ", iView.children.length);
+                         iView.notify.init(iView, ...args);
+                     } else {
+                         console.log("   (no notify function!)");
+                     }
+                     iView.children.forEach((i)=>this.init(i, ...args));
+                 },
+                 respond(...args){
+                     let iView = this.currentView;
+
+                     if(iView.notify && iView.notify.respond)
+                         iView.notify.respond(iView, ...args);
+                     else
+                         console.log("respond not forwarded for ", iView);
+                 },
+                 render(iView, ...args){
+                     if(!iView)
+                         iView = this.currentView;
+                     console.log("render ", iView);
+                     if(iView.notify)
+                         iView.notify.render(iView, ...args);
+                     if(iView.children)
+                         iView.children.forEach((i)=>i.notify.render(i, ...args));
+                 },
+                 push(dialogName, ...args) {
+                     console.log("views.push ", dialogName);
+                 ++this.inProgress;
+                     console.assert(this.currentView);
+                     this.stack.push(this.currentView);
+                     const iView = this.views[dialogName];
+                     this.setBody(iView);
+                     this.currentView = iView;
+                     console.log("views.push calls init for ", iView);
+                     this.init(this.currentView, ...args);
+                     this.render(this.currentView, ...args);
+                     --this.inProgress;
+                 },
+                 pop() {
+                 ++this.inProgress;
+                     const currentView = this.currentView;
+                     console.assert(currentView.isDialog);
+                     console.assert(currentView);
+                     console.log("pop() this.current = ", currentView);
+                     // our root is a div containing a dialog
+                     const liveRootNode   = document.body.firstElementChild;
+                     const liveDialogNode = liveRootNode.querySelector("dialog");
+                     console.assert(liveDialogNode.nodeName == "DIALOG");
+                     liveDialogNode.close();
+                     console.log("pop() closes dialog");
+                     liveRootNode.remove();
+                     this.currentView = this.stack.pop();
+                     history.pushState(null, "", `#${this.currentView.name}`);
+                     --this.inProgress;
+                 },
+                 onHashChange(event){
+                     console.log("onHashChange(): ", event);
+                     // newHash = everything after '#'
+                     let newHash = event.newURL.replace(/^[^#]*#/, '');
+                     // newPage = everthing after '#' and before any '/'
+                     let newPage = newHash.replace(/^([^/]+).*/, '$1');
+                     console.log("newHash = ", newHash, "newPage = ", newPage);
+                     //                 location.replace("#"+newHash);
+                     //                 LP5.setBody(newHash);
+                     if(!LP5.views.exists(newPage)){
+                         alert(`unknown URL: ${newPage}`);
+                         history.back();
+                     }
+                     else if(LP5.views.inProgress <= 0)
+                         LP5.views.change(newPage);
+                 },
+                 setBody(iView){
+                     const {name}      = iView;
+                     const currentView = this.currentView;
+                     const body        = document.body;
+
+                     console.log(`setBody(${name})`);
+                     history.pushState(null, "", "#" + name);
+                     console.log(`history.pushState("#${name}")`);
+                     // give current view back its nodes
+                     // this only happens when change()ing one non-dialog to another
+                     if(currentView && !iView.isDialog){
+                         currentView.rootNode.replaceChildren(body.firstElementChild);
+                     }
+
+                     //???                 const template = iView.rootNode.cloneNode(true);
+                     const template = iView.rootNode;
+                     let dialog = template.querySelector("dialog");
+                     if(dialog){
+                         if(false){
+                             const div = body.createElement("div");
+                             body.prepend(div);
+                             body.firstElementChild.replaceChildren(template);
+                         }
+                         body.prepend(template);
+                         dialog.showModal();
+                     } else {
+                         document.body.replaceChildren(template);
+                         /* if not showing dialog, autofocus only valid on page load,
+                          * so fix that manually.
+                          * https://html.spec.whatwg.org/multipage/interaction.html#the-autofocus-attribute
+                          */
+                         let focus = document.body.querySelector("input[autofocus]");
+                         if(focus)
+                             focus.focus();
+                     }
+                     this.currentView = iView;
+                 }
+             };
+
+             controller.compile = function(resource){
+                 let output = '';
+                 
+                 return output;
+             }
+             controller.model = function(){
+                 let result = {
+                     nextArticleID   : 0,
+                     dirHandle       : null,
+                     dirParentHandle : null,
+                     projectName     : new Map,
+                     urlToResource   : null,
+                     articles        : [],
+                     rootTOC         : null,
+                     projects        : {},
+                     anchorNameToNode: new Map(),
+                     articleFromArticleNode(node){
+                         let id = node.id.replace(/^article-/,'');
+                         console.assert(id >= 0);
+                         console.assert(id < this.articles.length);
+                         return this.articles[id];
+                     },
+                     articleFromURL(url){
+                         for(const article of this.articles)
+                             if(article.URL == url)
+                                 return article;
+                         return null;
+                     },
+                     async createEmptyArticle(targetArticle, location){
+                         // location: -1 = before, 0 = first child, 1 = after
+                         // create empty resource
+                         const MAX_TRIES = 5;
+                         for(let i = 0; i < MAX_TRIES; ++i){
+                             let articleURL = nextArticleID + ".lp5";
+                             try {
+                                 let fileHandle = await this.dirHandle.getFileHandle(ArticleURL);
+                             } catch(err) {
+                                 console.log(`article ${nextArticleID} already exists`);
+                                 continue;
+                             }
+                             
+                         }
+                     },
+                     *docOrder(article){
+                         console.assert(this.articles); // detect bogus 'this'
+                         yield article;
+                         let ulNode = article.ulNode;
+                         if(ulNode)
+                             for(const entry of ulNode.querySelectorAll(':scope > li')){
+                                 console.log(entry);
+                                 let id     = entry.getAttribute('id');
+                                 yield* this.docOrder(this.articleFromURL(id));
+                             }
+                     },
+                     *codeOrder(queue = null){
+                         if(queue === null){ // if initial iteration
+                             queue = [];
+                             for(const resource of this.docOrder(this.rootTOC))
+                                 if(resource.codeNode && !resource.codeNameNode){
+                                     yield resource;
+                                     queue.push(resource);
+                                 }
+                         }
+                         //                     if(queue
+                     },
+                     fileToResource(filename){
+                         const result = {
+                             name        : filename,
+                             children    : [],
+                             divContainer: null,
+                             shadowRoot  : null,
+                             ulNode      : null,
+                             sectionNode : null,
+                             titleNode   : null,
+                             docNode     : null,
+                             codeNode    : null,
+                             codeNameNode: null,
+                             templateNode: null,
+                             scriptNode  : null,
+                             text        : null,
+                             namedAnchorNodes: null,
+                         };
+                     },
+
+                     unindentCode(text){
+                         console.log("unindentCode ", text);
+                         text = text.replace(/^\s*[\r\n]+/,'');
+                         text = text.replace(/\s*$/,'') + '\n';
+                         let result = text;
+                         let lines = text.split(/\r?\n/);
+                         let indent = -1;
+                         for(let line of lines){
+                             line = line.replace(/\s+$/,'');
+                             if(line.length){
+                                 let thisIndent = line.search(/\S|$/);
+                                 console.log("this indent ", thisIndent, line);
+                                 if(indent == -1 || thisIndent < indent){
+                                     indent = thisIndent;
+                                     console.log("indent now ", indent, line);
+                                 }
+                             }
+                         }
+                         if(indent > 0){
+                             let space = " ".repeat(indent);
+                             let regex = new RegExp("^" + space, 'gm');
+                             result = text.replace(regex, '');
+                             console.assert(result != text);
+                         }
+                         return result;
+                     },
+                     resourceFromArticle(article){
+                         console.log("resourceFromArticle ", article);
+                     },
+                     async resourceExists(name){
+                         let result = false;
+                         try {
+                             let handle = await this.dirHandle.getFileHandle(name);
+                         } catch(err) {
+                         }
+                         return result;
+                     },
+
+                     async storeResource(articleNode, serial, asyncComplete){
+                         console.log("storeResource ", articleNode, serial);
+                         let article = this.articleFromArticleNode(articleNode);
+                         let fileHandle = null;
+                         let writable   = null;
+                         try {
+                             fileHandle = await this.dirHandle.getFileHandle(article.URL);
+                             console.log("Got fileHandle ", fileHandle);
+                         } catch(err) {
+                             console.log(`getFileHandle(${article.URL}) `, err);
+                         }
+                         try {
+                             writable = await fileHandle.createWritable();
+                         } catch(err) {
+                             console.log("createWritable ", err);
+                         }
+                         try {
+                             await writable.write(serial);
+                         } catch(err) {
+                             console.log("writable.write ", err);
+                         }
+                         try {
+                             await writable.close();
+                         } catch(err) {
+                             console.log("writable.close ", err);
+                         }
+
+                         //                     let   text = await file.text();
+                         //                     text       = fixScript(text);
+//                         asyncComplete(true);
+                         return true;
+                         let html   = new DOMParser().parseFromString(text, 'text/html');
+                         console.assert(html);
+                         console.log("html from DOMParser is ", html);
+                         let template = html.querySelector('template');
+                         console.assert(template, html);
+                         console.assert(template.parentNode.nodeName == 'HEAD');
+                         console.assert(template.parentNode.childElementCount == 1);
+                         console.log("template content from DOMParser is ", template.content.children);
+                         for(const child of template.content.childNodes){
+                             console.log(child);
+                         }
+                         result.articleNode = createFreeElement('article');
+                         result.articleNode.id = `article-${this.articles.length}`;
+                         result.articleNode.tabIndex = 0;
+                         const childElements = template.content.children;
+                         let nChild = childElements.length;
+                         console.log("nChild = ", nChild);
+                         let   iChild = 0;
+                         let   topLevelNode = childElements[iChild];
+                         console.log("topLevelNode", topLevelNode);
+                         if(nChild && topLevelNode.tagName == 'UL'){
+                             topLevelNode.style.display = 'none';
+                             result.ulNode = topLevelNode;
+                             result.articleNode.appendChild(result.ulNode);
+                             topLevelNode = childElements[0];
+                             --nChild;
+                         }
+                         console.log("topLevelNode", topLevelNode);
+                         if(nChild && topLevelNode.tagName == 'SECTION'
+                            && !topLevelNode.querySelector('script')){
+                             result.titleNode = topLevelNode.querySelector(
+                                 ':scope > h2:first-child');
+                             result.docSectionNode = topLevelNode;
+                             result.articleNode.appendChild(result.docSectionNode);
+                             topLevelNode = childElements[0];
+                             --nChild
+                         }
+                         console.log("topLevelNode", topLevelNode);
+                         if(nChild && topLevelNode.tagName == 'SECTION'
+                            && topLevelNode.querySelector('script')){
+                             result.codeNameNode = topLevelNode.querySelector(
+                                 ':scope > h2:first-child');
+                             result.codeSectionNode = topLevelNode;
+                             result.scriptNode      = topLevelNode
+                                 .querySelector(':scope >script:first-child');
+                             result.codeTextNode = createFreeElement('div');
+                             result.codeTextNode.classList.add('LP5-Code');
+                             result.codeSectionNode.appendChild(result.codeTextNode);
+                             result.articleNode.appendChild(result.codeSectionNode);
+                             topLevelNode = childElements[0];
+                             --nChild
+                         }
+                         console.log("topLevelNode", topLevelNode);
+                         console.assert(iChild == nChild, iChild);
+                         //                     this.resources.set(filename, result);
+                         this.articles.push(result);
+                         console.log("model.loadResource() returns ", result);
+                         return result;
+                     },
+                     async loadResource(url){
+                         let text = null;
+                         try {
+                             const fileHandle = await this.dirHandle.getFileHandle(url);
+                             console.assert(fileHandle);
+                             const file = await fileHandle.getFile();
+                             text = await file.text();
+                         } catch (e) {
+                             console.log("loadResource failed ", e);
+                         }
+                         return text;
+                     },
+                     async loadArticle(dirHandle, filename, parent){
+                         console.log("loadResource ", filename);
+                         const result = {
+                             URL             : filename,
+                             name            : filename,
+                             parent          : parent,
+                             children        : [],       // nested resources
+                             articleNode     : null,
+                             docSectionNode  : null,
+                             docText         : null,
+                             titleNode       : null,
+                             scriptNode      : null,
+                             codeSectionNode : null,
+                             codeTextNode    : null,
+                             codeNameNode    : null,
+                             ulNode          : null,
+                         };
+                         function fixScript(text){
+                             let result   = text;
+                             function count(re, text){
+                                 return ((text||'').match(re) || []).length;
+                             }
+                             const nBegin = count(/\<script[^a-z0-9]/gi, text);
+                             const nEnd   = count(/\<\/script[^a-z0-9]/gi, text);
+                             console.log(`fixScript nBegin=${nBegin} nEnd=${nEnd}`);
+
+                             return result;
+                         }
+
+                         let text = await this.loadResource(filename);
+                         if(false){
+                             const fileHandle = await dirHandle.getFileHandle(filename);
+                             console.assert(fileHandle);
+                             const file = await fileHandle.getFile();
+                             let   text = await file.text();
+                         }
+                         text       = fixScript(text);
+                         let html   = new DOMParser().parseFromString(text, 'text/html');
+                         console.assert(html);
+                         console.log("html from DOMParser is ", html);
+                         let template = html.querySelector('template');
+                         console.assert(template, html);
+                         console.assert(template.parentNode.nodeName == 'HEAD');
+                         console.assert(template.parentNode.childElementCount == 1);
+                         console.log("template content from DOMParser is ", template.content.children);
+                         for(const child of template.content.childNodes){
+                             console.log(child);
+                         }
+                         result.articleNode = createFreeElement('article');
+                         result.articleNode.id = `article-${this.articles.length}`;
+                         result.articleNode.tabIndex = 0;
+                         const childElements = template.content.children;
+                         let nChild = childElements.length;
+                         console.log("nChild = ", nChild);
+                         let   iChild = 0;
+                         let   topLevelNode = childElements[iChild];
+                         console.log("topLevelNode", topLevelNode);
+                         if(nChild && topLevelNode.tagName == 'UL'){
+                             topLevelNode.style.display = 'none';
+                             result.ulNode = topLevelNode;
+                             result.articleNode.appendChild(result.ulNode);
+                             topLevelNode = childElements[0];
+                             --nChild;
+                         }
+                         console.log("topLevelNode", topLevelNode);
+                         if(nChild && topLevelNode.tagName == 'SECTION'
+                            && !topLevelNode.querySelector('script')){
+                             result.titleNode = topLevelNode.querySelector(
+                                 ':scope > h2:first-child');
+                             result.docSectionNode = topLevelNode;
+                             result.articleNode.appendChild(result.docSectionNode);
+                             topLevelNode = childElements[0];
+                             --nChild
+                         }
+                         console.log("topLevelNode", topLevelNode);
+                         if(nChild && topLevelNode.tagName == 'SECTION'
+                            && topLevelNode.querySelector('script')){
+                             let nth = 1;
+                             result.codeNameNode = topLevelNode.querySelector(
+                                 `:scope > h2:nth-child(${nth})`);
+                             if(result.codeNameNode)
+                             ++nth;
+                             result.codeSectionNode = topLevelNode;
+                             result.scriptNode      = topLevelNode
+                                 .querySelector(`:scope >script:nth-child(${nth})`);
+                             result.codeTextNode = createFreeElement('div');
+                             result.codeTextNode.classList.add('LP5-Code');
+                             result.codeSectionNode.appendChild(result.codeTextNode);
+                             result.articleNode.appendChild(result.codeSectionNode);
+                             topLevelNode = childElements[0];
+                             --nChild
+                         }
+                         console.log("topLevelNode", topLevelNode);
+                         console.assert(iChild == nChild, iChild);
+                         //                     this.resources.set(filename, result);
+                         this.articles.push(result);
+                         console.log("model.loadArticle() returns ", result);
+                         return result;
+                     },
+
+                     async loadTOC(dirHandle, name, parent=null){
+                         console.log("loadTOC ", name);
+                         let resource = await this.loadArticle(dirHandle, name, parent);
+                         console.log("loadTOC back from await of loadArticle ", name);
+                         console.log(resource);
+                         if(resource.ulNode){
+                             console.log(`in loadTOC, resource "${name}" has a ul`);
+                             const entries = resource.ulNode.querySelectorAll('li');
+                             for(const li of entries){
+                                 let ID = li.getAttribute('id');
+                                 let child = await this.loadTOC(dirHandle, ID, resource);
+                                 resource.children.push(child);
+                             }
+                         } else
+                             console.log(`in loadTOC, resource "${name}" has NO ul`);
+                         console.log(`loadTOC(${name}) returns `, resource);
+                         return resource;
+                     },
+                     async openProject(name, asyncComplete){
+                         console.log("openProject ", name);
+                         const {dirHandle} = this.projects[name];
+                         console.log("dirHandle ", dirHandle);
+                         this.dirHandle = dirHandle;
+                         this.rootTOC = await this.loadTOC(dirHandle, name);
+                         console.log("openProject got rootTOC of ", this.rootTOC);
+                         console.assert(this.rootTOC.name == name, this.rootTOC);
+//                         asyncComplete(true);
+                         console.log("OpenProject returns after scheduling asyncComplete");
+                         return true;
+                     },
+                     async load(name){
+                         // ??? have to delete any existing model
+                         console.log(`modelLoad('${name}')`);
+                         console.assert(this.projects.hasOwnProperty(name));
+                         const dirHandle = this.projects[name].dirHandle;
+                         const rootName = name;
+                         const fileHandle = await dirHandle.getFileHandle(name);
                          console.assert(fileHandle);
                          const file = await fileHandle.getFile();
-                         let   text = await file.text();
-                     }
-                     text       = fixScript(text);
-                     let html   = new DOMParser().parseFromString(text, 'text/html');
-                     console.assert(html);
-                     console.log("html from DOMParser is ", html);
-                     let template = html.querySelector('template');
-                     console.assert(template, html);
-                     console.assert(template.parentNode.nodeName == 'HEAD');
-                     console.assert(template.parentNode.childElementCount == 1);
-                     console.log("template content from DOMParser is ", template.content.children);
-                     for(const child of template.content.childNodes){
-                         console.log(child);
-                     }
-                     result.articleNode = createFreeElement('article');
-                     result.articleNode.id = `article-${this.articles.length}`;
-                     const childElements = template.content.children;
-                     let nChild = childElements.length;
-                     console.log("nChild = ", nChild);
-                     let   iChild = 0;
-                     let   topLevelNode = childElements[iChild];
-                     console.log("topLevelNode", topLevelNode);
-                     if(nChild && topLevelNode.tagName == 'UL'){
-                         topLevelNode.style.display = 'none';
-                         result.ulNode = topLevelNode;
-                         result.articleNode.appendChild(result.ulNode);
-                         topLevelNode = childElements[0];
-                         --nChild;
-                     }
-                     console.log("topLevelNode", topLevelNode);
-                     if(nChild && topLevelNode.tagName == 'SECTION'
-                        && !topLevelNode.querySelector('script')){
-                         result.titleNode = topLevelNode.querySelector(
-                             ':scope > h2:first-child');
-                         result.docSectionNode = topLevelNode;
-                         result.articleNode.appendChild(result.docSectionNode);
-                         topLevelNode = childElements[0];
-                         --nChild
-                     }
-                     console.log("topLevelNode", topLevelNode);
-                     if(nChild && topLevelNode.tagName == 'SECTION'
-                        && topLevelNode.querySelector('script')){
-                         let nth = 1;
-                         result.codeNameNode = topLevelNode.querySelector(
-                             `:scope > h2:nth-child(${nth})`);
-                         if(result.codeNameNode)
-                             ++nth;
-                         result.codeSectionNode = topLevelNode;
-                         result.scriptNode      = topLevelNode
-                             .querySelector(`:scope >script:nth-child(${nth})`);
-                         result.codeTextNode = createFreeElement('div');
-                         result.codeTextNode.classList.add('LP5-Code');
-                         result.codeSectionNode.appendChild(result.codeTextNode);
-                         result.articleNode.appendChild(result.codeSectionNode);
-                         topLevelNode = childElements[0];
-                         --nChild
-                     }
-                     console.log("topLevelNode", topLevelNode);
-                     console.assert(iChild == nChild, iChild);
-                     //                     this.resources.set(filename, result);
-                     this.articles.push(result);
-                     console.log("model.loadArticle() returns ", result);
-                     return result;
-                 },
-
-                 async loadTOC(dirHandle, name){
-                     console.log("loadTOC ", name);
-                     let resource = await this.loadArticle(dirHandle, name);
-                     console.log("loadTOC back from await of loadArticle ", name);
-                     console.log(resource);
-                     if(resource.ulNode){
-                         console.log(`in loadTOC, resource "${name}" has a ul`);
-                         const entries = resource.ulNode.querySelectorAll('li');
-                         for(const li of entries){
-                             let ID = li.getAttribute('id');
-                             let child = await this.loadTOC(dirHandle, ID);
-                             resource.children.push(child);
-                         }
-                     } else
-                         console.log(`in loadTOC, resource "${name}" has NO ul`);
-                     console.log(`loadTOC(${name}) returns `, resource);
-                     return resource;
-                 },
-                 async openProject(name, asyncComplete){
-                     console.log("openProject ", name);
-                     const {dirHandle} = this.projects[name];
-                     console.log("dirHandle ", dirHandle);
-                     this.dirHandle = dirHandle;
-                     this.rootTOC = await this.loadTOC(dirHandle, name);
-                     console.log("openProject got rootTOC of ", this.rootTOC);
-                     console.assert(this.rootTOC.name == name, this.rootTOC);
-                     asyncComplete(true);
-                     console.log("OpenProject returns after scheduling asyncComplete");
-                 },
-                 async load(name){
-                     // ??? have to delete any existing model
-                     console.log(`modelLoad('${name}')`);
-                     console.assert(this.projects.hasOwnProperty(name));
-                     const dirHandle = this.projects[name].dirHandle;
-                     const rootName = name;
-                     const fileHandle = await dirHandle.getFileHandle(name);
-                     console.assert(fileHandle);
-                     const file = await fileHandle.getFile();
-                     console.log(`file = ${file}`);
-                     const text = await file.text();
-                     console.log(`text = ${text}`);
-                 },
-             };
-             return result;
-         }();
-
+                         console.log(`file = ${file}`);
+                         const text = await file.text();
+                         console.log(`text = ${text}`);
+                     },
+                 };
+                 return result;
+             }();
+         })();
         </script>
     </body>
 </html>
