@@ -820,18 +820,14 @@ ${codeText.value}
                  return true;
              }
 
-             async function test(){
-                 console.log("TEST!");
-                 if(!model.dirParentHandle){
-                     console.log("can't run tests, no directory to write to.");
-                     console.assert(false, model);
-                 }
+             async function testbody(model){
                  console.log("create scratch project for testing.");
+                 let {dirParentHandle} = model;
                  const TEST_DIR = 'lp5test';
-                 for await(let [name,handle] of model.dirParentHandle){
+                 for await(let [name,handle] of dirParentHandle){
                      if(name == TEST_DIR){
                          if(window.confirm(`OK to delete recursively ${name}?`)){
-                             model.dirParentHandle.removeEntry(
+                             dirParentHandle.removeEntry(
                                  name, { recursive: true });
                          } else {
                              console.log("testing halted");
@@ -840,9 +836,36 @@ ${codeText.value}
                          }
                      }
                  }
+                 console.log(`TEST: create project directory '${TEST_DIR}'`);
+                 let dirHandle = await dirParentHandle.getDirectoryHandle(
+                     TEST_DIR, { create: true });
+                 console.assert(dirHandle.kind == 'directory', dirHandle);
+                 console.log(`TEST: create a unique file `);
+                 let fileInfo = await model.createUniqueFile(dirHandle, 0);
+                 if(fileInfo.handle)
+                     console.assert(fileInfo.handle.name == "0.lp5");
+                 else
+                     console.assert(false, fileInfo);
                  
                  return true;
              }
+
+             async function test(model){
+                 console.log("TEST!");
+                 let {dirParentHandle} = model;
+                 if(!dirParentHandle){
+                     console.log("can't run tests, dirParentHandle not set.");
+                     console.assert(false, model);
+                 }
+                 let result = false;
+                 try {
+                     result = testbody(model);
+                 } catch(err) {
+                     console.log("Testing failed: ", err);
+                     console.assert(false);
+                 }
+             }
+
              function controller(event){
                  function articleNodeFromClick(event){
                      let result = null;
@@ -974,7 +997,7 @@ ${codeText.value}
                              }
                              let path   = event.composedPath();
                              console.log(path);
-                             let section = path.find((node, index)=>{
+                             let articleNode = path.find((node, index)=>{
                                  return node.tagName == 'ARTICLE'
                                      && index+1 < path.length
                                      && path[index+1].id == 'LP5-Source'
@@ -982,17 +1005,18 @@ ${codeText.value}
                              });
                              let target = path[0];
                              console.log(target);
-                             if(section){
-                                 console.log("views.push Edit Section ", section);
-                                 views.push('EditSection', model.articleFromArticleNode(section));
+                             if(articleNode){
+                                 console.log("views.push Edit Section ", articleNode);
+                                 views.push('EditSection',
+                                            model.articleFromArticleNode(articleNode));
                                  controller.state = 'EditingSection';
-                                 controller.currentArticle = section;
+                                 controller.currentArticle = articleNode;
                              }else if(target.id == 'LP5-Menu-Reload'){
                                  controller.state = 'openProject';
                                  asyncSchedule(model.openProject.bind(model), model.rootTOC.name);
                              } else if(target.id == 'LP5-Menu-Test'){
                                  controller.state = 'test';
-                                 asyncSchedule(test);
+                                 asyncSchedule(test, model);
                              } else if(target.tagName == 'A'){
                                  const href=target.getAttribute('href');
                                  if(href){
@@ -1416,6 +1440,25 @@ ${codeText.value}
                      rootTOC         : null,
                      projects        : {},
                      anchorNameToNode: new Map(),
+                     createArticleSerial(docTitle="", docText="", codeTitle="", codeText=""){
+                         let startScript='<script type="text/plain">';
+                         let endScript='<' + '/script>';
+                         let serial = `
+<template>
+    <section>
+        <h2>${docTitle}</h2>
+${docText}
+    </section>
+    <section>
+        <h2>${codeTitle}</h2>
+        ${startScript}
+${codeText}
+        ${endScript}
+    </section>
+</template>
+                         `;
+                         return serial;
+                     },
                      articleFromArticleNode(node){
                          let id = node.id.replace(/^article-/,'');
                          console.assert(id >= 0);
@@ -1428,20 +1471,43 @@ ${codeText.value}
                                  return article;
                          return null;
                      },
+                     async createUniqueFile(dirHandle, number, pattern="%d.lp5"){
+                         let result = { handle:null, number:number };
+                         
+                         const MAX_TRIES = 99;
+                         let handle      = null;
+                         let filename    = null;
+                         for(let i = 0; i < MAX_TRIES; ++i){
+                             result.number = number + i;
+                             filename = pattern.replace(/%d/, result.number);
+                             try {
+                                 console.log(`getFileHandle(${filename})`);
+                                 fileHandle = await dirHandle.getFileHandle(
+                                     filename, {create:false});
+                             } catch(err) {
+                                 console.log(`filename ${result.number} not found`);
+                                 break;
+                             }
+                         }
+                         try {
+                         result.handle = await dirHandle.getFileHandle(
+                             filename, {create:true});
+                         } catch(err) {
+                             console.log(`getFileHandle(${filename}) failed`);
+                             console.assert(false, err);
+                         }
+                         return result;
+                     },
+
                      async createEmptyArticle(targetArticle, location){
                          // location: -1 = before, 0 = first child, 1 = after
                          // create empty resource
-                         const MAX_TRIES = 5;
-                         for(let i = 0; i < MAX_TRIES; ++i){
-                             let articleURL = nextArticleID + ".lp5";
-                             try {
-                                 let fileHandle = await this.dirHandle.getFileHandle(ArticleURL);
-                             } catch(err) {
-                                 console.log(`article ${nextArticleID} already exists`);
-                                 continue;
-                             }
-                             
-                         }
+                         let fileHandle = await createUniqueFile(
+                             this.model.dirHandle, this.model.nextArticleID);
+                         let serial = createArticleSerial();
+                         let writable = await fileHandle.createWritable();
+                         await writable.write(serial);
+                         await writable.close();
                      },
                      *docOrder(article){
                          console.assert(this.articles); // detect bogus 'this'
