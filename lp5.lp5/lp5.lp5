@@ -1,7 +1,7 @@
 <template>
     <ul>
         <li id="1.lp5"/>
-        <li id ="3.lp5"/>
+        <li id="3.lp5"/>
         <li id="4.lp5"/>
         <li id="2.lp5"/>
     </ul>
@@ -9,7 +9,5 @@
         <h2>lp5 - decompositional explanatory programming.</h2>
         <div>
         </div>
-        <code>
-        </code>
     </section>
 </template>

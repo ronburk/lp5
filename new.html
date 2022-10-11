@@ -71,28 +71,32 @@
             <div>
                 <dialog id="ArticleContextMenu" class="lp5-context">
                     <ul data-id="ul">
-                        <li data-cmd="insertArticle">Insert New Article Before</li>
-                        <li data-cmd="appendArticle">Append New Article After</li>
-                        <li data-id="childOption" data-cmd="appendChildArticle">Create First Child Article</li>
+                        <li data-cmd="createArticle -1">Insert New Article Before</li>
+                        <li data-cmd="createArticle  1">Append New Article After</li>
+                        <li data-id="childOption" data-cmd="createArticle  0">Create First Child Article</li>
                     </ul>
                 </dialog>
             </div>
             <script>
-             const iView = require('iView');
-             const {ul, childOption} = iView.dataID;
+             const {ul, childOption} = require('dataID');
+             let articleTarget = null;
 
              function clickHandler(event){
                  console.log("clickHandler ", event);
                  const target = event.target;
                  console.log("cmd ", target.dataset.cmd);
                  if(target.dataset.cmd){
+                     let argv = target.dataset.cmd.split(/[ ]+/);
+                     argv.push(articleTarget);
+                     console.log("argv = ", argv);
                      document.dispatchEvent(
-                         new CustomEvent(target.dataset.cmd, {
-                             detail : null,
-                         }));
+                         new CustomEvent('command', {
+                             detail : argv,
+                     }));
                  }
              }
              function init(iView, article){
+                 articleTarget = article;
                  ul.addEventListener('click', clickHandler);
              }
              function render(iView, article){
@@ -114,14 +118,17 @@
                         <button data-id="cancel">Cancel</button>
                         <br>
                         <textarea data-id="docText" rows="10" cols="80"> stuff </textarea>
+                        <input data-id="codeName" type="text"/>
                         <textarea data-id="codeText" rows="10" cols="80"> other </textarea>
                     </center>
                 </dialog>
             </div>
             <script>
-             const model = require('model');
-             const iView = require('iView');
-             const {save, cancel, articleTitle, docText, codeText} = iView.dataID;
+             const {model, dataID, Article} = require('model,dataID,Article');
+//             const model = require('model');
+//             const iView = require('iView');
+             const {save, cancel, articleTitle, docText, codeName, codeText} = dataID;
+
              let   thisArticle = null;
 
              function sectionGetTitle(article){
@@ -131,22 +138,11 @@
              function clickSave(event){
                  console.log("clickSave!!!");
                  // serialize contents of dialog
-                 let startScript='<script type="text/plain">';
-                 let endScript='<' + '/script>';
-                 let serial = `
-<template>
-    <section>
-        <h2>${articleTitle.value}</h2>
-${docText.value}
-    </section>
-    <section>
-        <h2>${articleTitle.value}</h2>
-        ${startScript}
-${codeText.value}
-        ${endScript}
-    </section>
-</template>
-                 `;
+                 let serial = Article.createSerial(
+                     thisArticle.ulNode,
+                     articleTitle.value, docText.value,
+                     codeName.value, codeText.value);
+
                  document.dispatchEvent(
                      new CustomEvent('saveArticle', {
                          detail : serial,
@@ -166,11 +162,11 @@ ${codeText.value}
                  if(article.docSectionNode){
                      value = article.docSectionNode.innerHTML;
                      value = value.replace(/^\s*<h2[^<]+[^>]+>/,'');
-                     docText.value = model.unindentCode(value);
+                     docText.value = Article.unindentCode(value);
                  }
                  if(article.codeSectionNode){
                      value = article.scriptNode.childNodes[0].textContent;
-                     codeText.value = model.unindentCode(value);
+                     codeText.value = Article.unindentCode(value);
                  }
              }
              function respond(iView, event){
@@ -502,30 +498,38 @@ ${codeText.value}
                     <script>
                      const iView = require('iView');
                      const model = require('model');
+                     const createFreeElement = require('createFreeElement');
                      function init(){
                      };
                      function getTitle(li){
                          let ID = li.getAttribute('id');
                      }
-                     // ??? doesn't yet recurse!!!
+                     function renderChildTOC(article){
+                         console.assert(article.ulNode);
+                         let ul    = createFreeElement('ul');
+
+                         article.ulNode.querySelectorAll('li').forEach((entry)=>{
+                             let li           = createFreeElement('li');
+                             let id           = entry.getAttribute('id');
+                             let childArticle = model.articleFromURL(id);
+                             if(childArticle.titleNode)
+                                 li.innerText = childArticle.titleNode.innerText;
+                             else
+                                 li.innerText = "< no title >";
+                             ul.appendChild(li);
+                             if(childArticle.ulNode)
+                                 ul.appendChild(renderChildTOC(childArticle));
+                         });
+                         return ul;
+                     }
                      function renderTOC(){
                          console.log("render toc: ", model.rootTOC);
-                         if(model.rootTOC){
-                             let ul    = createFreeElement('ul');
-                             let first = model.rootTOC.ulNode;
-                             first.querySelectorAll('li').forEach((entry)=>{
-                                 let li = createFreeElement('li');
-                                 let id = entry.getAttribute('id');
-                                 //                                 let res = model.resources.get(id);
-                                 let res = model.articleFromURL(id);
-                                 if(res.titleNode)
-                                     li.innerText = res.titleNode.innerText;
-                                 else
-                                     li.innerText = "< no title >";
-                                 ul.appendChild(li);
-                             });
+                         let article = model.rootTOC;
+                         if(article && article.ulNode){
+                             let ul = renderChildTOC(article);
                              iView.rootNode.replaceChildren(ul);
                          }
+                         return;
                      };
                      let result = {init:init, render:renderTOC};
                      return result;
@@ -536,9 +540,8 @@ ${codeText.value}
                         <div class="wdrag" data-id="drag" ></div>
                     </div>
                     <script>
-                     const iView = require('iView');
-                     const {drag, outerDiv} = iView.dataID;
-                     const model = require('model');
+                     const {drag, outerDiv} = require('dataID');
+                     const {model, Article} = require('model, Article');
                      function init(){
                      };
                      function massageCode(text){
@@ -550,10 +553,8 @@ ${codeText.value}
                              line = line.replace(/\s+$/,'');
                              if(line.length){
                                  let thisIndent = line.search(/\S|$/);
-                                 console.log("this indent ", thisIndent, line);
                                  if(indent == -1 || thisIndent < indent){
                                      indent = thisIndent;
-                                     console.log("indent now ", indent, line);
                                  }
                              }
                          }
@@ -574,7 +575,9 @@ ${codeText.value}
                              
                              if(res.scriptNode){
                                  console.log("   got script node ");
-                                 res.codeTextNode.innerText = massageCode(
+//                                 res.codeTextNode.innerText = massageCode(
+                                 //                                     res.scriptNode.innerText);
+                                 res.codeTextNode.innerText = Article.unindentCode(
                                      res.scriptNode.innerText);
                                  //                                 outerDiv.appendChild(div);
                                  
@@ -657,11 +660,235 @@ ${codeText.value}
         </template>
         <script>
          "use strict";
+         void function(){
+             class Storage {
+                 constructor(dirHandle){
+                     this.dirHandle = dirHandle;
+                 }
+                 async exists(name){
+                     let result = false;
+                     try {
+                         let handle = await this.dirHandle.getFileHandle(
+                             name, {create:false});
+                         result = true;
+                     } catch(err) {
+                         console.log(`exists(${name}) fails: `, err);
+                     }
+                     return result;
+                 }
+                 async write(name, data){
+                     let result     = false;
+                     let fileHandle = null;
+                     let writable   = null;
+                     try {
+                         fileHandle = await this.dirHandle.getFileHandle(name);
+                         console.log("Got fileHandle ", fileHandle);
+                     } catch(err) {
+                         console.log(`Storage.write(${name}) `, err);
+                     }
+                     try {
+                         writable = await fileHandle.createWritable();
+                     } catch(err) {
+                         console.log("createWritable ", err);
+                     }
+                     try {
+                         await writable.write(data);
+                     } catch(err) {
+                         console.log("writable.write ", err);
+                     }
+                     try {
+                         await writable.close();
+                         result = true;
+                     } catch(err) {
+                         console.log("writable.close ", err);
+                     }
+                     return true;
+                 }
+                 async read(name){
+                     let text = null;
+                     try {
+                         const fileHandle = await this.dirHandle.getFileHandle(name);
+                         console.assert(fileHandle);
+                         const file = await fileHandle.getFile();
+                         text = await file.text();
+                     } catch (e) {
+                         console.log(`read(${name}) failed`, e);
+                     }
+                     return text;
+                 }
+                 async createUniqueFile(pattern, number){
+                     let   result    = null;
+                     const MAX_TRIES = 99;
+                     let   handle    = null;
+                     let   name      = "";
+                     console.assert(this.dirHandle);
+                     for(let i = 0; i < MAX_TRIES; ++i){
+                         ++number;
+                         name   = pattern.replace(/%d/, number);
+                         try {
+                             console.log(`getFileHandle(${name})`);
+                             await this.dirHandle.getFileHandle(
+                                 name, {create:false});
+                         } catch(err) {
+                             if(err.name == 'NotFoundError')
+                                 break;
+                             else{
+                                 console.log(`getFileHandle(${name}) failed:`, err);
+                                 return null;
+                             }
+                             break;
+                         }
+                     }
+                     try {
+                         handle = await this.dirHandle.getFileHandle(
+                             name, {create:true});
+                         result = handle;
+                     } catch(err) {
+                         console.log(`createUniqueFile(${pattern},${startNumber}) failed`);
+                         console.assert(false, err);
+                     }
+                     return result;
+                 }
+             }
+             class Article {
+                 constructor(parent=null, URL=""){
+                     this.parent          = parent;
+                     this.URL             = URL;
+                     this.children        = [];
+                     this.articleNode     = createFreeElement('article');
+                     this.docSectionNode  = null;
+                     this.docText         = null;
+                     this.titleNode       = null;
+                     this.scriptNode      = null;
+                     this.codeSectionNode = null;
+                     this.codeTextNode    = null;
+                     this.codeNameNode    = null;
+                     this.ulNode          = null;
+                 }
+                 static fromSerial(parent, URL, text){
+                     let result = new Article(parent, URL);
+                     let html   = new DOMParser().parseFromString(text, 'text/html');
+                     console.assert(html);
+                     console.log("html from DOMParser is ", html);
+                     let template = html.querySelector('template');
+                     console.assert(template, html);
+                     console.assert(template.parentNode.nodeName == 'HEAD');
+                     console.assert(template.parentNode.childElementCount == 1);
 
-         (function () {
-             let storage = {
-                 
-             };
+//                     result.articleNode = createFreeElement('article');
+//                     result.articleNode.id = `article-${this.articles.length}`;
+//                     result.articleNode.tabIndex = 0;
+                     const childElements = template.content.children;
+                     let nChild = childElements.length;
+                     console.log("nChild = ", nChild);
+                     let   iChild = 0;
+                     let   topLevelNode = childElements[iChild];
+                     console.log("topLevelNode", topLevelNode);
+                     if(nChild && topLevelNode.tagName == 'UL'){
+                         topLevelNode.style.display = 'none';
+                         result.ulNode = topLevelNode;
+                         result.articleNode.appendChild(result.ulNode);
+                         topLevelNode = childElements[0];
+                         --nChild;
+                     }
+                     console.log("topLevelNode", topLevelNode);
+                     if(nChild && topLevelNode.tagName == 'SECTION'
+                        && !topLevelNode.querySelector('script')){
+                         result.titleNode = topLevelNode.querySelector(
+                             ':scope > h2:first-child');
+                         result.docSectionNode = topLevelNode;
+                         result.articleNode.appendChild(result.docSectionNode);
+                         topLevelNode = childElements[0];
+                         --nChild
+                     }
+                     console.log("topLevelNode", topLevelNode);
+                     if(nChild && topLevelNode.tagName == 'SECTION'
+                        && topLevelNode.querySelector('script')){
+                         let nth = 1;
+                         result.codeNameNode = topLevelNode.querySelector(
+                             `:scope > h2:nth-child(${nth})`);
+                         if(result.codeNameNode)
+                         ++nth;
+                         result.codeSectionNode = topLevelNode;
+                         result.scriptNode      = topLevelNode
+                             .querySelector(`:scope >script:nth-child(${nth})`);
+                         result.codeTextNode = createFreeElement('div');
+                         result.codeTextNode.classList.add('LP5-Code');
+                         result.codeSectionNode.appendChild(result.codeTextNode);
+                         result.articleNode.appendChild(result.codeSectionNode);
+                         topLevelNode = childElements[0];
+                         --nChild;
+                     }
+                     console.log("topLevelNode", topLevelNode);
+                     console.assert(iChild == nChild, iChild);
+                     return result;
+                     //                     this.resources.set(filename, result);
+                     this.articles.push(result);
+                     console.log("model.loadArticle() returns ", result);
+                     return result;
+                 }
+
+                 static createSerial(ulNode=null, docTitle="", docText="", codeTitle="", codeText=""){
+                     // I'm terrible!
+                     if(URL in ulNode){
+                         let a=ulNode;
+                         return createSerial(
+                             a.ulNode,
+                             a.titleNode.innerHTML, a.docText.innerHTML,
+                             a.codeNameNode.innerHTML, a.codeTextNode.innerHTML
+                         );
+                     } else {
+                     
+                     let startScript='<script type="text/plain">';
+                     let endScript='<' + '/script>';
+                     let ulSerial = "";
+                     if(ulNode){
+                         console.assert(ulNode.innerHTML);
+                         ulSerial = ulNode.innerHTML;
+                     }
+                     let serial = `
+<template>
+    ${ulSerial}
+    <section>
+        <h2>${docTitle}</h2>
+${docText}
+    </section>
+    <section>
+        <h2>${codeTitle}</h2>
+        ${startScript}
+${codeText}
+        ${endScript}
+    </section>
+</template>
+                     `;
+                     return serial;
+                     }
+                 }
+                 static unindentCode(text){
+                     text = text.replace(/^\s*[\r\n]+/,'');
+                     text = text.replace(/\s*$/,'') + '\n';
+                     let result = text;
+                     let lines = text.split(/\r?\n/);
+                     let indent = -1;
+                     for(let line of lines){
+                         line = line.replace(/\s+$/,'');
+                         if(line.length){
+                             let thisIndent = line.search(/\S|$/);
+                             if(indent == -1 || thisIndent < indent){
+                                 indent = thisIndent;
+                             }
+                         }
+                     }
+                     if(indent > 0){
+                         let space = " ".repeat(indent);
+                         let regex = new RegExp("^" + space, 'gm');
+                         result = text.replace(regex, '');
+                         console.assert(result != text);
+                     }
+                     return result;
+                 }
+             }
+
 
              function isTest(){
                  return !!navigator.webdriver;
@@ -680,7 +907,6 @@ ${codeText.value}
                  node.remove();
                  return node;
              }
-
 
 
              async function openDB(){
@@ -748,7 +974,7 @@ ${codeText.value}
                  }else{
                      model.dirParentHandle = handle;
                  }
-//                 asyncComplete(true);
+                 //                 asyncComplete(true);
                  console.log("loadHandle() after asyncComplete");
                  return true;
              }
@@ -783,12 +1009,10 @@ ${codeText.value}
                          }
                      }
                  } catch (error) {
-                     //
                      console.log(typeof error);
                      console.log(error);
                  } finally {
                      if(!model.dirParentHandle){
-//                         asyncComplete(false);
                          console.log("selectParentDir() returns early");
                          return false;
                      }                     
@@ -809,14 +1033,12 @@ ${codeText.value}
                  } catch(error) {
                      console.log("What is this error? Filesystem problem?");
                      console.log(error);
-//                     asyncComplete(false);
                      return false;
                  }
                  if(model.dirParentHandle){
                      console.log("coSelectParent got a dirParentHandle");
                  }
                  console.log("selectParentDir() returns");
-//                 asyncComplete(true);
                  return true;
              }
 
@@ -878,13 +1100,13 @@ ${codeText.value}
                              && path[index+1].id == 'LP5-Source'
                          ;
                      });
+
                      return result;
                  }
                  const { model, views, asyncSchedule } = controller;
                  const currentViewName = views.currentView
                                        ? views.currentView.name : "";
-
-                 console.log(">>>>>>>>>>>>>>>>>>>>>>>>>enter controller ", controller.state);
+                 console.log(">>>>>>>>>>>>>>>>>>>>>>enter controller ", controller.state);
                  console.log(event);
                  console.assert(!controller.inSync);
                  if(event.type == 'error'){
@@ -962,9 +1184,24 @@ ${codeText.value}
                          controller.state = 'home';
                          views.render();
                          break;
+                     case 'AwaitAsyncComplete' :
+                         console.assert(event.type == 'asyncComplete');
+                         controller.state = 'home';
+                         views.render();
+                         break;
                      case 'ContextMenu' : // handle any context menu
                          // a click is either a command or a sub-menu
-                         if(event.type == 'click'){
+                         if(event.type == 'command'){
+                             console.log("command is ", event.detail);
+                             let argv = event.detail;
+                             if(argv[0] == 'createArticle'){
+                                 console.log(`createArticle(${argv[1]})`);
+                                 asyncSchedule(
+                                     model.createEmptyArticle, argv[1], argv[2]);
+                             }
+                             views.pop();
+                             controller.state = 'AwaitAsyncComplete';
+                         }else if(event.type == 'click'){
                              let path   = event.composedPath();
                              let target = path[0];
                              console.log(target);
@@ -987,13 +1224,15 @@ ${codeText.value}
                          }else if(event.type == 'click'){
                              {
                                  let body = document.getElementsByClassName('lp5-body')[0];
-                                 console.log("drag body ", body);
-                                 let style = getComputedStyle(body);
-                                 let columns = style.gridTemplateColumns;
-                                 console.log("drag style ", style);
-                                 console.log("columns ", columns);
-                                 console.log("type of columns ", typeof columns);
-                                 body.style.gridTemplateColumns = "438px 400px 203.664px";
+                                 if(false){
+                                     console.log("drag body ", body);
+                                     let style = getComputedStyle(body);
+                                     let columns = style.gridTemplateColumns;
+                                     console.log("drag style ", style);
+                                     console.log("columns ", columns);
+                                     console.log("type of columns ", typeof columns);
+                                     body.style.gridTemplateColumns = "438px 400px 203.664px";
+                                 }
                              }
                              let path   = event.composedPath();
                              console.log(path);
@@ -1070,6 +1309,7 @@ ${codeText.value}
                  'click',
                  'close',
                  'contextmenu',
+                 'command',
                  'error',
                  'hashchange',
                  'input',
@@ -1085,7 +1325,7 @@ ${codeText.value}
                      controller.asyncComplete(result);
                  }
                  setTimeout(()=>notifyWhenDone(func, ...args));
-//                 setTimeout(()=>func(...args, controller.asyncComplete));
+                 //                 setTimeout(()=>func(...args, controller.asyncComplete));
              }
              controller.asyncComplete = function(value){
                  function f() {
@@ -1096,6 +1336,7 @@ ${codeText.value}
                  setTimeout(f);
              };
              controller.states = new Set([
+                 'AwaitAsyncComplete',
                  'AwaitDirHandleLoad',
                  'ContextMenu',
                  'EditingSection',
@@ -1120,6 +1361,7 @@ ${codeText.value}
              controller.state  = 'load';
 
              function scopedEval(script, iView){
+//                 console.log("scopedEval ", script);
                  for(const element of iView.rootNode.querySelectorAll("[data-ID]"))
                      iView.dataID[element.dataset.id] = element;
                  let dataID = iView.rootNode.dataset.id;
@@ -1132,7 +1374,43 @@ ${codeText.value}
                          return Reflect.get(trapTarget, key, receiver);
                      }
                  });
+                 let globalEnv = {
+                     require           : require,
+                     createFreeElement : createFreeElement,
+                     model             : controller.model,
+                     views             : controller.views,
+                     iView             : iView,
+                     dataID            : iView.dataID,
+                     Article           : Article,
+                     [Symbol.iterator] : function*(){
+                         const args = Object.keys(globalEnv);
+                         for(let i=0; i < args.length; ++i) 
+                             yield globalEnv[args[i]];
+                     }
+                 };
                  function require(thing){
+                     let things = thing.split(/[ ,]+/);
+                     console.log("things = ", things);
+                     let final  = [];
+                     things.forEach(function requireFirstLoop(i){
+                         if(i.length)
+                             final.push(i);
+                     });
+                     console.log("final is ", final);
+                     // if it was simply require('singleItem')
+                     if(final.length == 1){
+                         if(thing in globalEnv)
+                             return globalEnv[thing];
+                         else
+                             console.assert(false);
+                     }
+                     let finalObj = {};
+                     final.forEach(function requireFinalLoop(i){
+                         console.assert(i in globalEnv, i);
+                         finalObj[i] = globalEnv[i];
+                     });
+                     return finalObj;
+
                      switch(thing){
                          case 'controller':
                              return controller;
@@ -1147,8 +1425,11 @@ ${codeText.value}
                      }
                  }
                  return new Function(
-                     "require", "createFreeElement", '"use strict";' + script)(
-                         require, createFreeElement);
+                     "require", '"use strict";' + script)(
+                         require);
+                 return new Function(...(Object.keys(globalEnv)),
+                                     '"use strict";' + script)(
+                                         ...globalEnv);
              }
 
              // interface to a view
@@ -1429,414 +1710,254 @@ ${codeText.value}
                  
                  return output;
              }
-             controller.model = function(){
-                 let result = {
-                     nextArticleID   : 0,
-                     dirHandle       : null,
-                     dirParentHandle : null,
-                     projectName     : new Map,
-                     urlToResource   : null,
-                     articles        : [],
-                     rootTOC         : null,
-                     projects        : {},
-                     anchorNameToNode: new Map(),
-                     createArticleSerial(docTitle="", docText="", codeTitle="", codeText=""){
-                         let startScript='<script type="text/plain">';
-                         let endScript='<' + '/script>';
-                         let serial = `
-<template>
-    <section>
-        <h2>${docTitle}</h2>
-${docText}
-    </section>
-    <section>
-        <h2>${codeTitle}</h2>
-        ${startScript}
-${codeText}
-        ${endScript}
-    </section>
-</template>
-                         `;
-                         return serial;
-                     },
-                     articleFromArticleNode(node){
-                         let id = node.id.replace(/^article-/,'');
-                         console.assert(id >= 0);
-                         console.assert(id < this.articles.length);
-                         return this.articles[id];
-                     },
-                     articleFromURL(url){
-                         for(const article of this.articles)
-                             if(article.URL == url)
-                                 return article;
-                         return null;
-                     },
-                     async createUniqueFile(dirHandle, number, pattern="%d.lp5"){
-                         let result = { handle:null, number:number };
-                         
-                         const MAX_TRIES = 99;
-                         let handle      = null;
-                         let filename    = null;
-                         for(let i = 0; i < MAX_TRIES; ++i){
-                             result.number = number + i;
-                             filename = pattern.replace(/%d/, result.number);
-                             try {
-                                 console.log(`getFileHandle(${filename})`);
-                                 fileHandle = await dirHandle.getFileHandle(
-                                     filename, {create:false});
-                             } catch(err) {
-                                 console.log(`filename ${result.number} not found`);
-                                 break;
-                             }
-                         }
-                         try {
-                         result.handle = await dirHandle.getFileHandle(
-                             filename, {create:true});
-                         } catch(err) {
-                             console.log(`getFileHandle(${filename}) failed`);
-                             console.assert(false, err);
-                         }
-                         return result;
-                     },
 
-                     async createEmptyArticle(targetArticle, location){
-                         // location: -1 = before, 0 = first child, 1 = after
-                         // create empty resource
-                         let fileHandle = await createUniqueFile(
-                             this.model.dirHandle, this.model.nextArticleID);
-                         let serial = createArticleSerial();
-                         let writable = await fileHandle.createWritable();
-                         await writable.write(serial);
-                         await writable.close();
-                     },
-                     *docOrder(article){
-                         console.assert(this.articles); // detect bogus 'this'
-                         yield article;
-                         let ulNode = article.ulNode;
-                         if(ulNode)
-                             for(const entry of ulNode.querySelectorAll(':scope > li')){
-                                 console.log(entry);
-                                 let id     = entry.getAttribute('id');
-                                 yield* this.docOrder(this.articleFromURL(id));
-                             }
-                     },
-                     *codeOrder(queue = null){
-                         if(queue === null){ // if initial iteration
-                             queue = [];
-                             for(const resource of this.docOrder(this.rootTOC))
-                                 if(resource.codeNode && !resource.codeNameNode){
-                                     yield resource;
-                                     queue.push(resource);
-                                 }
-                         }
-                         //                     if(queue
-                     },
-                     fileToResource(filename){
-                         const result = {
-                             name        : filename,
-                             children    : [],
-                             divContainer: null,
-                             shadowRoot  : null,
-                             ulNode      : null,
-                             sectionNode : null,
-                             titleNode   : null,
-                             docNode     : null,
-                             codeNode    : null,
-                             codeNameNode: null,
-                             templateNode: null,
-                             scriptNode  : null,
-                             text        : null,
-                             namedAnchorNodes: null,
-                         };
-                     },
+             let model = {};
+             model.nextArticleID    = 0;
+             model.storage          = null;
+             //             model.dirHandle        = null;
+             model.dirParentHandle  = null;
+             model.projectName      = new Map;
+             model.urlToResource    = null;
+             model.articles         = [];
+             model.rootTOC          = null;
+             model.projects         = {};
+             model.anchorNameToNode = new Map();
+             model.createUniqueFile = async function (){
+                 let handle = await this.storage.createUniqueFile(
+                     "%d.lp5", this.nextArticleID);
+                 if(handle){
+                     let dotPos = handle.name.indexOf('.');
+                     this.nextArticleID = 1 + handle.name.slice(0,dotPos);
+                 }
+                 return handle;
+             };
 
-                     unindentCode(text){
-                         console.log("unindentCode ", text);
-                         text = text.replace(/^\s*[\r\n]+/,'');
-                         text = text.replace(/\s*$/,'') + '\n';
-                         let result = text;
-                         let lines = text.split(/\r?\n/);
-                         let indent = -1;
-                         for(let line of lines){
-                             line = line.replace(/\s+$/,'');
-                             if(line.length){
-                                 let thisIndent = line.search(/\S|$/);
-                                 console.log("this indent ", thisIndent, line);
-                                 if(indent == -1 || thisIndent < indent){
-                                     indent = thisIndent;
-                                     console.log("indent now ", indent, line);
-                                 }
-                             }
-                         }
-                         if(indent > 0){
-                             let space = " ".repeat(indent);
-                             let regex = new RegExp("^" + space, 'gm');
-                             result = text.replace(regex, '');
-                             console.assert(result != text);
-                         }
-                         return result;
-                     },
-                     resourceFromArticle(article){
-                         console.log("resourceFromArticle ", article);
-                     },
-                     async resourceExists(name){
-                         let result = false;
-                         try {
-                             let handle = await this.dirHandle.getFileHandle(name);
-                         } catch(err) {
-                         }
-                         return result;
-                     },
+             model.articleFromArticleNode = function(node){
+                 // the article node ID contains the article #
+                 let id = node.id.replace(/^article-/,'');
+                 console.assert(id >= 0);
+                 console.assert(id < this.articles.length);
+                 return this.articles[id];
+             }
+             model.articleFromURL = function(url){
+                 for(const article of this.articles)
+                     if(article.URL == url)
+                         return article;
+                 return null;
+             }
+             model.createEmptyArticle = async function (location, targetArticle){
+                 // location: -1 = before, 0 = first child, 1 = after
+                 console.log("createEmptyArticle ", location, targetArticle);
+                 // create empty resource
+                 let handle  = await model.createUniqueFile();
+                 console.assert(handle);
+                 let emptyArticleName = handle.name;
+                 let serial = Article.createSerial();
+                 let writable = await handle.createWritable();
+                 await writable.write(serial);
+                 await writable.close();
+                 // must update some parent article correctly to point to new empty
 
-                     async storeResource(articleNode, serial, asyncComplete){
-                         console.log("storeResource ", articleNode, serial);
-                         let article = this.articleFromArticleNode(articleNode);
-                         let fileHandle = null;
-                         let writable   = null;
-                         try {
-                             fileHandle = await this.dirHandle.getFileHandle(article.URL);
-                             console.log("Got fileHandle ", fileHandle);
-                         } catch(err) {
-                             console.log(`getFileHandle(${article.URL}) `, err);
-                         }
-                         try {
-                             writable = await fileHandle.createWritable();
-                         } catch(err) {
-                             console.log("createWritable ", err);
-                         }
-                         try {
-                             await writable.write(serial);
-                         } catch(err) {
-                             console.log("writable.write ", err);
-                         }
-                         try {
-                             await writable.close();
-                         } catch(err) {
-                             console.log("writable.close ", err);
-                         }
+                 // if very first article of project
+                 if(!targetArticle)
+                     return;
+                 let parentArticle = targetArticle;
+                 let li = createFreeElement('li');
+                 li.id = emptyArticleName;
 
-                         //                     let   text = await file.text();
-                         //                     text       = fixScript(text);
-//                         asyncComplete(true);
-                         return true;
-                         let html   = new DOMParser().parseFromString(text, 'text/html');
-                         console.assert(html);
-                         console.log("html from DOMParser is ", html);
-                         let template = html.querySelector('template');
-                         console.assert(template, html);
-                         console.assert(template.parentNode.nodeName == 'HEAD');
-                         console.assert(template.parentNode.childElementCount == 1);
-                         console.log("template content from DOMParser is ", template.content.children);
-                         for(const child of template.content.childNodes){
-                             console.log(child);
-                         }
-                         result.articleNode = createFreeElement('article');
-                         result.articleNode.id = `article-${this.articles.length}`;
-                         result.articleNode.tabIndex = 0;
-                         const childElements = template.content.children;
-                         let nChild = childElements.length;
-                         console.log("nChild = ", nChild);
-                         let   iChild = 0;
-                         let   topLevelNode = childElements[iChild];
-                         console.log("topLevelNode", topLevelNode);
-                         if(nChild && topLevelNode.tagName == 'UL'){
-                             topLevelNode.style.display = 'none';
-                             result.ulNode = topLevelNode;
-                             result.articleNode.appendChild(result.ulNode);
-                             topLevelNode = childElements[0];
-                             --nChild;
-                         }
-                         console.log("topLevelNode", topLevelNode);
-                         if(nChild && topLevelNode.tagName == 'SECTION'
-                            && !topLevelNode.querySelector('script')){
-                             result.titleNode = topLevelNode.querySelector(
-                                 ':scope > h2:first-child');
-                             result.docSectionNode = topLevelNode;
-                             result.articleNode.appendChild(result.docSectionNode);
-                             topLevelNode = childElements[0];
-                             --nChild
-                         }
-                         console.log("topLevelNode", topLevelNode);
-                         if(nChild && topLevelNode.tagName == 'SECTION'
-                            && topLevelNode.querySelector('script')){
-                             result.codeNameNode = topLevelNode.querySelector(
-                                 ':scope > h2:first-child');
-                             result.codeSectionNode = topLevelNode;
-                             result.scriptNode      = topLevelNode
-                                 .querySelector(':scope >script:first-child');
-                             result.codeTextNode = createFreeElement('div');
-                             result.codeTextNode.classList.add('LP5-Code');
-                             result.codeSectionNode.appendChild(result.codeTextNode);
-                             result.articleNode.appendChild(result.codeSectionNode);
-                             topLevelNode = childElements[0];
-                             --nChild
-                         }
-                         console.log("topLevelNode", topLevelNode);
-                         console.assert(iChild == nChild, iChild);
-                         //                     this.resources.set(filename, result);
-                         this.articles.push(result);
-                         console.log("model.loadResource() returns ", result);
-                         return result;
-                     },
-                     async loadResource(url){
-                         let text = null;
-                         try {
-                             const fileHandle = await this.dirHandle.getFileHandle(url);
-                             console.assert(fileHandle);
-                             const file = await fileHandle.getFile();
-                             text = await file.text();
-                         } catch (e) {
-                             console.log("loadResource failed ", e);
-                         }
-                         return text;
-                     },
-                     async loadArticle(dirHandle, filename, parent){
-                         console.log("loadResource ", filename);
-                         const result = {
-                             URL             : filename,
-                             name            : filename,
-                             parent          : parent,
-                             children        : [],       // nested resources
-                             articleNode     : null,
-                             docSectionNode  : null,
-                             docText         : null,
-                             titleNode       : null,
-                             scriptNode      : null,
-                             codeSectionNode : null,
-                             codeTextNode    : null,
-                             codeNameNode    : null,
-                             ulNode          : null,
-                         };
-                         function fixScript(text){
-                             let result   = text;
-                             function count(re, text){
-                                 return ((text||'').match(re) || []).length;
-                             }
-                             const nBegin = count(/\<script[^a-z0-9]/gi, text);
-                             const nEnd   = count(/\<\/script[^a-z0-9]/gi, text);
-                             console.log(`fixScript nBegin=${nBegin} nEnd=${nEnd}`);
+                 if(location == 0){
+                     console.assert(!parentArticle.ulNode);
+                     let ul = createFreeElement('ul');
+                     parentArticle.ulNode = ul;
+                 } else {
+                     parentArticle = targetArticle.parent;
+                     let ul = parentArticle.ulNode;
+                     console.assert(ul);
+                     let sibling = ul.querySelector('#'+emptyArticleName);
+                     if(location < 0)
+                         sibling.before(li);
+                     else
+                         sibling.after(li);
+                 }
+                 serial = Article.createSerial(parentArticle);
+                 console.log("write parent article", parentArticle.URL, serial);
+                             
+                 await model.storage.write(parentArticle.URL,serial);
 
-                             return result;
+             };
+             model.docOrder = function*(article){
+                 console.assert(this.articles); // detect bogus 'this'
+                 yield article;
+                 let ulNode = article.ulNode;
+                 if(ulNode)
+                     for(const entry of ulNode.querySelectorAll(':scope > li')){
+                         console.log(entry);
+                         let id     = entry.getAttribute('id');
+                         yield* this.docOrder(this.articleFromURL(id));
+                     }
+             };
+             model.codeOrder = function*(queue = null){
+                 if(queue === null){ // if initial iteration
+                     queue = [];
+                     for(const resource of this.docOrder(this.rootTOC))
+                         if(resource.codeNode && !resource.codeNameNode){
+                             yield resource;
+                             queue.push(resource);
                          }
+                 }
+             }
 
-                         let text = await this.loadResource(filename);
-                         if(false){
-                             const fileHandle = await dirHandle.getFileHandle(filename);
-                             console.assert(fileHandle);
-                             const file = await fileHandle.getFile();
-                             let   text = await file.text();
-                         }
-                         text       = fixScript(text);
-                         let html   = new DOMParser().parseFromString(text, 'text/html');
-                         console.assert(html);
-                         console.log("html from DOMParser is ", html);
-                         let template = html.querySelector('template');
-                         console.assert(template, html);
-                         console.assert(template.parentNode.nodeName == 'HEAD');
-                         console.assert(template.parentNode.childElementCount == 1);
-                         console.log("template content from DOMParser is ", template.content.children);
-                         for(const child of template.content.childNodes){
-                             console.log(child);
-                         }
-                         result.articleNode = createFreeElement('article');
-                         result.articleNode.id = `article-${this.articles.length}`;
-                         result.articleNode.tabIndex = 0;
-                         const childElements = template.content.children;
-                         let nChild = childElements.length;
-                         console.log("nChild = ", nChild);
-                         let   iChild = 0;
-                         let   topLevelNode = childElements[iChild];
-                         console.log("topLevelNode", topLevelNode);
-                         if(nChild && topLevelNode.tagName == 'UL'){
-                             topLevelNode.style.display = 'none';
-                             result.ulNode = topLevelNode;
-                             result.articleNode.appendChild(result.ulNode);
-                             topLevelNode = childElements[0];
-                             --nChild;
-                         }
-                         console.log("topLevelNode", topLevelNode);
-                         if(nChild && topLevelNode.tagName == 'SECTION'
-                            && !topLevelNode.querySelector('script')){
-                             result.titleNode = topLevelNode.querySelector(
-                                 ':scope > h2:first-child');
-                             result.docSectionNode = topLevelNode;
-                             result.articleNode.appendChild(result.docSectionNode);
-                             topLevelNode = childElements[0];
-                             --nChild
-                         }
-                         console.log("topLevelNode", topLevelNode);
-                         if(nChild && topLevelNode.tagName == 'SECTION'
-                            && topLevelNode.querySelector('script')){
-                             let nth = 1;
-                             result.codeNameNode = topLevelNode.querySelector(
-                                 `:scope > h2:nth-child(${nth})`);
-                             if(result.codeNameNode)
-                             ++nth;
-                             result.codeSectionNode = topLevelNode;
-                             result.scriptNode      = topLevelNode
-                                 .querySelector(`:scope >script:nth-child(${nth})`);
-                             result.codeTextNode = createFreeElement('div');
-                             result.codeTextNode.classList.add('LP5-Code');
-                             result.codeSectionNode.appendChild(result.codeTextNode);
-                             result.articleNode.appendChild(result.codeSectionNode);
-                             topLevelNode = childElements[0];
-                             --nChild
-                         }
-                         console.log("topLevelNode", topLevelNode);
-                         console.assert(iChild == nChild, iChild);
-                         //                     this.resources.set(filename, result);
-                         this.articles.push(result);
-                         console.log("model.loadArticle() returns ", result);
-                         return result;
-                     },
-
-                     async loadTOC(dirHandle, name, parent=null){
-                         console.log("loadTOC ", name);
-                         let resource = await this.loadArticle(dirHandle, name, parent);
-                         console.log("loadTOC back from await of loadArticle ", name);
-                         console.log(resource);
-                         if(resource.ulNode){
-                             console.log(`in loadTOC, resource "${name}" has a ul`);
-                             const entries = resource.ulNode.querySelectorAll('li');
-                             for(const li of entries){
-                                 let ID = li.getAttribute('id');
-                                 let child = await this.loadTOC(dirHandle, ID, resource);
-                                 resource.children.push(child);
-                             }
-                         } else
-                             console.log(`in loadTOC, resource "${name}" has NO ul`);
-                         console.log(`loadTOC(${name}) returns `, resource);
-                         return resource;
-                     },
-                     async openProject(name, asyncComplete){
-                         console.log("openProject ", name);
-                         const {dirHandle} = this.projects[name];
-                         console.log("dirHandle ", dirHandle);
-                         this.dirHandle = dirHandle;
-                         this.rootTOC = await this.loadTOC(dirHandle, name);
-                         console.log("openProject got rootTOC of ", this.rootTOC);
-                         console.assert(this.rootTOC.name == name, this.rootTOC);
-//                         asyncComplete(true);
-                         console.log("OpenProject returns after scheduling asyncComplete");
-                         return true;
-                     },
-                     async load(name){
-                         // ??? have to delete any existing model
-                         console.log(`modelLoad('${name}')`);
-                         console.assert(this.projects.hasOwnProperty(name));
-                         const dirHandle = this.projects[name].dirHandle;
-                         const rootName = name;
-                         const fileHandle = await dirHandle.getFileHandle(name);
-                         console.assert(fileHandle);
-                         const file = await fileHandle.getFile();
-                         console.log(`file = ${file}`);
-                         const text = await file.text();
-                         console.log(`text = ${text}`);
-                     },
+             model.storeResource = async function(articleNode, serial){
+                 console.log("storeResource ", articleNode, serial);
+                 let article = this.articleFromArticleNode(articleNode);
+                 await this.storage.write(article.URL, serial);
+                 return true;
+             }
+             model.loadResource = async function(url){
+                 let text = null;
+                 try {
+                     const fileHandle = await this.dirHandle.getFileHandle(url);
+                     console.assert(fileHandle);
+                     const file = await fileHandle.getFile();
+                     text = await file.text();
+                 } catch (e) {
+                     console.log("loadResource failed ", e);
+                 }
+                 return text;
+             }
+             model.loadArticle = async function(dirHandle, filename, parent){
+                 console.log("loadResource ", filename);
+if(false){
+                 const result = {
+                     URL             : filename,
+                     name            : filename,
+                     parent          : parent,
+                     children        : [],       // nested resources
+                     articleNode     : null,
+                     docSectionNode  : null,
+                     docText         : null,
+                     titleNode       : null,
+                     scriptNode      : null,
+                     codeSectionNode : null,
+                     codeTextNode    : null,
+                     codeNameNode    : null,
+                     ulNode          : null,
                  };
+                 function fixScript(text){
+                     let result   = text;
+                     function count(re, text){
+                         return ((text||'').match(re) || []).length;
+                     }
+                     const nBegin = count(/\<script[^a-z0-9]/gi, text);
+                     const nEnd   = count(/\<\/script[^a-z0-9]/gi, text);
+                     console.log(`fixScript nBegin=${nBegin} nEnd=${nEnd}`);
+
+                     return result;
+                 }
+}
+                 let text = await this.loadResource(filename);
+//                 text       = fixScript(text);
+                 let result = new Article(parent, filename);
+                 if(false){
+                 let html   = new DOMParser().parseFromString(text, 'text/html');
+                 console.assert(html);
+                 console.log("html from DOMParser is ", html);
+                 let template = html.querySelector('template');
+                 console.assert(template, html);
+                 console.assert(template.parentNode.nodeName == 'HEAD');
+                 console.assert(template.parentNode.childElementCount == 1);
+                 console.log("template content from DOMParser is ", template.content.children);
+                 for(const child of template.content.childNodes){
+                     console.log(child);
+                 }
+                 result.articleNode = createFreeElement('article');
+                 result.articleNode.id = `article-${this.articles.length}`;
+                 result.articleNode.tabIndex = 0;
+                 const childElements = template.content.children;
+                 let nChild = childElements.length;
+                 console.log("nChild = ", nChild);
+                 let   iChild = 0;
+                 let   topLevelNode = childElements[iChild];
+                 console.log("topLevelNode", topLevelNode);
+                 if(nChild && topLevelNode.tagName == 'UL'){
+                     topLevelNode.style.display = 'none';
+                     result.ulNode = topLevelNode;
+                     result.articleNode.appendChild(result.ulNode);
+                     topLevelNode = childElements[0];
+                     --nChild;
+                 }
+                 console.log("topLevelNode", topLevelNode);
+                 if(nChild && topLevelNode.tagName == 'SECTION'
+                    && !topLevelNode.querySelector('script')){
+                     result.titleNode = topLevelNode.querySelector(
+                         ':scope > h2:first-child');
+                     result.docSectionNode = topLevelNode;
+                     result.articleNode.appendChild(result.docSectionNode);
+                     topLevelNode = childElements[0];
+                     --nChild
+                 }
+                 console.log("topLevelNode", topLevelNode);
+                 if(nChild && topLevelNode.tagName == 'SECTION'
+                    && topLevelNode.querySelector('script')){
+                     let nth = 1;
+                     result.codeNameNode = topLevelNode.querySelector(
+                         `:scope > h2:nth-child(${nth})`);
+                     if(result.codeNameNode)
+                         ++nth;
+                     result.codeSectionNode = topLevelNode;
+                     result.scriptNode      = topLevelNode
+                         .querySelector(`:scope >script:nth-child(${nth})`);
+                     result.codeTextNode = createFreeElement('div');
+                     result.codeTextNode.classList.add('LP5-Code');
+                     result.codeSectionNode.appendChild(result.codeTextNode);
+                     result.articleNode.appendChild(result.codeSectionNode);
+                     topLevelNode = childElements[0];
+                     --nChild;
+                 }
+                 console.log("topLevelNode", topLevelNode);
+                 console.assert(iChild == nChild, iChild);
+                     //                     this.resources.set(filename, result);
+                 }
+                 this.articles.push(result);
+                 console.log("model.loadArticle() returns ", result);
                  return result;
-             }();
-         })();
+             }
+             model.loadTOC = async function(dirHandle, name, parent=null){
+                 console.log("loadTOC ", name);
+                 let resource = await this.loadArticle(dirHandle, name, parent);
+                 console.log("loadTOC back from await of loadArticle ", name);
+                 let match = name.match(/^[0-9]+/);
+                 if(match && match[0] > model.nextArticleID)
+                     model.nextArticleID = Number(match[0]);
+                 console.log(resource);
+                 if(resource.ulNode){
+                     console.log(`in loadTOC, resource "${name}" has a ul`);
+                     const entries = resource.ulNode.querySelectorAll('li');
+                     for(const li of entries){
+                         let ID = li.getAttribute('id');
+                         let child = await this.loadTOC(dirHandle, ID, resource);
+                         resource.children.push(child);
+                     }
+                 } else
+                     console.log(`in loadTOC, resource "${name}" has NO ul`);
+                 console.log(`loadTOC(${name}) returns `, resource);
+                 return resource;
+             }
+
+             model.openProject = async function(name){
+                 console.log("openProject ", name);
+                 const {dirHandle} = this.projects[name];
+                 console.log("dirHandle ", dirHandle);
+                 this.dirHandle = dirHandle;
+                 this.storage   = new Storage(dirHandle);
+                 this.rootTOC = await this.loadTOC(dirHandle, name);
+                 console.log("openProject got rootTOC of ", this.rootTOC);
+                 console.assert(this.rootTOC.URL == name, this.rootTOC);
+                 console.log("OpenProject returns after scheduling asyncComplete");
+                 return true;
+             }
+             controller.model = model;
+         }();
         </script>
     </body>
 </html>
