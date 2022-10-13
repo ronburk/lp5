@@ -1,3 +1,21 @@
+Embedded Project
+================
+Need way to embed readonly snapshot of a project in a copy
+of lp5.html. It simply lets you give a single URL for a project
+rather than saying: go to foo.com/lp5.html, then from inside
+the program, open foo.com/projectA.
+
+In addition to 'compile' menu option, one could have 'collect',
+which generates a series of templates containing all the
+articles, for insertion into lp5.html. Bit of a self-reference
+problem there, but if I can get the URL containing my own
+source code as a string, I can insert the new series of
+templates and emit the whole thing as a customized mutation
+of lp5.html. That mutation would be read-only, but would
+let you 'save' to a local directory, which thereafter could
+be edited with the normal lp5.html.
+
+
 Active Macros
 =============
 Consider the case of menu commands. Each command-name appears

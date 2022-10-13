@@ -67,6 +67,35 @@
 
     </head>
     <body>
+        <template data-name="Crash">
+            <div>
+                <style>
+                 dialog {
+                     background-color: LavenderBlush;
+                 }
+                 textarea {
+                     width: 100%;
+                     height: 100%;
+                 }
+                </style>
+                <dialog >
+                    <h1>Oops, we're crashed now.</h1>
+                    <hr>
+                    <textarea data-id="display" readonly>
+                    </textarea>
+                </dialog>
+            </div>
+            <script>
+             const {display} = require('dataID');
+             function init(){}
+             function render(iView, message){
+                 console.log(message);
+                 if(message)
+                     display.value = message;
+             }
+             return { init:init, render:render };
+            </script>
+        </template>
         <template data-name="ArticleContextMenu">
             <div>
                 <dialog id="ArticleContextMenu" class="lp5-context">
@@ -110,23 +139,44 @@
             </script>
         </template>
         <template data-name="EditSection">
-            <div>
-                <dialog id="EditSection">
-                    <center>
-                        <input data-id="articleTitle" type="text"/>
+            <style>
+             .table { display: table; }
+             p      { display: table-row; }
+             label  { display: table-cell; vertical-align: text-top;}
+             input  { display: table-cell; }
+             button { display: table-cell; }
+             textarea { display: table-cell; vertical-align: text-top; width: 100%;}
+             .col1 { display: table-column; }
+             .col2 { display: table-column; }
+            </style>
+            <dialog id="EditSection">
+                <div class="table">
+                    <div class="col1"></div>
+                    <div class="col2"></div>
+                    <p>
                         <button data-id="save">Save</button>
                         <button data-id="cancel">Cancel</button>
-                        <br>
-                        <textarea data-id="docText" rows="10" cols="80"> stuff </textarea>
+                    </p>
+                    <p>
+                        <label>title:</label>
+                        <input data-id="articleTitle" type="text"/>
+                    </p>
+                    <p>
+                        <label>documentation:</label>
+                        <textarea data-id="docText" rows="10" cols="60"></textarea>
+                    </p>
+                    <p>
+                        <label>name:</label>
                         <input data-id="codeName" type="text"/>
-                        <textarea data-id="codeText" rows="10" cols="80"> other </textarea>
-                    </center>
-                </dialog>
-            </div>
+                    </p>
+                    <p>
+                        <label>code:</label>
+                        <textarea data-id="codeText" rows="10" cols="60"></textarea>
+                    </p>
+                </div>
+            </dialog>
             <script>
              const {model, dataID, Article} = require('model,dataID,Article');
-//             const model = require('model');
-//             const iView = require('iView');
              const {save, cancel, articleTitle, docText, codeName, codeText} = dataID;
 
              let   thisArticle = null;
@@ -137,7 +187,7 @@
              }
              function clickSave(event){
                  console.log("clickSave!!!");
-                 // serialize contents of dialog
+                 // serialize contents of editing dialog
                  let serial = Article.createSerial(
                      thisArticle.ulNode,
                      articleTitle.value, docText.value,
@@ -153,7 +203,7 @@
                  save.addEventListener('click', clickSave);
              }
              function renderEditSectionDialog(iView, article){
-                 console.log("EditSection Dialog render!!!!!!");
+                 console.log("EditSection Dialog render!!!!!!", article);
                  thisArticle = article; // remember for future use
                  let title = sectionGetTitle(article);
                  console.log("Title is ", title);
@@ -511,7 +561,8 @@
                          article.ulNode.querySelectorAll('li').forEach((entry)=>{
                              let li           = createFreeElement('li');
                              let id           = entry.getAttribute('id');
-                             let childArticle = model.articleFromURL(id);
+                             let childArticle = model.articles.fromURL(id);
+                             console.assert(childArticle, {id:id});
                              if(childArticle.titleNode)
                                  li.innerText = childArticle.titleNode.innerText;
                              else
@@ -575,12 +626,8 @@
                              
                              if(res.scriptNode){
                                  console.log("   got script node ");
-//                                 res.codeTextNode.innerText = massageCode(
-                                 //                                     res.scriptNode.innerText);
                                  res.codeTextNode.innerText = Article.unindentCode(
                                      res.scriptNode.innerText);
-                                 //                                 outerDiv.appendChild(div);
-                                 
                              }
                          }
                          if(ulNode){
@@ -590,7 +637,7 @@
                                  let id = li.getAttribute('id');
                                  console.assert(id, ulNode);
                                  //                                 let res = model.resources.get(id);
-                                 let res = model.articleFromURL(id);
+                                 let res = model.articles.fromURL(id);
                                  console.assert(res, id);
                                  renderSection(res);
                              });
@@ -661,6 +708,25 @@
         <script>
          "use strict";
          void function(){
+             // defense against malformed HTML leading to insane behavior
+             function findBadTemplate(e){
+                 if(e.childNodes)
+                     e.childNodes.forEach((c)=>{
+                         if(c.nodeName != 'SCRIPT'){
+                             findBadTemplate(c);
+                             if(/\<\//.test(c.innerText)){
+                                 console.log("Element contains a close tag?");
+                                 console.assert(!c, c);
+                             }
+                             if(c.content){
+                                 findBadTemplate(c.content);
+                             }
+                         }
+                     });
+             }
+             
+             findBadTemplate(document);
+
              class Storage {
                  constructor(dirHandle){
                      this.dirHandle = dirHandle;
@@ -750,103 +816,188 @@
                      return result;
                  }
              }
-             class Article {
-                 constructor(parent=null, URL=""){
-                     this.parent          = parent;
-                     this.URL             = URL;
-                     this.children        = [];
-                     this.articleNode     = createFreeElement('article');
-                     this.docSectionNode  = null;
-                     this.docText         = null;
-                     this.titleNode       = null;
-                     this.scriptNode      = null;
-                     this.codeSectionNode = null;
-                     this.codeTextNode    = null;
-                     this.codeNameNode    = null;
-                     this.ulNode          = null;
-                 }
-                 static fromSerial(parent, URL, text){
-                     let result = new Article(parent, URL);
-                     let html   = new DOMParser().parseFromString(text, 'text/html');
-                     console.assert(html);
-                     console.log("html from DOMParser is ", html);
-                     let template = html.querySelector('template');
-                     console.assert(template, html);
-                     console.assert(template.parentNode.nodeName == 'HEAD');
-                     console.assert(template.parentNode.childElementCount == 1);
+             let Articles = null;
+             let Article  = null;
+             void function() {
+                 let secret = Symbol("new Article()");
+                 Articles = class {
+                     #array;
+                     constructor(){
+                         this.#array = new Array();
+                         //                         this[Symbol.iterator] = this.#array[Symbol.iterator];
+                     }
+                     *[Symbol.iterator](){ yield* this.#array }
+                     newArticle(parent=null, URL=""){
+                         let newArticle = new Article(secret, parent, URL);
+                         if(newArticle){
+                             newArticle.articleNode.id = `article-${this.length}`;
+                             this.#array.push(newArticle);
+                         }
+                         return newArticle;
+                     }
+                     get length(){
+                         return this.#array.length;
+                     }
+                     fromArticleNode(node){
+                         // the article node ID contains the article #
+                         let id = node.id;
+                         console.assert(id);
+                         id = node.id.replace(/^article-/,'');
+                         console.assert(id >= 0);
+                         console.assert(id < this.length);
+                         let result = this.#array[id];
+                         console.assert(result, {id:id});
+                         return result;
+                     }
+                     fromURL(url){
+                         for(const article of this.#array)
+                             if(article.URL == url)
+                                 return article;
+                         return null;
+                     }
+                     fromSerial(parent, URL, text){
+                         let result = this.newArticle(parent, URL);
+                         let html   = new DOMParser().parseFromString(text, 'text/html');
+                         console.assert(html);
+                         console.log("html from DOMParser is ", html);
+                         let template = html.querySelector('template');
+                         console.assert(template, html);
+                         console.assert(template.parentNode.nodeName == 'HEAD');
+                         console.assert(template.parentNode.childElementCount == 1);
 
-//                     result.articleNode = createFreeElement('article');
-//                     result.articleNode.id = `article-${this.articles.length}`;
-//                     result.articleNode.tabIndex = 0;
-                     const childElements = template.content.children;
-                     let nChild = childElements.length;
-                     console.log("nChild = ", nChild);
-                     let   iChild = 0;
-                     let   topLevelNode = childElements[iChild];
-                     console.log("topLevelNode", topLevelNode);
-                     if(nChild && topLevelNode.tagName == 'UL'){
-                         topLevelNode.style.display = 'none';
-                         result.ulNode = topLevelNode;
-                         result.articleNode.appendChild(result.ulNode);
-                         topLevelNode = childElements[0];
-                         --nChild;
+                         result.articleNode.tabIndex = 0;
+                         const childElements = template.content.children;
+                         let nChild = childElements.length;
+                         console.log("nChild = ", nChild);
+                         let   iChild = 0;
+                         let   topLevelNode = childElements[iChild];
+                         console.log("topLevelNode", topLevelNode);
+                         if(nChild && topLevelNode.tagName == 'UL'){
+                             topLevelNode.style.display = 'none';
+                             result.ulNode = topLevelNode;
+                             result.articleNode.appendChild(result.ulNode);
+                             topLevelNode = childElements[0];
+                             --nChild;
+                         }
+                         console.log("topLevelNode", topLevelNode);
+                         if(nChild && topLevelNode.tagName == 'SECTION'
+                            && !topLevelNode.querySelector('script')){
+                             result.titleNode = topLevelNode.querySelector(
+                                 ':scope > h2:first-child');
+                             result.docSectionNode = topLevelNode;
+                             result.articleNode.appendChild(result.docSectionNode);
+                             topLevelNode = childElements[0];
+                             --nChild
+                         }
+                         console.log("topLevelNode", topLevelNode);
+                         if(nChild && topLevelNode.tagName == 'SECTION'
+                            && topLevelNode.querySelector('script')){
+                             let nth = 1;
+                             result.codeNameNode = topLevelNode.querySelector(
+                                 `:scope > h2:nth-child(${nth})`);
+                             if(result.codeNameNode)
+                             ++nth;
+                             result.codeSectionNode = topLevelNode;
+                             result.scriptNode      = topLevelNode
+                                 .querySelector(`:scope >script:nth-child(${nth})`);
+                             result.codeTextNode = createFreeElement('div');
+                             result.codeTextNode.classList.add('LP5-Code');
+                             result.codeSectionNode.appendChild(result.codeTextNode);
+                             result.articleNode.appendChild(result.codeSectionNode);
+                             topLevelNode = childElements[0];
+                             --nChild;
+                         }
+                         console.log("topLevelNode", topLevelNode);
+                         if(iChild != nChild){
+                             let message = `article ${URL} seems malformed:  `;
+                             message += text;
+                             throw new Error(message);
+                         }
+                         console.assert(iChild == nChild, iChild);
+                         return result;
                      }
-                     console.log("topLevelNode", topLevelNode);
-                     if(nChild && topLevelNode.tagName == 'SECTION'
-                        && !topLevelNode.querySelector('script')){
-                         result.titleNode = topLevelNode.querySelector(
-                             ':scope > h2:first-child');
-                         result.docSectionNode = topLevelNode;
-                         result.articleNode.appendChild(result.docSectionNode);
-                         topLevelNode = childElements[0];
-                         --nChild
-                     }
-                     console.log("topLevelNode", topLevelNode);
-                     if(nChild && topLevelNode.tagName == 'SECTION'
-                        && topLevelNode.querySelector('script')){
-                         let nth = 1;
-                         result.codeNameNode = topLevelNode.querySelector(
-                             `:scope > h2:nth-child(${nth})`);
-                         if(result.codeNameNode)
-                         ++nth;
-                         result.codeSectionNode = topLevelNode;
-                         result.scriptNode      = topLevelNode
-                             .querySelector(`:scope >script:nth-child(${nth})`);
-                         result.codeTextNode = createFreeElement('div');
-                         result.codeTextNode.classList.add('LP5-Code');
-                         result.codeSectionNode.appendChild(result.codeTextNode);
-                         result.articleNode.appendChild(result.codeSectionNode);
-                         topLevelNode = childElements[0];
-                         --nChild;
-                     }
-                     console.log("topLevelNode", topLevelNode);
-                     console.assert(iChild == nChild, iChild);
-                     return result;
-                     //                     this.resources.set(filename, result);
-                     this.articles.push(result);
-                     console.log("model.loadArticle() returns ", result);
-                     return result;
                  }
-
-                 static createSerial(ulNode=null, docTitle="", docText="", codeTitle="", codeText=""){
-                     // I'm terrible!
-                     if(URL in ulNode){
-                         let a=ulNode;
-                         return createSerial(
-                             a.ulNode,
-                             a.titleNode.innerHTML, a.docText.innerHTML,
-                             a.codeNameNode.innerHTML, a.codeTextNode.innerHTML
+                 Article = class {
+                     constructor(sym, parent=null, URL=""){
+                         console.assert(
+                             sym === secret,
+                             "Only 'Articles' can call 'new Article()'");
+                         this.parent          = parent;
+                         this.URL             = URL;
+                         this.children        = [];
+                         this.articleNode     = createFreeElement('article');
+                         this.docSectionNode  = null;
+                         this.docText         = null;
+                         this.titleNode       = null;
+                         this.scriptNode      = null;
+                         this.codeSectionNode = null;
+                         this.codeTextNode    = null;
+                         this.codeNameNode    = null;
+                         this.ulNode          = null;
+                         let titleNode = createFreeElement('h2');
+                         titleNode.innerHTML = '<h2>New_Empty_Article</h2>';
+                     }
+                     #prepareForChild(newChildArticle, siblingArticle=null){
+                         if(!this.ulNode)
+                             this.ulNode = createFreeElement('ul');
+                         let result = {};
+                         result.li = createFreeElement('li', {id:newChildArticle.URL});
+                         if(siblingArticle){
+                             result.siblingNode = this.ulNode.querySelector(
+                                 '#'+siblingArticle.URL);
+                             console.assert(result.siblingNode);
+                         } else {
+                             result.siblingNode = null;
+                         }
+                         return result;
+                     }
+                     addFirstChild(newChildArticle){
+                         console.assert(!this.ulNode || !this.childElementCount);
+                         let stuff = this.#prepareForChild(newChildArticle);
+                         this.ulNode.appendChild(stuff.li);
+                         console.log("after addFirstChild: ", this);
+                     }
+                     addChildBefore(newChildArticle, siblingArticle){
+                         console.assert(this.ulNode);
+                         let stuff = this.#prepareForChild(newChildArticle,siblingArticle);
+                         stuff.siblingNode.before(stuff.li);
+                     }
+                     addChildAfter(newChildArticle, siblingArticle){
+                         console.assert(this.ulNode);
+                         let stuff = this.#prepareForChild(newChildArticle,siblingArticle);
+                         stuff.siblingNode.before(stuff.li);
+                     }
+                     toSerial(){
+                         function val(node){
+                             let result = "";
+                             if(node)
+                                 result = node.innerHTML;
+                             return result;
+                         }
+                         return Article.createSerial(
+                             this.ulNode,
+                             val(this.titleNode), val(this.docText),
+                             val(this.codeNameNode), val(this.codeTextNode)
                          );
-                     } else {
-                     
-                     let startScript='<script type="text/plain">';
-                     let endScript='<' + '/script>';
-                     let ulSerial = "";
-                     if(ulNode){
-                         console.assert(ulNode.innerHTML);
-                         ulSerial = ulNode.innerHTML;
                      }
-                     let serial = `
+
+                     static createSerial(ulNode=null, docTitle="", docText="", codeTitle="", codeText=""){
+                         // I'm terrible!
+                         if(ulNode && URL in ulNode){
+                             let a=ulNode;
+                             return createSerial(
+                                 a.ulNode,
+                                 a.titleNode.innerHTML, a.docText.innerHTML,
+                                 a.codeNameNode.innerHTML, a.codeTextNode.innerHTML
+                             );
+                         } else {
+                             let startScript='<'+'script type="text/plain">';
+                             let endScript='<' + '/script>';
+                             let ulSerial = "";
+                             if(ulNode && ulNode.innerHTML){
+                                 ulSerial = ulNode.outerHTML;
+                             }
+                             let serial = `
 <template>
     ${ulSerial}
     <section>
@@ -860,35 +1011,35 @@ ${codeText}
         ${endScript}
     </section>
 </template>
-                     `;
-                     return serial;
-                     }
-                 }
-                 static unindentCode(text){
-                     text = text.replace(/^\s*[\r\n]+/,'');
-                     text = text.replace(/\s*$/,'') + '\n';
-                     let result = text;
-                     let lines = text.split(/\r?\n/);
-                     let indent = -1;
-                     for(let line of lines){
-                         line = line.replace(/\s+$/,'');
-                         if(line.length){
-                             let thisIndent = line.search(/\S|$/);
-                             if(indent == -1 || thisIndent < indent){
-                                 indent = thisIndent;
-                             }
+                             `;
+                             return serial;
                          }
                      }
-                     if(indent > 0){
-                         let space = " ".repeat(indent);
-                         let regex = new RegExp("^" + space, 'gm');
-                         result = text.replace(regex, '');
-                         console.assert(result != text);
+                     static unindentCode(text){
+                         text = text.replace(/^\s*[\r\n]+/,'');
+                         text = text.replace(/\s*$/,'') + '\n';
+                         let result = text;
+                         let lines = text.split(/\r?\n/);
+                         let indent = -1;
+                         for(let line of lines){
+                             line = line.replace(/\s+$/,'');
+                             if(line.length){
+                                 let thisIndent = line.search(/\S|$/);
+                                 if(indent == -1 || thisIndent < indent){
+                                     indent = thisIndent;
+                                 }
+                             }
+                         }
+                         if(indent > 0){
+                             let space = " ".repeat(indent);
+                             let regex = new RegExp("^" + space, 'gm');
+                             result = text.replace(regex, '');
+                             console.assert(result != text);
+                         }
+                         return result;
                      }
-                     return result;
                  }
-             }
-
+             }();
 
              function isTest(){
                  return !!navigator.webdriver;
@@ -902,9 +1053,12 @@ ${codeText}
                  }
                  return result;
              }
-             function createFreeElement(tagName){
+             function createFreeElement(tagName, options){
                  let node = document.createElement(tagName);
                  node.remove();
+                 if(options)
+                     for(const key in options)
+                         node[key] = options[key];
                  return node;
              }
 
@@ -972,10 +1126,9 @@ ${codeText}
                              model.dirParentHandle = handle;
                      }
                  }else{
-                     model.dirParentHandle = handle;
+                     model.dirParentHandle       = handle;
                  }
-                 //                 asyncComplete(true);
-                 console.log("loadHandle() after asyncComplete");
+                 console.log("loadHandle() after asyncComplete", handle);
                  return true;
              }
 
@@ -1089,6 +1242,11 @@ ${codeText}
              }
 
              function controller(event){
+                 const { model, views, asyncSchedule } = controller;
+                 if(event.type == 'asyncComplete' && event.detail instanceof Error){
+                     views.push('Crash', event.detail);
+                     controller.state = 'Crash';
+                 }
                  function articleNodeFromClick(event){
                      let result = null;
                      let path   = event.composedPath();
@@ -1103,7 +1261,6 @@ ${codeText}
 
                      return result;
                  }
-                 const { model, views, asyncSchedule } = controller;
                  const currentViewName = views.currentView
                                        ? views.currentView.name : "";
                  console.log(">>>>>>>>>>>>>>>>>>>>>>enter controller ", controller.state);
@@ -1115,6 +1272,9 @@ ${codeText}
                  }
                  controller.inSync = true;
                  switch(controller.state){
+                     case 'Crash' :
+                         
+                         break;
                      case 'load' :
                          console.assert(event.type == 'load', event);
                          asyncSchedule(loadHandles, model);
@@ -1169,7 +1329,7 @@ ${codeText}
                          controller.state = 'SelectParent';
                          break;
                      case 'PickOrCreateProject' :
-                         if(event.type == 'click'){
+                         if(event.type == 'click' || event.type == 'input' || event.type == 'change'){
                          } else if(event.type == 'selectProject'){
                              console.assert(event.type == 'selectProject');
                              views.pop();
@@ -1179,14 +1339,18 @@ ${codeText}
                              console.assert(false, event.type);
                          }
                          break;
-                     case 'openProject' :
+                     case 'openProject' : // waiting for project to open
                          console.assert(event.type == 'asyncComplete');
                          controller.state = 'home';
                          views.render();
                          break;
                      case 'AwaitAsyncComplete' :
                          console.assert(event.type == 'asyncComplete');
-                         controller.state = 'home';
+                         if(event.detail instanceof Error){
+                             controller.state = 'Crash';
+                             alert(event.detail);
+                         } else
+                             controller.state = 'home';
                          views.render();
                          break;
                      case 'ContextMenu' : // handle any context menu
@@ -1216,7 +1380,7 @@ ${codeText}
                              if(articleNode){
                                  views.push(
                                      'ArticleContextMenu',
-                                     model.articleFromArticleNode(articleNode));
+                                     model.articles.fromArticleNode(articleNode));
                                  event.preventDefault();
                                  controller.state = 'ContextMenu';
                              }
@@ -1243,16 +1407,16 @@ ${codeText}
                                  ;
                              });
                              let target = path[0];
-                             console.log(target);
+                             console.log(target, articleNode);
                              if(articleNode){
                                  console.log("views.push Edit Section ", articleNode);
                                  views.push('EditSection',
-                                            model.articleFromArticleNode(articleNode));
+                                            model.articles.fromArticleNode(articleNode));
                                  controller.state = 'EditingSection';
                                  controller.currentArticle = articleNode;
                              }else if(target.id == 'LP5-Menu-Reload'){
                                  controller.state = 'openProject';
-                                 asyncSchedule(model.openProject.bind(model), model.rootTOC.name);
+                                 asyncSchedule(model.openProject.bind(model), model.rootTOC.URL);
                              } else if(target.id == 'LP5-Menu-Test'){
                                  controller.state = 'test';
                                  asyncSchedule(test, model);
@@ -1282,6 +1446,7 @@ ${codeText}
                          if(event.type == 'close') {
                              console.log("Clse event came in");
                              controller.state = 'home';
+                             views.pop();
                          } else if(event.type == 'saveArticle'){
                              views.respond(event);
                              console.log("now call asyncSchedule ", controller.currentArticle);
@@ -1303,6 +1468,7 @@ ${codeText}
                  controller.inSync = false;
                  console.log("<<<<<<<<<<<<<<<<<<<<<<<<<exit controller: ", controller.state);
              }
+
              [
                  'asyncComplete',
                  'change',
@@ -1317,15 +1483,23 @@ ${codeText}
                  'reload',
                  'saveArticle',
                  'selectProject',
-             ].forEach(e=>window.addEventListener(e, e=>controller(e), true));
+             ].forEach(e=>window.addEventListener(
+                 e,
+                 controller,
+                 true));
 
              controller.asyncSchedule = function(func, ...args){
-                 async function notifyWhenDone(func, ...args){
-                     const result = await func(...args);
-                     controller.asyncComplete(result);
+                 async function notifyWhenDone(){
+                     try {
+                         controller.asyncComplete(await func(...args));
+                     }catch(err){
+                         controller.asyncComplete(err);
+                     }
                  }
-                 setTimeout(()=>notifyWhenDone(func, ...args));
-                 //                 setTimeout(()=>func(...args, controller.asyncComplete));
+                 setTimeout(notifyWhenDone);
+                 //                     async function notifyWhenDone(){
+                 //                         controller.asyncComplete(await func(...args));
+                 //                 });
              }
              controller.asyncComplete = function(value){
                  function f() {
@@ -1339,6 +1513,7 @@ ${codeText}
                  'AwaitAsyncComplete',
                  'AwaitDirHandleLoad',
                  'ContextMenu',
+                 'Crash',
                  'EditingSection',
                  'home',
                  'load',
@@ -1361,7 +1536,7 @@ ${codeText}
              controller.state  = 'load';
 
              function scopedEval(script, iView){
-//                 console.log("scopedEval ", script);
+                 //                 console.log("scopedEval ", script);
                  for(const element of iView.rootNode.querySelectorAll("[data-ID]"))
                      iView.dataID[element.dataset.id] = element;
                  let dataID = iView.rootNode.dataset.id;
@@ -1461,6 +1636,7 @@ ${codeText}
                      
                      // template must be of form: style? div/nav script?
                      function parseTemplate(template){
+                         console.log("parseTemplate of: ", template);
                          let   style = null, div = null, script = null;
                          const root  = template.content;
                          console.assert(root);
@@ -1490,7 +1666,7 @@ ${codeText}
                          console.assert(!script || script.nodeName == 'SCRIPT');
 
                          const result = {style:style, div:div, script:script};
-                         console.log(result);
+                         console.log("parseTemplate returns: ", result);
                          return result;
                      }
 
@@ -1510,11 +1686,9 @@ ${codeText}
                          });
 
                          const iView    = structuredClone(viewInterface);
-                         let name = t.dataset.name;
-                         if(!name){
-                         }
                          iView.name     = t.dataset.name; // data-name='xxx'
                          console.log("template named ", iView.name);
+                         console.log(t.content);
 
                          const templateRoot = template.div;
                          const script       = template.script;
@@ -1556,7 +1730,6 @@ ${codeText}
                              iView.notify = null;
                          }
                          // two templates with same name is a mistake
-                         //                         console.assert(!LP5.views.views.hasOwnProperty(iView.name));
                          console.assert(!this.views.hasOwnProperty(iView.name));
 
                          if(!parentView){ // if this is an outermost template
@@ -1622,7 +1795,7 @@ ${codeText}
                  },
                  push(dialogName, ...args) {
                      console.log("views.push ", dialogName);
-                 ++this.inProgress;
+                     ++this.inProgress;
                      console.assert(this.currentView);
                      this.stack.push(this.currentView);
                      const iView = this.views[dialogName];
@@ -1683,12 +1856,15 @@ ${codeText}
                      //???                 const template = iView.rootNode.cloneNode(true);
                      const template = iView.rootNode;
                      let dialog = template.querySelector("dialog");
+                     // dialogs get shoved into the start of body,
+                     // leaving lower layers visible
                      if(dialog){
                          if(false){
                              const div = body.createElement("div");
                              body.prepend(div);
                              body.firstElementChild.replaceChildren(template);
                          }
+                         console.log("body.prepend ", template);
                          body.prepend(template);
                          dialog.showModal();
                      } else {
@@ -1718,7 +1894,7 @@ ${codeText}
              model.dirParentHandle  = null;
              model.projectName      = new Map;
              model.urlToResource    = null;
-             model.articles         = [];
+             model.articles         = new Articles();
              model.rootTOC          = null;
              model.projects         = {};
              model.anchorNameToNode = new Map();
@@ -1732,19 +1908,27 @@ ${codeText}
                  return handle;
              };
 
-             model.articleFromArticleNode = function(node){
-                 // the article node ID contains the article #
-                 let id = node.id.replace(/^article-/,'');
-                 console.assert(id >= 0);
-                 console.assert(id < this.articles.length);
-                 return this.articles[id];
+             if(false){
+                 model.articleFromArticleNode = function(node){
+                     // the article node ID contains the article #
+                     let id = node.id;
+                     console.assert(id);
+                     id = node.id.replace(/^article-/,'');
+                     console.assert(id >= 0);
+                     console.assert(id < this.articles.length);
+                     let result = this.articles[id];
+                     console.assert(result, {id:id});
+                     return result;
+                 }
+                 model.articleFromURL = function(url){
+                     for(const article of this.articles)
+                         if(article.URL == url)
+                             return article;
+                     return null;
+                 }
              }
-             model.articleFromURL = function(url){
-                 for(const article of this.articles)
-                     if(article.URL == url)
-                         return article;
-                 return null;
-             }
+             // we want to create the backing store first, to
+             // make sure we can.
              model.createEmptyArticle = async function (location, targetArticle){
                  // location: -1 = before, 0 = first child, 1 = after
                  console.log("createEmptyArticle ", location, targetArticle);
@@ -1752,7 +1936,18 @@ ${codeText}
                  let handle  = await model.createUniqueFile();
                  console.assert(handle);
                  let emptyArticleName = handle.name;
-                 let serial = Article.createSerial();
+                 let parentArticle = null;
+                 if(targetArticle){
+                     if(location == 0)
+                         parentArticle = targetArticle;
+                     else {
+                         console.assert(targetArticle.parent);
+                         parentArticle = targetArticle.parent;
+                     }
+                 }
+                 let newArticle = model.articles.newArticle(
+                     parentArticle, emptyArticleName);
+                 let serial = newArticle.toSerial();
                  let writable = await handle.createWritable();
                  await writable.write(serial);
                  await writable.close();
@@ -1761,29 +1956,20 @@ ${codeText}
                  // if very first article of project
                  if(!targetArticle)
                      return;
-                 let parentArticle = targetArticle;
-                 let li = createFreeElement('li');
-                 li.id = emptyArticleName;
 
-                 if(location == 0){
-                     console.assert(!parentArticle.ulNode);
-                     let ul = createFreeElement('ul');
-                     parentArticle.ulNode = ul;
-                 } else {
-                     parentArticle = targetArticle.parent;
-                     let ul = parentArticle.ulNode;
-                     console.assert(ul);
-                     let sibling = ul.querySelector('#'+emptyArticleName);
-                     if(location < 0)
-                         sibling.before(li);
-                     else
-                         sibling.after(li);
-                 }
-                 serial = Article.createSerial(parentArticle);
-                 console.log("write parent article", parentArticle.URL, serial);
-                             
+                 if(location == 0)
+                     parentArticle.addFirstChild(newArticle);
+                 else if(location == -1)
+                     parentArticle.addChildBefore(newArticle);
+                 else if(location == 1)
+                     parentArticle.addChildAfter(newArticle);
+                 else
+                     console.assert(false);
+
+                 let changedArticle = location ? targetArticle.parent : targetArticle;
+                 serial = parentArticle.toSerial();
+                 console.log("write changed article", parentArticle, serial);
                  await model.storage.write(parentArticle.URL,serial);
-
              };
              model.docOrder = function*(article){
                  console.assert(this.articles); // detect bogus 'this'
@@ -1809,7 +1995,7 @@ ${codeText}
 
              model.storeResource = async function(articleNode, serial){
                  console.log("storeResource ", articleNode, serial);
-                 let article = this.articleFromArticleNode(articleNode);
+                 let article = this.articles.fromArticleNode(articleNode);
                  await this.storage.write(article.URL, serial);
                  return true;
              }
@@ -1827,130 +2013,42 @@ ${codeText}
              }
              model.loadArticle = async function(dirHandle, filename, parent){
                  console.log("loadResource ", filename);
-if(false){
-                 const result = {
-                     URL             : filename,
-                     name            : filename,
-                     parent          : parent,
-                     children        : [],       // nested resources
-                     articleNode     : null,
-                     docSectionNode  : null,
-                     docText         : null,
-                     titleNode       : null,
-                     scriptNode      : null,
-                     codeSectionNode : null,
-                     codeTextNode    : null,
-                     codeNameNode    : null,
-                     ulNode          : null,
-                 };
-                 function fixScript(text){
-                     let result   = text;
-                     function count(re, text){
-                         return ((text||'').match(re) || []).length;
-                     }
-                     const nBegin = count(/\<script[^a-z0-9]/gi, text);
-                     const nEnd   = count(/\<\/script[^a-z0-9]/gi, text);
-                     console.log(`fixScript nBegin=${nBegin} nEnd=${nEnd}`);
-
-                     return result;
-                 }
-}
                  let text = await this.loadResource(filename);
-//                 text       = fixScript(text);
-                 let result = new Article(parent, filename);
-                 if(false){
-                 let html   = new DOMParser().parseFromString(text, 'text/html');
-                 console.assert(html);
-                 console.log("html from DOMParser is ", html);
-                 let template = html.querySelector('template');
-                 console.assert(template, html);
-                 console.assert(template.parentNode.nodeName == 'HEAD');
-                 console.assert(template.parentNode.childElementCount == 1);
-                 console.log("template content from DOMParser is ", template.content.children);
-                 for(const child of template.content.childNodes){
-                     console.log(child);
-                 }
-                 result.articleNode = createFreeElement('article');
-                 result.articleNode.id = `article-${this.articles.length}`;
-                 result.articleNode.tabIndex = 0;
-                 const childElements = template.content.children;
-                 let nChild = childElements.length;
-                 console.log("nChild = ", nChild);
-                 let   iChild = 0;
-                 let   topLevelNode = childElements[iChild];
-                 console.log("topLevelNode", topLevelNode);
-                 if(nChild && topLevelNode.tagName == 'UL'){
-                     topLevelNode.style.display = 'none';
-                     result.ulNode = topLevelNode;
-                     result.articleNode.appendChild(result.ulNode);
-                     topLevelNode = childElements[0];
-                     --nChild;
-                 }
-                 console.log("topLevelNode", topLevelNode);
-                 if(nChild && topLevelNode.tagName == 'SECTION'
-                    && !topLevelNode.querySelector('script')){
-                     result.titleNode = topLevelNode.querySelector(
-                         ':scope > h2:first-child');
-                     result.docSectionNode = topLevelNode;
-                     result.articleNode.appendChild(result.docSectionNode);
-                     topLevelNode = childElements[0];
-                     --nChild
-                 }
-                 console.log("topLevelNode", topLevelNode);
-                 if(nChild && topLevelNode.tagName == 'SECTION'
-                    && topLevelNode.querySelector('script')){
-                     let nth = 1;
-                     result.codeNameNode = topLevelNode.querySelector(
-                         `:scope > h2:nth-child(${nth})`);
-                     if(result.codeNameNode)
-                         ++nth;
-                     result.codeSectionNode = topLevelNode;
-                     result.scriptNode      = topLevelNode
-                         .querySelector(`:scope >script:nth-child(${nth})`);
-                     result.codeTextNode = createFreeElement('div');
-                     result.codeTextNode.classList.add('LP5-Code');
-                     result.codeSectionNode.appendChild(result.codeTextNode);
-                     result.articleNode.appendChild(result.codeSectionNode);
-                     topLevelNode = childElements[0];
-                     --nChild;
-                 }
-                 console.log("topLevelNode", topLevelNode);
-                 console.assert(iChild == nChild, iChild);
-                     //                     this.resources.set(filename, result);
-                 }
-                 this.articles.push(result);
+                 let result = this.articles.fromSerial(parent, filename, text);
+//                 result.articleNode.id = `article-${this.articles.length}`;
+                 
                  console.log("model.loadArticle() returns ", result);
                  return result;
              }
              model.loadTOC = async function(dirHandle, name, parent=null){
                  console.log("loadTOC ", name);
-                 let resource = await this.loadArticle(dirHandle, name, parent);
-                 console.log("loadTOC back from await of loadArticle ", name);
+                 let article = await this.loadArticle(dirHandle, name, parent);
+                 console.log("loadTOC back from await of loadArticle ", name, article);
                  let match = name.match(/^[0-9]+/);
                  if(match && match[0] > model.nextArticleID)
                      model.nextArticleID = Number(match[0]);
-                 console.log(resource);
-                 if(resource.ulNode){
-                     console.log(`in loadTOC, resource "${name}" has a ul`);
-                     const entries = resource.ulNode.querySelectorAll('li');
+                 console.log(article);
+                 if(article.ulNode){
+                     console.log(`in loadTOC, article "${name}" has a ul`);
+                     const entries = article.ulNode.querySelectorAll('li');
                      for(const li of entries){
                          let ID = li.getAttribute('id');
-                         let child = await this.loadTOC(dirHandle, ID, resource);
-                         resource.children.push(child);
+                         let child = await this.loadTOC(dirHandle, ID, article);
+                         article.children.push(child);
                      }
                  } else
-                     console.log(`in loadTOC, resource "${name}" has NO ul`);
-                 console.log(`loadTOC(${name}) returns `, resource);
-                 return resource;
+                     console.log(`in loadTOC, article "${name}" has NO ul`);
+                 console.log(`loadTOC(${name}) returns `, article);
+                 return article;
              }
 
              model.openProject = async function(name){
-                 console.log("openProject ", name);
+                 console.log("openProject ", name, this.projects);
                  const {dirHandle} = this.projects[name];
                  console.log("dirHandle ", dirHandle);
                  this.dirHandle = dirHandle;
                  this.storage   = new Storage(dirHandle);
-                 this.rootTOC = await this.loadTOC(dirHandle, name);
+                 this.rootTOC   = await this.loadTOC(dirHandle, name);
                  console.log("openProject got rootTOC of ", this.rootTOC);
                  console.assert(this.rootTOC.URL == name, this.rootTOC);
                  console.log("OpenProject returns after scheduling asyncComplete");
