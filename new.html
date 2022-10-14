@@ -42,7 +42,7 @@
          div.epigraph > div {
              max-width: 27em;
          }
-         div.epigraph  hr { width:100%; size:0;display:none;}
+         div.epigraph  hr { width:100%; display:none;}
         </style>
         <style>
          pre code {
@@ -578,7 +578,7 @@
                          let article = model.rootTOC;
                          if(article && article.ulNode){
                              let ul = renderChildTOC(article);
-                             iView.rootNode.replaceChildren(ul);
+                             iView.rootNode.shadowRoot.replaceChildren(ul);
                          }
                          return;
                      };
@@ -1053,6 +1053,10 @@ ${codeText}
                  }
                  return result;
              }
+             function die(msg, ...args){
+                 console.log(msg);
+                 console.assert(false, ...args);
+             }
              function createFreeElement(tagName, options){
                  let node = document.createElement(tagName);
                  node.remove();
@@ -1288,8 +1292,10 @@ ${codeText}
                          controller.state = 'SelectParent';
                          break;
                      case 'SelectParent' :
-                         if(event.target.id == 'SelectParentDirButton'
-                            || event.target.id == 'SelectParentDirPreviousButton'){
+                         let path   = event.composedPath();
+                         let target = path[0];
+                         if(target.id == 'SelectParentDirButton'
+                            || target.id == 'SelectParentDirPreviousButton'){
                              console.assert(event.type == 'click');
                              console.log(">>>>>>>>>>>>>asyncSchedule!!!!!!");
                              asyncSchedule(selectParentDir, model, event);
@@ -1536,9 +1542,11 @@ ${codeText}
              controller.state  = 'load';
 
              function scopedEval(script, iView){
-                 //                 console.log("scopedEval ", script);
-                 for(const element of iView.rootNode.querySelectorAll("[data-ID]"))
+                 console.log("scopedEval ", iView, script);
+                 for(const element of iView.rootNode.shadowRoot.querySelectorAll("[data-ID]")){
+                     console.log("Found data-id of ", element.dataset.id);
                      iView.dataID[element.dataset.id] = element;
+                 }
                  let dataID = iView.rootNode.dataset.id;
                  if(dataID)
                      iView.dataID[dataID] = iView.rootNode;
@@ -1610,7 +1618,7 @@ ${codeText}
              // interface to a view
              const viewInterface = {
                  name         : "",
-                 isDialog     : false,
+                 dialogNode   : null,
                  notify       : null,
                  children     : [],
                  rootNode     : null,
@@ -1632,78 +1640,62 @@ ${codeText}
                      );
                  },
                  loadTemplates(rootElement=document, parentView=null){
-                     console.log("views.loadTemplates()");
-                     
-                     // template must be of form: style? div/nav script?
-                     function parseTemplate(template){
-                         console.log("parseTemplate of: ", template);
-                         let   style = null, div = null, script = null;
-                         const root  = template.content;
-                         console.assert(root);
-                         const children = root.children;
-                         console.assert(children);
+                     console.log("views.loadTemplates()", rootElement);
+                     console.log(rootElement.querySelectorAll('template').length);
 
-                         switch(children.length){
-                             case 1 :
-                                 [div] = children;
-                                 break;
-                             case 2 :
-                                 if(children[0].nodeName == 'STYLE'){
-                                     [style, div] = children;
-                                 }else{
-                                     [div, script] = children;
-                                 }
-                                 break;
-                             case 3:
-                                 [style, div, script] = children;
-                                 break;
-                             default:
-                                 console.log("malformed template", template);
-                                 console.assert(false, children);
-                         };
-                         console.assert(!style  || style.nodeName  == 'STYLE');
-                         console.assert(!div    || (div.nodeName    == 'DIV' || div.nodeName == 'NAV'));
-                         console.assert(!script || script.nodeName == 'SCRIPT');
-
-                         const result = {style:style, div:div, script:script};
-                         console.log("parseTemplate returns: ", result);
-                         return result;
-                     }
-
-                     let scripts = null;
                      rootElement.querySelectorAll('template').forEach((t)=>{
-                         const template = parseTemplate(t);
-                         // every script inside a template must be direct child of template
-                         scripts   = t.content.querySelectorAll('script');
-                         scripts.forEach(function (s){
-                             if(s.parentNode != t.content){
-                                 let name = s.parentNode.nodeName;
-                                 if(name != 'TEMPLATE'){
-                                     console.log("Script must be child of template, not ", name);
-                                     console.assert(false, s.parentNode);
+                         let scriptNode = null;
+                         t.content.querySelectorAll('script').forEach((s)=>{
+                             console.log("found script ", s);
+                             if(s.parentNode.nodeName != '#document-fragment'){
+                                 die("script not direct child of template node", t, s);
+                             } else if(s.parentNode == t.content){
+                                 if(scriptNode){
+                                     die("Only one script per template!", s);
+                                 } else {
+                                     scriptNode = s;
+                                     console.log("    and removed script");
+                                     scriptNode.remove();
                                  }
                              }
                          });
 
+                         const rootNode = createFreeElement('div');
+                         const shadow   = rootNode.attachShadow({mode:'open'});
+                         console.log("t.content is [${t.content.children.length}]",
+                                     t.content);
+                         let child=null;
+                         while(child = t.content.firstChild){
+                             console.log("appending child ", child);
+                             console.assert(child.nodeName != 'SCRIPT');
+                             shadow.appendChild(child);
+                         }
+                         if(false)
+                         for(let i= 0; i < t.content.children.length; ++i){
+                             let child = t.content.children[i];
+                             console.log("appending child ", child);
+                             console.assert(child.nodeName != 'SCRIPT');
+                             shadow.appendChild(child);
+                         }
+                         console.log("rootNode is ", rootNode);
+
                          const iView    = structuredClone(viewInterface);
                          iView.name     = t.dataset.name; // data-name='xxx'
-                         console.log("template named ", iView.name);
-                         console.log(t.content);
-
-                         const templateRoot = template.div;
-                         const script       = template.script;
+                         console.log(`template named ${iView.name}, parent `, parentView);
                          
                          // if this is a child template
                          if(parentView){
-                             iView.rootNode = templateRoot;
-                             t.replaceWith(t.content);
+                             iView.rootNode = rootNode;
+//                             t.replaceWith(t.content);
+                             t.replaceWith(rootNode);
                          } else {
                              // clone template, then discard it
-                             iView.rootNode = templateRoot.cloneNode(true);
+                             //                             iView.rootNode = templateRoot.cloneNode(true);
+                             iView.rootNode = rootNode;
                              t.remove();
-                             const dialogNode = iView.rootNode.querySelector('dialog');
+                             const dialogNode = iView.rootNode.shadowRoot.querySelector('dialog');
                              if(dialogNode){
-                                 iView.isDialog = true;
+                                 iView.dialogNode = dialogNode;
                                  // do not define dialog 'open' attribute, please
                                  console.assert(!dialogNode.hasAttribute('open'));
                              }
@@ -1713,15 +1705,14 @@ ${codeText}
                          // However, doing so has strange additional consequences:
                          // https://html.spec.whatwg.org/multipage/interactive-elements.html#the-dialog-element
                          //                     let script = templateRoot.querySelector('script');
-                         if(script){
+                         if(scriptNode){
                              // remove script else it will run when frag inserted into DOM
-                             script.remove();
                              try {
                                  // run the script to obtain its notification functions
                                  console.log(" eval the script");
-                                 iView.notify   = scopedEval(script.innerHTML, iView);
+                                 iView.notify   = scopedEval(scriptNode.innerHTML, iView);
                              } catch(error){
-                                 console.log("Failed on script: ", script.innerHTML);
+                                 console.log("Failed on script: ", scriptNode.innerHTML);
                                  console.assert(false, error);
                              }
                              console.assert(iView.notify.hasOwnProperty('init'));
@@ -1734,7 +1725,7 @@ ${codeText}
 
                          if(!parentView){ // if this is an outermost template
                              // recurse to handle any nested children
-                             this.loadTemplates(iView.rootNode, iView);
+                             this.loadTemplates(iView.rootNode.shadowRoot, iView);
                              this.views[iView.name] = iView;
                          } else {
                              parentView.children.push(iView);
@@ -1809,7 +1800,7 @@ ${codeText}
                  pop() {
                  ++this.inProgress;
                      const currentView = this.currentView;
-                     console.assert(currentView.isDialog);
+                     console.assert(currentView.dialogNode);
                      console.assert(currentView);
                      console.log("pop() this.current = ", currentView);
                      // our root is a div containing a dialog
@@ -1849,33 +1840,29 @@ ${codeText}
                      console.log(`history.pushState("#${name}")`);
                      // give current view back its nodes
                      // this only happens when change()ing one non-dialog to another
-                     if(currentView && !iView.isDialog){
+                     if(currentView && !iView.dialogNode){
+                         console.log(`Giving ${currentView.name} back its nodes.`);
                          currentView.rootNode.replaceChildren(body.firstElementChild);
                      }
 
-                     //???                 const template = iView.rootNode.cloneNode(true);
-                     const template = iView.rootNode;
-                     let dialog = template.querySelector("dialog");
+                     console.assert(!iView.rootNode.shadowRoot.querySelector('script'));
                      // dialogs get shoved into the start of body,
                      // leaving lower layers visible
-                     if(dialog){
-                         if(false){
-                             const div = body.createElement("div");
-                             body.prepend(div);
-                             body.firstElementChild.replaceChildren(template);
-                         }
-                         console.log("body.prepend ", template);
-                         body.prepend(template);
-                         dialog.showModal();
+                     if(iView.dialogNode){
+                         console.log("body.prepend ", iView.rootNode);
+                         body.prepend(iView.rootNode);
+                         iView.dialogNode.showModal();
                      } else {
-                         document.body.replaceChildren(template);
+                         console.log("before problem ", iView.rootNode);
+                         document.body.replaceChildren(iView.rootNode);
+                         console.log("after problem");
                          /* if not showing dialog, autofocus only valid on page load,
                           * so fix that manually.
                           * https://html.spec.whatwg.org/multipage/interaction.html#the-autofocus-attribute
                           */
-                         let focus = document.body.querySelector("input[autofocus]");
-                         if(focus)
-                             focus.focus();
+                         //                         let focus = document.body.querySelector("input[autofocus]");
+                         //                         if(focus)
+                         //                             focus.focus();
                      }
                      this.currentView = iView;
                  }
@@ -2015,7 +2002,7 @@ ${codeText}
                  console.log("loadResource ", filename);
                  let text = await this.loadResource(filename);
                  let result = this.articles.fromSerial(parent, filename, text);
-//                 result.articleNode.id = `article-${this.articles.length}`;
+                 //                 result.articleNode.id = `article-${this.articles.length}`;
                  
                  console.log("model.loadArticle() returns ", result);
                  return result;
