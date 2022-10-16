@@ -149,7 +149,7 @@
              .col1 { display: table-column; }
              .col2 { display: table-column; }
             </style>
-            <dialog id="EditSection">
+            <dialog data-id="EditSection">
                 <div class="table">
                     <div class="col1"></div>
                     <div class="col2"></div>
@@ -177,7 +177,7 @@
             </dialog>
             <script>
              const {model, dataID, Article} = require('model,dataID,Article');
-             const {save, cancel, articleTitle, docText, codeName, codeText} = dataID;
+             const {EditSection, save, cancel, articleTitle, docText, codeName, codeText} = dataID;
 
              let   thisArticle = null;
 
@@ -201,6 +201,7 @@
              function init(iView, node){
                  console.log("EditSection ", node);
                  save.addEventListener('click', clickSave);
+                 EditSection.addEventListener('close', (e)=>{console.log(e);});
              }
              function renderEditSectionDialog(iView, article){
                  console.log("EditSection Dialog render!!!!!!", article);
@@ -238,7 +239,6 @@
             </script>
         </template>
         <template data-name="SelectParent">
-            <div>
                 <style>
                 </style>
                 <dialog id="SelectParentDialog">
@@ -258,7 +258,6 @@
                         </div>
                     </center>
                 </dialog>
-            </div>
             <script>
              const model = require('model');
              const iView = require('iView');
@@ -391,149 +390,78 @@
             </div>
         </template>
         <template data-name="home">
+            <style>
+             .lp5-body {
+                 display: grid;
+                 grid-template-areas:
+                     "menu menu menu"
+                     "toc source output"
+                     "footer footer footer";
+                 grid-template-rows: 60px 3fr 60px;
+                 grid-template-columns: 1fr 3fr 1fr;
+                 grid-gap: 10px;
+                 height: 100vh;
+                 margin: 0;
+             }
+                     #LP5-Source div.wdrag {
+                         position: absolute;
+                         left: -4px;
+                         top: 0;
+                         bottom: 0;
+                         width: 8px;
+                         cursor: w-resize;
+                     }
+             #LP5-Source{
+                 position: relative;
+                 background-color: #FFFFEB;
+                 grid-area: source;
+                 min-height: 0;
+                 overflow: auto;
+                 display: flex;
+                 flex-flow: column;
+                 /*             align-items: stretch; */
+             }
+
+             #LP5-Footer{
+                 grid-area: footer;
+                 background:#d0d0d0;
+             }
+             .LP5-Comment h1 {
+                 margin: .2em 0 .2em 0;
+             }
+             .LP5-Comment h2 {
+                 margin: .15em 0 .15em 0;
+             }
+             .LP5-Comment h3 {
+                 margin: .1em 0 .1em 0;
+             }
+             #LP5-Output{
+                 grid-area: output;
+                 white-space: pre-line;
+             }
+             #LP5-Menu {
+                 height:50px;
+                 background:#d0d0d0;
+                 border:1px solid #b9b9b9;
+                 grid-area: menu;
+             }
+             #LP5-Menu ul {
+                 display: flex;
+                 align-items: center;
+                 list-style: none;
+                 background-color: #d0d0d0;
+                 color: #11F;
+             }
+             #LP5-Menu li {
+                 margin-left: 20px;
+                 cursor: pointer;
+                 transition: .5s;
+             }
+             #LP5-Menu li:hover {
+                 color: red;
+             }
+            </style>
             <div class="lp5-body">
-                <style>
-                 .lp5-body {
-                     display: grid;
-                     grid-template-areas:
-                         "menu menu menu"
-                         "toc source output"
-                         "footer footer footer";
-                     grid-template-rows: 60px 3fr 60px;
-                     grid-template-columns: 1fr 3fr 1fr;
-                     grid-gap: 10px;
-                     height: 100vh;
-                     margin: 0;
-                 }
-                 #LP5-Footer{
-                     grid-area: footer;
-                     background:#d0d0d0;
-                 }
-                 #LP5-Toc li {
-                     list-style-type: none;
-                     padding-left: 0;
-                     white-space:nowrap;
-                     overflow:hidden;
-                 }
-                 #LP5-Toc ul {
-                     padding-inline-start: 0;
-                 }
-                 #LP5-Toc a {text-decoration: none;}
-                 #LP5-Toc a:visited { color: rgb(0,0,238); }
-                 #LP5-Toc {
-                     font-family: Helvetica;
-                     grid-area: toc;
-                 }
-                 #LP5-Toc h1 {
-                     margin: inherit;
-                     cursor: pointer;
-                     font-size: 18px;
-                 }
-                 #LP5-Toc h2 {
-                     text-indent: 5%;
-                     margin: inherit;
-                     cursor: pointer;
-                     font-size: 15px;
-                 }
-                 #LP5-Toc h3 {
-                     text-indent: 10%;
-                     margin: inherit;
-                     cursor: pointer;
-                     font-size: 15px;
-                 }
-                 #LP5-Source div.wdrag {
-                     position: absolute;
-                     left: -4px;
-                     top: 0;
-                     bottom: 0;
-                     width: 8px;
-                     cursor: w-resize;
-                 }
-                 #LP5-Source{
-                     position: relative;
-                     background-color: #FFFFEB;
-                     grid-area: source;
-                     overflow: auto;
-                     display: flex;
-                     flex-flow: column;
-                     /*             align-items: stretch; */
-                 }
-                 .LP5-Section{
-                     border-bottom: 1px dotted  #a5c8ba;
-                     padding-right: 5px;
-                     padding-left: 5px;
-                     background-color: #FFFFC9;
-                     width: fit-content;
-                     /*             width: auto;*/
-                 }
-                 .LP5-Code {
-                     font-family: "Consolas", monospace;
-                     white-space: pre;
-                     background-color: #FFFFFF;
-                     border: 0;
-                     padding: 0;
-                     margin: 0;
-                     border-top: .2em solid #FFFF00;
-                     line-height: 100%;
-                 }
-                 .LP5-Code p {
-                     margin: 0;
-                 }
-                 .LP5-Code-Unref {
-                     background-color: #FFa0FF;
-                     font-family: "Verdana", "Arial", Gadget, sans-serif;
-                     white-space: normal;
-                 }
-                 .LP5-Code-Ref {
-                     background-color: #FFFFEB;
-                     font-family: "Verdana", "Arial", Gadget, sans-serif;
-                     white-space: normal;
-                 }
-                 .LP5-CodeName {
-                     font-family: "Arial", Gadget, sans-serif;
-                     background-color: #F9FFF0;
-                     word-wrap: break-word;
-                     white-space: normal;
-                 }
-                 .LP5-CodeNameBrackets { font-family: monospace; }
-                 .LP5-Comment{
-                     /*             background-color: #FFFFEB; */
-                 }
-                 .LP5-Comment h1 {
-                     margin: .2em 0 .2em 0;
-                 }
-                 .LP5-Comment h2 {
-                     margin: .15em 0 .15em 0;
-                 }
-                 .LP5-Comment h3 {
-                     margin: .1em 0 .1em 0;
-                 }
-                 #LP5-Output{
-                     grid-area: output;
-                     white-space: pre-line;
-                 }
-                 #LP5-Menu {
-                     height:50px;
-                     background:#d0d0d0;
-                     border:1px solid #b9b9b9;
-                     grid-area: menu;
-                 }
-                 #LP5-Menu ul {
-                     display: flex;
-                     align-items: center;
-                     list-style: none;
-                     background-color: #d0d0d0;
-                     color: #11F;
-                 }
-                 #LP5-Menu li {
-                     margin-left: 20px;
-                     cursor: pointer;
-                     transition: .5s;
-                 }
-                 #LP5-Menu li:hover {
-                     color: red;
-                 }
-                </style>
                 <div id="LP5-Menu">
                     <ul>
                         <li id="LP5-Menu-Reload" tabindex="0">Reload</li>
@@ -542,7 +470,41 @@
                         <li id="LP5-Menu-Test">Test</li>
                     </ul>
                 </div>
-                <template data-name="tableOfContents">
+                <template data-name="tableOfContents" id="LP5-Toc">
+                    <style>
+                     #LP5-Toc li {
+                         list-style-type: none;
+                         padding-left: 0;
+                         white-space:nowrap;
+                         overflow:hidden;
+                     }
+                     #LP5-Toc ul {
+                         padding-inline-start: 0;
+                     }
+                     #LP5-Toc a {text-decoration: none;}
+                     #LP5-Toc a:visited { color: rgb(0,0,238); }
+                     #LP5-Toc {
+                         font-family: Helvetica;
+                         grid-area: toc;
+                     }
+                     #LP5-Toc h1 {
+                         margin: inherit;
+                         cursor: pointer;
+                         font-size: 18px;
+                     }
+                     #LP5-Toc h2 {
+                         text-indent: 5%;
+                         margin: inherit;
+                         cursor: pointer;
+                         font-size: 15px;
+                     }
+                     #LP5-Toc h3 {
+                         text-indent: 10%;
+                         margin: inherit;
+                         cursor: pointer;
+                         font-size: 15px;
+                     }
+                    </style>
                     <nav id="LP5-Toc">
                     </nav>
                     <script>
@@ -578,7 +540,9 @@
                          let article = model.rootTOC;
                          if(article && article.ulNode){
                              let ul = renderChildTOC(article);
-                             iView.rootNode.shadowRoot.replaceChildren(ul);
+                             let tocRootNode = iView.rootNode.shadowRoot.querySelector('#LP5-Toc');
+                             console.assert(tocRootNode && tocRootNode.id == "LP5-Toc");
+                             tocRootNode.replaceChildren(ul);
                          }
                          return;
                      };
@@ -586,7 +550,51 @@
                      return result;
                     </script>
                 </template>
-                <template data-name="sourceDiv">
+                <template data-name="sourceDiv" id="LP5-Source">
+                    <style>
+                     .LP5-Section{
+                         border-bottom: 1px dotted  #a5c8ba;
+                         padding-right: 5px;
+                         padding-left: 5px;
+                         background-color: #FFFFC9;
+                         width: fit-content;
+                         /*             width: auto;*/
+                     }
+                     .LP5-Code {
+                         font-family: "Consolas", monospace;
+                         white-space: pre;
+                         background-color: #FFFFFF;
+                         border: 0;
+                         padding: 0;
+                         margin: 0;
+                         border-top: .2em solid #FFFF00;
+                         line-height: 100%;
+                     }
+                     .LP5-Code p {
+                         margin: 0;
+                     }
+                     .LP5-Code-Unref {
+                         background-color: #FFa0FF;
+                         font-family: "Verdana", "Arial", Gadget, sans-serif;
+                         white-space: normal;
+                     }
+                     .LP5-Code-Ref {
+                         background-color: #FFFFEB;
+                         font-family: "Verdana", "Arial", Gadget, sans-serif;
+                         white-space: normal;
+                     }
+                     .LP5-CodeName {
+                         font-family: "Arial", Gadget, sans-serif;
+                         background-color: #F9FFF0;
+                         word-wrap: break-word;
+                         white-space: normal;
+                     }
+                     .LP5-CodeNameBrackets { font-family: monospace; }
+                     .LP5-Comment{
+                         /*             background-color: #FFFFEB; */
+                     }
+
+                    </style>
                     <div id="LP5-Source" data-id="outerDiv">
                         <div class="wdrag" data-id="drag" ></div>
                     </div>
@@ -1065,6 +1073,11 @@ ${codeText}
                          node[key] = options[key];
                  return node;
              }
+             function copyChildElements(from, to){
+                 let child = null;
+                 while(child=from.firstChild)
+                     to.appendChild(child);
+             }
 
 
              async function openDB(){
@@ -1136,13 +1149,13 @@ ${codeText}
                  return true;
              }
 
-             async function selectParentDir(model, event, asyncComplete){
-                 console.log("selectParentDir()");
+             async function selectParentDir(model, targetID){
+                 console.log(`selectParentDir(${targetID})`);
 
                  let handle = model.dirParentHandle;
                  let options = {mode:'readwrite'};
                  try {
-                     if(event.target.id == 'SelectParentDirPreviousButton'){
+                     if(targetID == 'SelectParentDirPreviousButton'){
                          console.log("    It was the previousDir button");
                          let option = {mode:'readwrite'};
                          let perms = await handle.queryPermission(option);
@@ -1158,6 +1171,7 @@ ${codeText}
                              }
                          }
                      }else{
+                         console.assert(targetID == 'SelectParentDirButton');
                          model.dirParentHandle = await window.showDirectoryPicker(options);
                          if(model.dirParentHandle){
                              let db = await openDB();
@@ -1297,9 +1311,7 @@ ${codeText}
                          if(target.id == 'SelectParentDirButton'
                             || target.id == 'SelectParentDirPreviousButton'){
                              console.assert(event.type == 'click');
-                             console.log(">>>>>>>>>>>>>asyncSchedule!!!!!!");
-                             asyncSchedule(selectParentDir, model, event);
-                             console.log("<<<<<<<<<<<<<asyncSchedule!!!!!!");
+                             asyncSchedule(selectParentDir, model, target.id);
                              controller.state = 'SelectingParent';
                          } else if(event.type == 'click') {
                              // let the view handle clicks
@@ -1480,6 +1492,7 @@ ${codeText}
                  'change',
                  'click',
                  'close',
+                 'closeDialog',
                  'contextmenu',
                  'command',
                  'error',
@@ -1661,22 +1674,14 @@ ${codeText}
                          });
 
                          const rootNode = createFreeElement('div');
+                         if(t.id)
+                             rootNode.id = t.id;
+                         if(t.className)
+                             rootNode.className = t.className;
                          const shadow   = rootNode.attachShadow({mode:'open'});
                          console.log("t.content is [${t.content.children.length}]",
                                      t.content);
-                         let child=null;
-                         while(child = t.content.firstChild){
-                             console.log("appending child ", child);
-                             console.assert(child.nodeName != 'SCRIPT');
-                             shadow.appendChild(child);
-                         }
-                         if(false)
-                         for(let i= 0; i < t.content.children.length; ++i){
-                             let child = t.content.children[i];
-                             console.log("appending child ", child);
-                             console.assert(child.nodeName != 'SCRIPT');
-                             shadow.appendChild(child);
-                         }
+                         copyChildElements(t.content, shadow);
                          console.log("rootNode is ", rootNode);
 
                          const iView    = structuredClone(viewInterface);
@@ -1686,11 +1691,9 @@ ${codeText}
                          // if this is a child template
                          if(parentView){
                              iView.rootNode = rootNode;
-//                             t.replaceWith(t.content);
                              t.replaceWith(rootNode);
                          } else {
                              // clone template, then discard it
-                             //                             iView.rootNode = templateRoot.cloneNode(true);
                              iView.rootNode = rootNode;
                              t.remove();
                              const dialogNode = iView.rootNode.shadowRoot.querySelector('dialog');
@@ -1698,6 +1701,7 @@ ${codeText}
                                  iView.dialogNode = dialogNode;
                                  // do not define dialog 'open' attribute, please
                                  console.assert(!dialogNode.hasAttribute('open'));
+                                 dialogNode.addEventListener('close', controller, true);
                              }
                          }
 
@@ -1798,15 +1802,17 @@ ${codeText}
                      --this.inProgress;
                  },
                  pop() {
-                 ++this.inProgress;
+                     ++this.inProgress;
                      const currentView = this.currentView;
                      console.assert(currentView.dialogNode);
                      console.assert(currentView);
                      console.log("pop() this.current = ", currentView);
                      // our root is a div containing a dialog
                      const liveRootNode   = document.body.firstElementChild;
-                     const liveDialogNode = liveRootNode.querySelector("dialog");
+                     const liveDialogNode = liveRootNode.shadowRoot.querySelector("dialog");
                      console.assert(liveDialogNode.nodeName == "DIALOG");
+                     // don't confuse controller with 'close' event not initiated by user
+                     liveDialogNode.removeEventListener('close', controller, true);
                      liveDialogNode.close();
                      console.log("pop() closes dialog");
                      liveRootNode.remove();
