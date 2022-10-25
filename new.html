@@ -5,7 +5,11 @@
         <title>lp5</title>
         <script>
         </script>
-        <style id="LP5-Global-Style">
+        <style class="contextMenu">
+         article:focus {
+             outline: 3px solid orange;
+         }
+         article:focus { background-color: yellow; }
          dialog:has(> ul > li) { padding:0; }
          .lp5-context {
              position:absolute;
@@ -96,7 +100,10 @@
              return { init:init, render:render };
             </script>
         </template>
-        <template data-name="ArticleContextMenu">
+        <template data-name="ArticleContextMenu" data-style="contextMenu">
+            <style>
+             :host { all: initial !important; }
+            </style>
             <div>
                 <dialog id="ArticleContextMenu" class="lp5-context">
                     <ul data-id="ul">
@@ -201,7 +208,6 @@
              function init(iView, node){
                  console.log("EditSection ", node);
                  save.addEventListener('click', clickSave);
-                 EditSection.addEventListener('close', (e)=>{console.log(e);});
              }
              function renderEditSectionDialog(iView, article){
                  console.log("EditSection Dialog render!!!!!!", article);
@@ -239,25 +245,25 @@
             </script>
         </template>
         <template data-name="SelectParent">
-                <style>
-                </style>
-                <dialog id="SelectParentDialog">
-                    <center>
-                        <p>
-                            Select <em>parent</em> directory of existing
-                            or new lp5 project.
-                            <span style="background-color:#ffffa0; border-radius:50%; cursor:help;" title="I need access to the parent directory to place generated files there.&#10;A user click is required by Chrome for me to ask for this permission.">&#9432</span>
-                        </p>
-                        <input id="SelectParentDirButton"
-                               autofocus type="button" value="Select"
-                               data-id="selectButton" >
-                        <div data-id="auxDiv">
-                            <p>or select previous parent directory:</p>
-                            <input id="SelectParentDirPreviousButton"
-                                   data-id="previousDir" type="button">
-                        </div>
-                    </center>
-                </dialog>
+            <style>
+            </style>
+            <dialog id="SelectParentDialog">
+                <center>
+                    <p>
+                        Select <em>parent</em> directory of existing
+                        or new lp5 project.
+                        <span style="background-color:#ffffa0; border-radius:50%; cursor:help;" title="I need access to the parent directory to place generated files there.&#10;A user click is required by Chrome for me to ask for this permission.">&#9432</span>
+                    </p>
+                    <input id="SelectParentDirButton"
+                           autofocus type="button" value="Select"
+                           data-id="selectButton" >
+                    <div data-id="auxDiv">
+                        <p>or select previous parent directory:</p>
+                        <input id="SelectParentDirPreviousButton"
+                               data-id="previousDir" type="button">
+                    </div>
+                </center>
+            </dialog>
             <script>
              const model = require('model');
              const iView = require('iView');
@@ -391,6 +397,11 @@
         </template>
         <template data-name="home">
             <style>
+             article:focus {
+                 outline: 3px solid orange;
+             }
+             article:focus { background-color: yellow; }
+
              .lp5-body {
                  display: grid;
                  grid-template-areas:
@@ -403,14 +414,14 @@
                  height: 100vh;
                  margin: 0;
              }
-                     #LP5-Source div.wdrag {
-                         position: absolute;
-                         left: -4px;
-                         top: 0;
-                         bottom: 0;
-                         width: 8px;
-                         cursor: w-resize;
-                     }
+             #LP5-Source div.wdrag {
+                 position: absolute;
+                 left: -4px;
+                 top: 0;
+                 bottom: 0;
+                 width: 8px;
+                 cursor: w-resize;
+             }
              #LP5-Source{
                  position: relative;
                  background-color: #FFFFEB;
@@ -437,7 +448,7 @@
              }
              #LP5-Output{
                  grid-area: output;
-                 white-space: pre-line;
+                 white-space: pre-wrap;
              }
              #LP5-Menu {
                  height:50px;
@@ -480,6 +491,7 @@
                      }
                      #LP5-Toc ul {
                          padding-inline-start: 0;
+                         margin-left: 1em;
                      }
                      #LP5-Toc a {text-decoration: none;}
                      #LP5-Toc a:visited { color: rgb(0,0,238); }
@@ -552,6 +564,10 @@
                 </template>
                 <template data-name="sourceDiv" id="LP5-Source">
                     <style>
+                     article:focus {
+                         outline: 3px solid orange;
+                     }
+
                      .LP5-Section{
                          border-bottom: 1px dotted  #a5c8ba;
                          padding-right: 5px;
@@ -664,22 +680,106 @@
                     </script>
                 </template>
                 <div id="LP5-Output">
-                    Here be some output!
                     <template data-name="outputDiv">
-                        <div><p> hahahahaha </p>
+                        <div data-id="outputDiv">
                         </div>
                         <script>
-                         // LP5-Output
-                         console.log("hahahahaha");
+                         let model = require('model');
+                         let {outputDiv} = require('dataID');
+                         const createFreeElement = require('createFreeElement');
+
                          function init(iView){
                          }
+                         function findRoots(article){
+                             let result = [];
+                             if(article.getCodeName() !== null)
+                                 result.push(article);
+                             for(let child of article.children)
+                                 result = result.concat(findRoots(child));
+                             return result;
+                         }
+                         // emitter function accumulates text, emits text node when node arrives or end
+                         function *emitOutput(node){
+                             let text = "";
+                             function emitAccumulated(){
+                                 if(text.length){
+                                     let textNode = document.createTextNode(text);
+                                     node.appendChild(textNode);
+                                     text = "";
+                                 }
+                             }
+                             let stuff = null;
+                             while((stuff = yield) != null){
+                                 if(typeof stuff == 'string')
+                                     text += stuff;
+                                 else {
+                                     emitAccumulated();
+                                     console.assert(stuff.nodeType); // must be a Node
+                                     node.appendChild(stuff);
+                                 }
+                             }
+                             emitAccumulated();
+                         }
+                         function  parseStartTag(str, len, posStart){
+                             console.assert(str.charAt(posStart) == '<');
+                             let pos = posStart + "<lp5".length;
+                             
+                         }
+                         function* parse(str){
+                             let tag = "<lp5";
+                             let pos = 0;
+                             let len = str.length;
+                             while(pos >= 0){
+                                 let posStartTag = str.indexOf(tag, pos);
+                                 if(posStartTag == -1)
+                                     break;
+                                 let posRover = posStartTag + tag.length;
+                                 while(posRover < len){
+                                 }
+
+                                 let posEmptyTag = str.indexOf("/>", posStartTag);
+                                 let posEndTag   = str.indexOf("</lp5>", posStartTag);
+                                 if(posEmptyTag != -1 && posEmptyTag < posEndTag){
+                                     yield str.slice(pos, posEndTag + 6);
+                                     pos = posEmptyTag + 6;
+                                 } 
+                             }
+                             return str.slice(pos);
+                         }
+                         function renderArticle(article, node){
+                             console.log("renderArticle ", article);
+                             let output = createFreeElement('SPAN');
+                             output.dataset.ref = article.URL;
+                             let codeSerial     = article.getCodeSerial();
+                             let emit           = emitOutput(node);
+                             let posStart       = 0;
+                             //                             while(posStartTag != -1){
+                             while(true){
+                                 let posStartTag = codeSerial.indexOf("<lp5 ", posStart);
+                                 if(posStartTag == -1)
+                                     break;
+                                 let posEnd      = posStartTag;
+                                 emit.next(codeSerial.slice(posStart, posEnd));
+                             }
+                             emit.next(codeSerial.slice(posStart));
+                             console.log("returns ", output);
+                             return output;
+                         }
                          function render(){
+                             let article = model.rootTOC;
+                             outputDiv.replaceChildren();
+                             if(article && article.ulNode){
+                                 let roots = findRoots(article);
+                                 console.log("roots = ", roots);
+                                 for(let root of roots){
+                                     outputDiv.appendChild(renderArticle(root, outputDiv));
+                                 }
+                             }
                          }
                          let result = {init:init, render:render};
                          return result;
                         </script>
                     </template>
-                    Code as it would be generated from the current source should appear here.
                 </div>
                 
                 <div id="LP5-Footer">
@@ -689,17 +789,20 @@
                         </style>
                         <div>
                             <span data-id="span"></span>
-                            Here's a footer! Maybe some kind of status info would go here.
+                            <span data-id="ref"></span>
                         </div>
                         <script>
+                         const model = require('model');
                          const iView = require('iView');
-                         const {span} = iView.dataID;
+                         const {span, ref} = iView.dataID;
 
                          function init(){
                              if(navigator.webdriver)
                                  span.innerText = "webdriver";
                          };
                          function render(){
+                             let message = model.articles.length + " articles.";
+                             span.innerText = message;
                          };
                          return {init:init, render:render};
                         </script>
@@ -735,6 +838,20 @@
              
              findBadTemplate(document);
 
+             class RelativeCodeRanges {
+                 #ranges;    // array of {relPos, length}
+                 constructor(codeText){
+                     this.#ranges = new Array();
+                     let relPos = 0;
+                     let length = 0;
+                     let index  = 0;
+                     while((index=codeText.indexOf('<lp5')) != -1){
+                         this.#ranges.push({relPos:relPos, length:index-relPos});
+                         
+                     }
+                 }
+                 *[Symbol.iterator](){ yield* this.#ranges; }
+             }
              class Storage {
                  constructor(dirHandle){
                      this.dirHandle = dirHandle;
@@ -832,10 +949,10 @@
                      #array;
                      constructor(){
                          this.#array = new Array();
-                         //                         this[Symbol.iterator] = this.#array[Symbol.iterator];
                      }
                      *[Symbol.iterator](){ yield* this.#array }
-                     newArticle(parent=null, URL=""){
+                     newArticle(parent=null, URL){
+                         console.assert(URL);
                          let newArticle = new Article(secret, parent, URL);
                          if(newArticle){
                              newArticle.articleNode.id = `article-${this.length}`;
@@ -843,9 +960,13 @@
                          }
                          return newArticle;
                      }
+                     reset(){
+                         this.#array.length = 0;
+                     }
                      get length(){
                          return this.#array.length;
                      }
+                     // locate article from its DOM node
                      fromArticleNode(node){
                          // the article node ID contains the article #
                          let id = node.id;
@@ -857,12 +978,14 @@
                          console.assert(result, {id:id});
                          return result;
                      }
+                     // locate article from its URL
                      fromURL(url){
                          for(const article of this.#array)
                              if(article.URL == url)
                                  return article;
                          return null;
                      }
+                     // create article from serial string
                      fromSerial(parent, URL, text){
                          let result = this.newArticle(parent, URL);
                          let html   = new DOMParser().parseFromString(text, 'text/html');
@@ -942,8 +1065,36 @@
                          this.codeTextNode    = null;
                          this.codeNameNode    = null;
                          this.ulNode          = null;
-                         let titleNode = createFreeElement('h2');
+                         let titleNode        = createFreeElement('h2');
                          titleNode.innerHTML = '<h2>New_Empty_Article</h2>';
+                     }
+                     getCodeSerial(){
+                         let result = null;
+                         if(this.scriptNode)
+                             result = this.scriptNode.innerHTML;
+                         return result;
+                     }
+                     getCodeName(){
+                         console.log("getCodeName() ", this);
+                         let result = null;
+                         if(this.codeNameNode){
+                             console.log("    got codeNameNode");
+                             let name = this.codeNameNode.innerText.trim();
+                             let code = this.codeTextNode.innerText.trim();
+                             if(code)
+                                 result = name;
+                             console.log(`    name='${name}', code='${code}'`);
+                         }
+                         console.log("    returns ", result);
+                         console.log(result);
+                         return result;
+                     }
+                     getCodeText(){
+                         let result = null;
+                         if(this.codeTextNode){
+                             result = this.codeTextNode.innerText;
+                         }
+                         return result;
                      }
                      #prepareForChild(newChildArticle, siblingArticle=null){
                          if(!this.ulNode)
@@ -1251,6 +1402,8 @@ ${codeText}
                      console.assert(false, model);
                  }
                  let result = false;
+                 
+                 return;
                  try {
                      result = testbody(model);
                  } catch(err) {
@@ -1281,7 +1434,8 @@ ${codeText}
                  }
                  const currentViewName = views.currentView
                                        ? views.currentView.name : "";
-                 console.log(">>>>>>>>>>>>>>>>>>>>>>enter controller ", controller.state);
+                 console.log(">>>>>>>>>>>>>>>>>>>>>>enter controller ",
+                             controller.state, model.articles.length);
                  console.log(event);
                  console.assert(!controller.inSync);
                  if(event.type == 'error'){
@@ -1389,6 +1543,7 @@ ${codeText}
                              console.log(target);
                          } else if(event.type == 'close'){
                              console.log("Clse event came in");
+                             views.pop();
                              controller.state = 'home';
                          }
                          break;
@@ -1399,7 +1554,7 @@ ${codeText}
                                  views.push(
                                      'ArticleContextMenu',
                                      model.articles.fromArticleNode(articleNode));
-                                 event.preventDefault();
+                                 //                                 event.preventDefault();
                                  controller.state = 'ContextMenu';
                              }
                              break;
@@ -1424,21 +1579,26 @@ ${codeText}
                                      && path[index+1].id == 'LP5-Source'
                                  ;
                              });
+                             if(articleNode){
+                                 controller.currentArticle = articleNode;
+                                 event.preventDefault();
+                                 articleNode.focus();
+                             }
+
                              let target = path[0];
                              console.log(target, articleNode);
-                             if(articleNode){
+                             if(articleNode && event.ctrlKey && event.shiftKey){
                                  console.log("views.push Edit Section ", articleNode);
                                  views.push('EditSection',
                                             model.articles.fromArticleNode(articleNode));
                                  controller.state = 'EditingSection';
-                                 controller.currentArticle = articleNode;
                              }else if(target.id == 'LP5-Menu-Reload'){
                                  controller.state = 'openProject';
                                  asyncSchedule(model.openProject.bind(model), model.rootTOC.URL);
-                             } else if(target.id == 'LP5-Menu-Test'){
+                             }else if(target.id == 'LP5-Menu-Test'){
                                  controller.state = 'test';
                                  asyncSchedule(test, model);
-                             } else if(target.tagName == 'A'){
+                             }else if(target.tagName == 'A'){
                                  const href=target.getAttribute('href');
                                  if(href){
                                      if(href.startsWith("#")){
@@ -1464,10 +1624,12 @@ ${codeText}
                          if(event.type == 'close') {
                              console.log("Clse event came in");
                              controller.state = 'home';
+                             controller.state = 'openProject';
+                             asyncSchedule(model.openProject.bind(model), model.rootTOC.URL);
                              views.pop();
+                             views.render();
                          } else if(event.type == 'saveArticle'){
                              views.respond(event);
-                             console.log("now call asyncSchedule ", controller.currentArticle);
                              asyncSchedule(model.storeResource.bind(model),
                                            controller.currentArticle, event.detail);
                          } else {
@@ -1657,6 +1819,9 @@ ${codeText}
                      console.log(rootElement.querySelectorAll('template').length);
 
                      rootElement.querySelectorAll('template').forEach((t)=>{
+                         let templateName = t.dataset.name;
+                         console.assert(t.dataset.name);
+
                          let scriptNode = null;
                          t.content.querySelectorAll('script').forEach((s)=>{
                              console.log("found script ", s);
@@ -1678,9 +1843,17 @@ ${codeText}
                              rootNode.id = t.id;
                          if(t.className)
                              rootNode.className = t.className;
-                         const shadow   = rootNode.attachShadow({mode:'open'});
+                         const shadow   = rootNode.attachShadow({mode:'open',delegatesFocus:true});
                          console.log("t.content is [${t.content.children.length}]",
                                      t.content);
+                         let styleClass = t.dataset.style;
+                         if(styleClass){
+                             let styleClasses = document.getElementsByClassName(styleClass);
+                             if(!styleClasses)
+                                 die(`template ${templateName} asks for missing style class ${styleClass}`);
+                             for(let s of styleClasses)
+                                 shadow.appendChild(s);
+                         }
                          copyChildElements(t.content, shadow);
                          console.log("rootNode is ", rootNode);
 
@@ -1701,7 +1874,6 @@ ${codeText}
                                  iView.dialogNode = dialogNode;
                                  // do not define dialog 'open' attribute, please
                                  console.assert(!dialogNode.hasAttribute('open'));
-                                 dialogNode.addEventListener('close', controller, true);
                              }
                          }
 
@@ -1710,7 +1882,6 @@ ${codeText}
                          // https://html.spec.whatwg.org/multipage/interactive-elements.html#the-dialog-element
                          //                     let script = templateRoot.querySelector('script');
                          if(scriptNode){
-                             // remove script else it will run when frag inserted into DOM
                              try {
                                  // run the script to obtain its notification functions
                                  console.log(" eval the script");
@@ -1799,6 +1970,7 @@ ${codeText}
                      console.log("views.push calls init for ", iView);
                      this.init(this.currentView, ...args);
                      this.render(this.currentView, ...args);
+                     this.currentView.dialogNode.addEventListener('close', controller, true);
                      --this.inProgress;
                  },
                  pop() {
@@ -2015,12 +2187,13 @@ ${codeText}
              }
              model.loadTOC = async function(dirHandle, name, parent=null){
                  console.log("loadTOC ", name);
+                 if(parent == null)
+                     this.articles.reset();
                  let article = await this.loadArticle(dirHandle, name, parent);
                  console.log("loadTOC back from await of loadArticle ", name, article);
                  let match = name.match(/^[0-9]+/);
                  if(match && match[0] > model.nextArticleID)
                      model.nextArticleID = Number(match[0]);
-                 console.log(article);
                  if(article.ulNode){
                      console.log(`in loadTOC, article "${name}" has a ul`);
                      const entries = article.ulNode.querySelectorAll('li');
