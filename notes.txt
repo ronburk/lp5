@@ -1,3 +1,22 @@
+markup: code and/or doc
+=======================
+<lp5 ref="url"/>   => displays as <<title of url>>
+
+markup: code
+============
+<lp5 endscript/>   => displays/emits as "</script>"
+
+
+inline collapse
+===============
+Allow something like:
+    if(<lp5 inline>cond1 || cond2 || cond3<lp5/>any condition is true</lp5>)
+such that the abbreviation name is shown with tiny widget that lets you view
+the underlying code instead. So, looks like a code ref, but the def is
+inline.
+
+
+
 Embedded Project
 ================
 Need way to embed readonly snapshot of a project in a copy
@@ -104,6 +123,8 @@ way to mark up the code section is with... HTML!
 todo
 ====
 not sure data-id works on outermost element
+[ ] Clicking on TOC item does nothing.
+
 
 
 reentrancy

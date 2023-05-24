@@ -688,7 +688,14 @@
                          let {outputDiv} = require('dataID');
                          const createFreeElement = require('createFreeElement');
 
+                         let startTagRegex = /<lp5\s*((\/>)|(>)|([A-Za-z_]))/g;
+                         let attributeRegex = null;
                          function init(iView){
+                             let id    = "[_a-zA-Z]\w*";
+                             let dval  = '"[^"\n\r]*"';
+                             let sval  = "'[^'\n\r]*'";
+                             let value = `(?:${sval}|${dval})`;
+                             attributeRegex  = new RegExp(`^\s*(${id})=(${value})\s*`);
                          }
                          function findRoots(article){
                              let result = [];
@@ -708,9 +715,13 @@
                                      text = "";
                                  }
                              }
+                             // the caller yields output stuff to us.
+                             // we want to coalesce adjacent stuff that is 'string'
+                             // into one text node
                              let stuff = null;
                              while((stuff = yield) != null){
-                                 if(typeof stuff == 'string')
+                                 console.log("stuff = ", stuff);
+                                 if(typeof stuff === 'string')
                                      text += stuff;
                                  else {
                                      emitAccumulated();
@@ -718,17 +729,59 @@
                                      node.appendChild(stuff);
                                  }
                              }
+                             // caller is done yielding stuff to us
                              emitAccumulated();
                          }
-                         function  parseStartTag(str, len, posStart){
-                             console.assert(str.charAt(posStart) == '<');
-                             let pos = posStart + "<lp5".length;
-                             
+//                         function  parseStartTag(str, len, posStart){
+                         function  parseStartTag(str, startTagRegex){
+                             let result = null;
+                             let startMatch = startTagRegex.exec(str);
+                             if(startMatch !== null){
+                                 result = {
+                                     startPos: startTagRegex.index,
+                                 };
+                                 
+                                 let pos = posStart + "<lp5".length;
+                                 if(pos < len){
+                                     console.log("fun");
+                                     
+                                 }
+                                 return pos;
+                             }
+                             return result;
                          }
+                         /* yields: { type:, value: }
+                          *     0 - text string
+                          *     1 - parsed lp5 element
+                          *
+                          * value.attributes, where .name contains value of that attr
+                          * value.outer, outer string
+                          * value.inner, inner string
+                          */
                          function* parse(str){
+                             let posStart = 0;
+                             let posEnd   = 0;
+                             let len      = str.length;
+
+                             startTagRegex.lastIndex = 0;
+                             let match = null;
+                             while((match=parseStartTag(str,startTagRegex))!==null){
+                                 console.log("match = ", match);
+                             }
+                             let matches  = codeSerial.matchAll(startTagRegex);
+                             for(const match of matches){
+                                 if(match.index < posStart)
+                                     continue;
+                                 console.warn(match);
+                                 let lp5Start  = match.index;
+//                                 yield str.slice(posStart, posEnd);
+                                 // '>' or '/>' or first char of attribute name
+                                 let endChars = match[1];
+                             }
+
                              let tag = "<lp5";
                              let pos = 0;
-                             let len = str.length;
+                             len = str.length;
                              while(pos >= 0){
                                  let posStartTag = str.indexOf(tag, pos);
                                  if(posStartTag == -1)
@@ -746,6 +799,7 @@
                              }
                              return str.slice(pos);
                          }
+                         // renderArticle() - create display version of an article.
                          function renderArticle(article, node){
                              console.log("renderArticle ", article);
                              let output = createFreeElement('SPAN');
@@ -754,12 +808,17 @@
                              let emit           = emitOutput(node);
                              let posStart       = 0;
                              //                             while(posStartTag != -1){
+                             let matches = codeSerial.matchAll(startTagRegex);
+                             for(const match of matches){
+                                 console.warn(match);
+                             }
                              while(true){
                                  let posStartTag = codeSerial.indexOf("<lp5 ", posStart);
                                  if(posStartTag == -1)
                                      break;
                                  let posEnd      = posStartTag;
                                  emit.next(codeSerial.slice(posStart, posEnd));
+                                 posStart = posEnd + 1;
                              }
                              emit.next(codeSerial.slice(posStart));
                              console.log("returns ", output);
@@ -1437,11 +1496,18 @@ ${codeText}
                  console.log(">>>>>>>>>>>>>>>>>>>>>>enter controller ",
                              controller.state, model.articles.length);
                  console.log(event);
-                 console.assert(!controller.inSync);
                  if(event.type == 'error'){
-                     console.log("Oh oh, got error!");
+                     const {lineno,colno} = event;
+                     console.assert(controller.script);
+                     let line = controller.script.split('\n')[lineno-3];
+                     console.log(line);
+                     let marker = "-".repeat(colno-1)+"^";
+                     console.log(marker);
+                     console.log(event.message);
+//                     console.log(event);
                      console.assert(false);
                  }
+                 console.assert(!controller.inSync);
                  controller.inSync = true;
                  switch(controller.state){
                      case 'Crash' :
@@ -1717,7 +1783,7 @@ ${codeText}
              controller.state  = 'load';
 
              function scopedEval(script, iView){
-                 console.log("scopedEval ", iView, script);
+//                 console.log("scopedEval ", iView, script);
                  for(const element of iView.rootNode.shadowRoot.querySelectorAll("[data-ID]")){
                      console.log("Found data-id of ", element.dataset.id);
                      iView.dataID[element.dataset.id] = element;
@@ -1882,13 +1948,27 @@ ${codeText}
                          // https://html.spec.whatwg.org/multipage/interactive-elements.html#the-dialog-element
                          //                     let script = templateRoot.querySelector('script');
                          if(scriptNode){
+                             let script = scriptNode.innerHTML;
+                             if(false){
                              try {
                                  // run the script to obtain its notification functions
                                  console.log(" eval the script");
-                                 iView.notify   = scopedEval(scriptNode.innerHTML, iView);
+                                 iView.notify   = scopedEval(script, iView);
                              } catch(error){
-                                 console.log("Failed on script: ", scriptNode.innerHTML);
+                                 console.log(error);
+                                 console.log("Failed on script: ", script);
                                  console.assert(false, error);
+                             }
+                             }else{
+                                 controller.script = script;
+if(false)
+                                 window.addEventListener('error', (errorEvent) => {
+                                     const { lineno, colno } = errorEvent;
+                                     console.log(`Error thrown at: ${lineno}:${colno}`);
+                                     // Don't pollute the console with additional info:
+                                     errorEvent.preventDefault();
+                                 });
+                                 iView.notify   = scopedEval(scriptNode.innerHTML, iView);
                              }
                              console.assert(iView.notify.hasOwnProperty('init'));
                              console.assert(iView.notify.hasOwnProperty('render'));
@@ -2194,6 +2274,7 @@ ${codeText}
                  let match = name.match(/^[0-9]+/);
                  if(match && match[0] > model.nextArticleID)
                      model.nextArticleID = Number(match[0]);
+                 // if article contains a <ul>, it is parent of other articles
                  if(article.ulNode){
                      console.log(`in loadTOC, article "${name}" has a ul`);
                      const entries = article.ulNode.querySelectorAll('li');
