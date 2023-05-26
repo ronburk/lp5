@@ -472,6 +472,15 @@
                  color: red;
              }
             </style>
+            <script>
+             function init(thisView){
+                 console.warn(thisView, thisView.views);
+             }
+             function render(iView, message){
+                 console.log(message);
+             }
+             return { init:init, render:render };
+            </script>
             <div class="lp5-body">
                 <div id="LP5-Menu">
                     <ul>
@@ -517,49 +526,76 @@
                          font-size: 15px;
                      }
                     </style>
-                    <nav id="LP5-Toc">
+                    <nav id="LP5-Toc" data-id="pane">
                     </nav>
                     <script>
-                     const iView = require('iView');
-                     const model = require('model');
-                     const createFreeElement = require('createFreeElement');
-                     function init(){
-                     };
-                     function getTitle(li){
-                         let ID = li.getAttribute('id');
-                     }
-                     function renderChildTOC(article){
-                         console.assert(article.ulNode);
-                         let ul    = createFreeElement('ul');
+                        const iView = require('iView');
+                        const model = require('model');
+                        const {command}         = require('controller');
 
-                         article.ulNode.querySelectorAll('li').forEach((entry)=>{
-                             let li           = createFreeElement('li');
-                             let id           = entry.getAttribute('id');
-                             let childArticle = model.articles.fromURL(id);
-                             console.assert(childArticle, {id:id});
-                             if(childArticle.titleNode)
-                                 li.innerText = childArticle.titleNode.innerText;
-                             else
-                                 li.innerText = "< no title >";
-                             ul.appendChild(li);
-                             if(childArticle.ulNode)
-                                 ul.appendChild(renderChildTOC(childArticle));
-                         });
-                         return ul;
-                     }
-                     function renderTOC(){
-                         console.log("render toc: ", model.rootTOC);
-                         let article = model.rootTOC;
-                         if(article && article.ulNode){
-                             let ul = renderChildTOC(article);
-                             let tocRootNode = iView.rootNode.shadowRoot.querySelector('#LP5-Toc');
-                             console.assert(tocRootNode && tocRootNode.id == "LP5-Toc");
-                             tocRootNode.replaceChildren(ul);
-                         }
-                         return;
-                     };
-                     let result = {init:init, render:renderTOC};
-                     return result;
+                        const createFreeElement = require('createFreeElement');
+                        function clickHandler(event){
+                        event.preventDefault();
+                        let path = event.composedPath();
+                        // was click inside TOC element?
+                        let a = path.find((node,index)=>{
+                        return node.tagName == 'A'
+                        && index +2 < path.length
+                        && path[index+1].tagName == 'LI'
+                        && path[index+2].tagName == 'UL'
+                        && path[index+3].id == 'LP5-Toc'
+                        ;
+                        });
+                        if(a && a.id){
+                        const argv = ['showArticle', a.id.substring(1) ];
+                        command(argv);
+                        }
+                        }
+                        function init(){
+                        const {pane} = require('dataID');
+                        pane.addEventListener('click', clickHandler);
+                        };
+                        function getTitle(li){
+                        let ID = li.getAttribute('id');
+                        }
+                        function renderChildTOC(article){
+                        console.assert(article.ulNode);
+                        let ul    = createFreeElement('ul');
+
+                        article.ulNode.querySelectorAll('li').forEach((entry)=>{
+                        let li           = createFreeElement('li');
+                        let id           = entry.getAttribute('id');
+                        let a            = createFreeElement('a');
+                        li.appendChild(a);
+                        let childArticle = model.articles.fromURL(id);
+                        a.setAttribute('href', "#"+childArticle.articleNode.id);
+                        console.assert(childArticle, {id:id});
+                        if(childArticle.titleNode)
+                        a.innerText = childArticle.titleNode.innerText;
+                        else
+                        a.innerText = "< no title >";
+                        ul.appendChild(li);
+                        if(childArticle.ulNode)
+                        ul.appendChild(renderChildTOC(childArticle));
+                        });
+                        return ul;
+                        }
+                        function renderTOC(){
+                        console.log("render toc: ", model.rootTOC);
+                        let article = model.rootTOC;
+                        if(article && article.ulNode){
+                        let ul = renderChildTOC(article);
+                        let tocRootNode = iView.rootNode.shadowRoot.querySelector('#LP5-Toc');
+                        console.assert(tocRootNode && tocRootNode.id == "LP5-Toc");
+                        tocRootNode.replaceChildren(ul);
+                        }
+                        return;
+                        };
+                        function handleEvent(event){
+                        console.assert(false);
+                        }
+                        let result = {init:init, render:renderTOC, handleEvent:handleEvent};
+                        return result;
                     </script>
                 </template>
                 <template data-name="sourceDiv" id="LP5-Source">
@@ -705,13 +741,15 @@
                                  result = result.concat(findRoots(child));
                              return result;
                          }
-                         // emitter function accumulates text, emits text node when node arrives or end
-                         function *emitOutput(node){
+                         // coroutine to emit output as children of the given node.
+                         // yield to us either strings or HTML nodes.
+                         // adjacent strings will be coalesced into one text node.
+                         function *emitOutput(parentNode){
                              let text = "";
                              function emitAccumulated(){
                                  if(text.length){
                                      let textNode = document.createTextNode(text);
-                                     node.appendChild(textNode);
+                                     parentNode.appendChild(textNode);
                                      text = "";
                                  }
                              }
@@ -726,13 +764,13 @@
                                  else {
                                      emitAccumulated();
                                      console.assert(stuff.nodeType); // must be a Node
-                                     node.appendChild(stuff);
+                                     ParentNode.appendChild(stuff);
                                  }
                              }
                              // caller is done yielding stuff to us
                              emitAccumulated();
                          }
-//                         function  parseStartTag(str, len, posStart){
+                         //                         function  parseStartTag(str, len, posStart){
                          function  parseStartTag(str, startTagRegex){
                              let result = null;
                              let startMatch = startTagRegex.exec(str);
@@ -772,9 +810,9 @@
                              for(const match of matches){
                                  if(match.index < posStart)
                                      continue;
-                                 console.warn(match);
+                                 console.warn("parse match=", match);
                                  let lp5Start  = match.index;
-//                                 yield str.slice(posStart, posEnd);
+                                 //                                 yield str.slice(posStart, posEnd);
                                  // '>' or '/>' or first char of attribute name
                                  let endChars = match[1];
                              }
@@ -810,7 +848,7 @@
                              //                             while(posStartTag != -1){
                              let matches = codeSerial.matchAll(startTagRegex);
                              for(const match of matches){
-                                 console.warn(match);
+                                 console.warn("render Article match=", match);
                              }
                              while(true){
                                  let posStartTag = codeSerial.indexOf("<lp5 ", posStart);
@@ -824,6 +862,7 @@
                              console.log("returns ", output);
                              return output;
                          }
+                         // render entire Source pane from scratch.
                          function render(){
                              let article = model.rootTOC;
                              outputDiv.replaceChildren();
@@ -1061,7 +1100,6 @@
                          console.log("nChild = ", nChild);
                          let   iChild = 0;
                          let   topLevelNode = childElements[iChild];
-                         console.log("topLevelNode", topLevelNode);
                          if(nChild && topLevelNode.tagName == 'UL'){
                              topLevelNode.style.display = 'none';
                              result.ulNode = topLevelNode;
@@ -1079,7 +1117,6 @@
                              topLevelNode = childElements[0];
                              --nChild
                          }
-                         console.log("topLevelNode", topLevelNode);
                          if(nChild && topLevelNode.tagName == 'SECTION'
                             && topLevelNode.querySelector('script')){
                              let nth = 1;
@@ -1097,7 +1134,6 @@
                              topLevelNode = childElements[0];
                              --nChild;
                          }
-                         console.log("topLevelNode", topLevelNode);
                          if(iChild != nChild){
                              let message = `article ${URL} seems malformed:  `;
                              message += text;
@@ -1494,24 +1530,42 @@ ${codeText}
                  const currentViewName = views.currentView
                                        ? views.currentView.name : "";
                  console.log(">>>>>>>>>>>>>>>>>>>>>>enter controller ",
-                             controller.state, model.articles.length);
+                             controller.state, model.articles.length, arguments.length);
                  console.log(event);
                  if(event.type == 'error'){
-                     const {lineno,colno} = event;
-                     console.assert(controller.script);
-                     let line = controller.script.split('\n')[lineno-3];
-                     console.log(line);
-                     let marker = "-".repeat(colno-1)+"^";
-                     console.log(marker);
-                     console.log(event.message);
-//                     console.log(event);
-                     console.assert(false);
+                     if(false){
+                         const {lineno,colno} = event;
+                         // if it's text we are eval'ing
+                         if(controller.script){
+                             let line = controller.script.split('\n')[lineno-3];
+                             console.log(line);
+                             let marker = "-".repeat(colno-1)+"^";
+                             console.log(marker);
+                         }
+                         console.log(event.message);
+                         //                     console.log(event);
+                         var stack = event.stack.toString().split(/\r\n|\n/);
+                         if (msg === '') {
+                             msg = '""';
+                         }
+                         console.log(msg, '          [' + stack[1] + ']');        
+                     }
+                     controller.state = 'Crash';
+                     // we are likely already inside a controller call, so return
+                     console.log(" return with inSync=", controller.inSync);
+                     return;
                  }
                  console.assert(!controller.inSync);
                  controller.inSync = true;
+                 try {
                  switch(controller.state){
                      case 'Crash' :
-                         
+                         console.log("crash.");
+                         controller.state = 'Crashed';
+                         views.push('Crash');
+                         break;
+                     case 'Crashed' :
+                         console.log("crashed.");
                          break;
                      case 'load' :
                          console.assert(event.type == 'load', event);
@@ -1581,6 +1635,7 @@ ${codeText}
                          console.assert(event.type == 'asyncComplete');
                          controller.state = 'home';
                          views.render();
+                         console.log("Back from render!");
                          break;
                      case 'AwaitAsyncComplete' :
                          console.assert(event.type == 'asyncComplete');
@@ -1624,6 +1679,12 @@ ${codeText}
                                  controller.state = 'ContextMenu';
                              }
                              break;
+                         }else if(event.type == 'command'){
+                             const args = event.detail;
+                             console.warn("command is:", args);
+                             if(args[0] == 'showArticle'){
+                                 
+                             }
                          }else if(event.type == 'click'){
                              {
                                  let body = document.getElementsByClassName('lp5-body')[0];
@@ -1639,6 +1700,12 @@ ${codeText}
                              }
                              let path   = event.composedPath();
                              console.log(path);
+                             let paneNode = path.find((node, index)=>{
+                                 return node.id && node.id.substring(0,4) == 'LP5-';
+                             });
+                             if(paneNode && paneNode.id == 'LP5-Toc')
+                                 break;
+                             
                              let articleNode = path.find((node, index)=>{
                                  return node.tagName == 'ARTICLE'
                                      && index+1 < path.length
@@ -1675,7 +1742,8 @@ ${codeText}
                                              inline  : 'nearest',
                                          };
                                          console.log(options);
-                                         let destination = model.anchorNameToNode.get(href);
+                                         //                                         let destination = model.anchorNameToNode.get(href);
+                                         let destination = document.getElementById(href.substring(1));
                                          //                                     let destination = document.querySelector(`a[name="${href}"]`);
                                          console.assert(destination);
                                          destination.scrollIntoView(true);
@@ -1710,6 +1778,9 @@ ${codeText}
                      default:
                          console.log("Can't happen, unknown state: ", controller.state);
                          console.assert(false);
+                 }
+                 } catch(e) {
+                     console.error("error!", e);
                  }
                  controller.inSync = false;
                  console.log("<<<<<<<<<<<<<<<<<<<<<<<<<exit controller: ", controller.state);
@@ -1748,13 +1819,18 @@ ${codeText}
                  //                         controller.asyncComplete(await func(...args));
                  //                 });
              }
+             controller.command = function(args){
+                 console.warn("function args =", args);
+                 setTimeout(()=>document.dispatchEvent(
+                     new CustomEvent('command',{ detail:args })));
+             }
              controller.asyncComplete = function(value){
-                 function f() {
+                 function controller_asyncComplete() {
                      console.log("inside asyncComplete");
                      document.dispatchEvent(
                          new CustomEvent('asyncComplete', { detail:value}));
                  }
-                 setTimeout(f);
+                 setTimeout(controller_asyncComplete);
              };
              controller.states = new Set([
                  'AwaitAsyncComplete',
@@ -1783,7 +1859,7 @@ ${codeText}
              controller.state  = 'load';
 
              function scopedEval(script, iView){
-//                 console.log("scopedEval ", iView, script);
+                 //                 console.log("scopedEval ", iView, script);
                  for(const element of iView.rootNode.shadowRoot.querySelectorAll("[data-ID]")){
                      console.log("Found data-id of ", element.dataset.id);
                      iView.dataID[element.dataset.id] = element;
@@ -1801,6 +1877,7 @@ ${codeText}
                  let globalEnv = {
                      require           : require,
                      createFreeElement : createFreeElement,
+                     controller        : controller,
                      model             : controller.model,
                      views             : controller.views,
                      iView             : iView,
@@ -1861,7 +1938,7 @@ ${codeText}
                  name         : "",
                  dialogNode   : null,
                  notify       : null,
-                 children     : [],
+                 children     : {},
                  rootNode     : null,
                  dataID       : {},
              };
@@ -1950,25 +2027,26 @@ ${codeText}
                          if(scriptNode){
                              let script = scriptNode.innerHTML;
                              if(false){
-                             try {
-                                 // run the script to obtain its notification functions
-                                 console.log(" eval the script");
-                                 iView.notify   = scopedEval(script, iView);
-                             } catch(error){
-                                 console.log(error);
-                                 console.log("Failed on script: ", script);
-                                 console.assert(false, error);
-                             }
+                                 try {
+                                     // run the script to obtain its notification functions
+                                     console.log(" eval the script");
+                                     iView.notify   = scopedEval(script, iView);
+                                 } catch(error){
+                                     console.log(error);
+                                     console.log("Failed on script: ", script);
+                                     console.assert(false, error);
+                                 }
                              }else{
                                  controller.script = script;
-if(false)
-                                 window.addEventListener('error', (errorEvent) => {
-                                     const { lineno, colno } = errorEvent;
-                                     console.log(`Error thrown at: ${lineno}:${colno}`);
-                                     // Don't pollute the console with additional info:
-                                     errorEvent.preventDefault();
-                                 });
+                                 if(false)
+                                     window.addEventListener('error', (errorEvent) => {
+                                         const { lineno, colno } = errorEvent;
+                                         console.log(`Error thrown at: ${lineno}:${colno}`);
+                                         // Don't pollute the console with additional info:
+                                         errorEvent.preventDefault();
+                                     });
                                  iView.notify   = scopedEval(scriptNode.innerHTML, iView);
+                                 controller.script = null;
                              }
                              console.assert(iView.notify.hasOwnProperty('init'));
                              console.assert(iView.notify.hasOwnProperty('render'));
@@ -1983,7 +2061,8 @@ if(false)
                              this.loadTemplates(iView.rootNode.shadowRoot, iView);
                              this.views[iView.name] = iView;
                          } else {
-                             parentView.children.push(iView);
+                             //                                                 parentView.children.push(iView);
+                             parentView.children[iView.name] = iView;
                          }
 
                      });
@@ -2001,7 +2080,7 @@ if(false)
                  },
                  change(viewName) {
                      console.log(`views.change(${viewName})`);
-                 ++this.inProgress;
+                                         ++this.inProgress;
                      // get interface to incoming view
                      const newView = this.views[viewName];
                      //                 this.currentView = this.views[viewName];
@@ -2020,7 +2099,8 @@ if(false)
                      } else {
                          console.log("   (no notify function!)");
                      }
-                     iView.children.forEach((i)=>this.init(i, ...args));
+                     if(iView.children)
+                         Object.keys(iView.children).forEach((i)=>this.init(i, ...args));
                  },
                  respond(...args){
                      let iView = this.currentView;
@@ -2036,8 +2116,10 @@ if(false)
                      console.log("render ", iView);
                      if(iView.notify)
                          iView.notify.render(iView, ...args);
-                     if(iView.children)
-                         iView.children.forEach((i)=>i.notify.render(i, ...args));
+                     if(iView.children){
+                         console.log(iView, iView.children);
+                         Object.keys(iView.children).forEach((i)=>this.render(i, ...args));
+                     }
                  },
                  push(dialogName, ...args) {
                      console.log("views.push ", dialogName);
@@ -2257,12 +2339,10 @@ if(false)
                  return text;
              }
              model.loadArticle = async function(dirHandle, filename, parent){
-                 console.log("loadResource ", filename);
                  let text = await this.loadResource(filename);
                  let result = this.articles.fromSerial(parent, filename, text);
                  //                 result.articleNode.id = `article-${this.articles.length}`;
                  
-                 console.log("model.loadArticle() returns ", result);
                  return result;
              }
              model.loadTOC = async function(dirHandle, name, parent=null){

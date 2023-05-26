@@ -1,3 +1,61 @@
+2023/05/25
+
+Wish view code had easy access to its sub-views. The view init()
+gets passed the view object. view.children is Array of sub-views.
+Why an array? Wouldn't it be better just an object indexed by
+the template name, which needs to be unique anyway?
+
+Why is inSync true after crash dialog is displayed?
+Hmmm. Controller is entered with an 'asyncComplete', but never get the exit
+controller message.
+
+Does an uncaught exception mean the stack was cleared?
+
+2023/05/24
+
+If different panes/views are required to go through controller
+to communicate, offers opportunities for abstraction and isolation.
+Take clicking on TOC entry. Should controller get involved beyond
+passing click on to pane? Maybe not.
+
+1) controller decides TOC pane is available
+2) controller passes event on to TOC pane
+3) TOC pane detects there was click on TOC entry
+4) TOC pane scheduled 'command' event of "showArticle" and returns
+
+How does controller know what to do with "showArticle" event?
+LP5-Source contains the "showArticle" command. Would like to
+make visible the piping between the emitter and receptor of the
+"showArticle" command.
+
+Well, each controller state could have a map of what events
+are legal and where to send them. That essentially exists now
+in the form of the switch(controller.state) cases.
+
+Controller gets events from individual sub-views of 'home' view.
+Does it directly pass information to 'home' sub-views, or directly
+to 'home'? The 'command' event abstracts and isolates the description
+of what is to be done. If the controller just passes this on to
+the 'home' view, then the detail of which pane it is going to are hidden.
+
+So, the point of events going through the controller is mainly to
+detect any event that is inappropriate for the current controller.state.
+
+feature: category list
+======================
+Suppose that in some overview documentation, I want display
+a list of all the custom events the code generates. And I want
+to show a link to each code fragment that generates one of the events.
+
+This invokes the classic complaint that the documentation must
+be kept in sync with the code. We could ameliorate this by adding
+a custom attribute to each code fragment that indicates what
+events it generates. The doc fragment could then gather those up
+and generate the correct HTML text inside the doc.
+
+
+
+
 markup: code and/or doc
 =======================
 <lp5 ref="url"/>   => displays as <<title of url>>
