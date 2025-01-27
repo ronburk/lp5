@@ -1,3 +1,43 @@
+
+
+2023/05/27
+So, need to evaluate scripts outside the scope of any exception handler and
+catch the detailed error information with a global error handler.
+
+Will eval scripts for internal templates. If that dies, we crash.
+Will eval scripts that reside in user's articles. If that dies, we
+report, and maybe refuse to compile?
+
+Maybe just always "crash", with the caveat that data is always saved.
+Too unfriendly to user changes to user code.
+
+2023/05/26
+Error handling, wish I had documented it. Let's see if my memory
+is correct that you can't get detailed info on errors in code eval
+with a try/catch and must let it generate an Error event.
+
+OK, wrote it up at:
+https://stackoverflow.com/questions/3526902/tracing-the-source-line-of-an-error-in-a-javascript-eval/76344208#76344208
+
+---
+
+How can I arrange for new Function to only get called outside of any exception
+handler?
+
+controller.controller in 'load' state
+    loadTemplates*
+        scopedEval
+            new Function
+
+In controller.state 'load', we first asyncSchedule loadHandles().
+loadHandles() tries to load any previously created parent directory
+handle.
+
+https://stackoverflow.com/questions/3526902/tracing-the-source-line-of-an-error-in-a-javascript-eval/76344208#76344208
+
+
+
+
 2023/05/25
 
 Wish view code had easy access to its sub-views. The view init()

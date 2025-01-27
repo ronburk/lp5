@@ -1371,7 +1371,8 @@ ${codeText}
                  });
              }
 
-             async function loadHandles(model, asyncComplete){
+             // load any previously stored handle to our parent directory
+             async function loadDirParentHandle(model){
                  console.log("loadHandles()");
                  let db = await openDB();
                  let handle = await getDB(db, "handle");
@@ -1391,7 +1392,7 @@ ${codeText}
                  }else{
                      model.dirParentHandle       = handle;
                  }
-                 console.log("loadHandle() after asyncComplete", handle);
+                 console.log("loadDirParentHandle() obtains handle: ", handle);
                  return true;
              }
 
@@ -1557,6 +1558,9 @@ ${codeText}
                  }
                  console.assert(!controller.inSync);
                  controller.inSync = true;
+                 if(controller.state == 'evalTemplates'){
+                     views.evalTemplates();
+                 }
                  try {
                  switch(controller.state){
                      case 'Crash' :
@@ -1569,10 +1573,13 @@ ${codeText}
                          break;
                      case 'load' :
                          console.assert(event.type == 'load', event);
-                         asyncSchedule(loadHandles, model);
+                         asyncSchedule(loadDirParentHandle, model);
                          views.loadTemplates();
-                         views.change('home');
-                         controller.state = 'AwaitDirHandleLoad';
+//                         views.change('home');
+                         controller.nextState = 'AwaitDirHandleLoad';
+                         controller.state = 'evalTemplates';
+                         break;
+                     case 'AwaitDirHandleLoad' :
                          break;
                      case 'AwaitDirHandleLoad' :
                          console.assert(event.type == 'asyncComplete');
@@ -1781,6 +1788,8 @@ ${codeText}
                  }
                  } catch(e) {
                      console.error("error!", e);
+                     if(e instanceof SyntaxError)
+                         throw(e);
                  }
                  controller.inSync = false;
                  console.log("<<<<<<<<<<<<<<<<<<<<<<<<<exit controller: ", controller.state);
@@ -1815,9 +1824,6 @@ ${codeText}
                      }
                  }
                  setTimeout(notifyWhenDone);
-                 //                     async function notifyWhenDone(){
-                 //                         controller.asyncComplete(await func(...args));
-                 //                 });
              }
              controller.command = function(args){
                  console.warn("function args =", args);
@@ -1932,7 +1938,6 @@ ${codeText}
                                      '"use strict";' + script)(
                                          ...globalEnv);
              }
-
              // interface to a view
              const viewInterface = {
                  name         : "",
@@ -2113,13 +2118,12 @@ ${codeText}
                  render(iView, ...args){
                      if(!iView)
                          iView = this.currentView;
+                     const childNames = Object.keys(iView.children);
                      console.log("render ", iView);
                      if(iView.notify)
                          iView.notify.render(iView, ...args);
-                     if(iView.children){
-                         console.log(iView, iView.children);
-                         Object.keys(iView.children).forEach((i)=>this.render(i, ...args));
-                     }
+                     console.log(iView, childNames);
+                     childNames.forEach((i)=>this.render(iView.children[i], ...args));
                  },
                  push(dialogName, ...args) {
                      console.log("views.push ", dialogName);
