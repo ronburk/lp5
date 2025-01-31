@@ -1,3 +1,87 @@
+2025/01/30
+The problem of getting full SyntaxError info back from
+an eval or "new Function" remains annoying.
+
+2025/01/29
+How do we process the "code" text to produce the "output"
+pane?  We could just claim it is raw text and ignore the
+problem of handling, e.g., quoted strings.
+
+No, the "code" text is HTML5, like everything else.
+
+Must at least detect references to other code sections and
+also any "</script>", which could break our storage scheme
+(the text is stored inside <script></script>).
+
+In the text section of the article, the text is just HTML,
+giving the author complete freedom to use HTML constructs
+to format the text.
+
+Double no: the "code" text is NOT HTML5.
+
+In the code section, the text is raw text that can contain
+<lp5-> elements that result in special treatment. As an
+escape clause, "<lp5-html" lets you "escape to HTML"
+Maybe it's, e.g., "<lp5-html-b>" turns into "<b>".
+
+Problem is, code must be rendered three different ways.
+First way is for display in the document pane. Second
+way is in the output pane. Third way is for actual
+output to a file, which might not be *exactly* like
+the second way.
+
+Render for Document Pane:
+  Could want syntax highlighting, hot links to other code in doc pane.
+Render for Output Pane:
+  Want ability to click on text and find source of that text in
+  doc pane.
+Render for Output File:
+  Must get everything stripped but actual desired output. Might
+  want conditional output. Would be really nice if innerText
+  could deliver the goods.
+
+<lp5- ref="url"/>
+<lp5-endscript/>
+
+
+
+2025/01/28
+Wow, try to remember what I was doing. Ah, problem is the user gives
+us scripts and we must eval them and must give good error messages
+if the eval fails.  As the StackOverflow post says, must do the eval
+outside the scope of any exception handler if you want to get all the info.
+
+Alright, got myself into a mess here. Not entirely my fault,
+more due to funky inability to do "new Function" inside an exception
+handler if you want full error information returned.
+
+Stopped trying to handle the need-global-error-handler-for-eval
+problem. Back to rendering the output div.
+
+In an article, the 'code' section is in a <script></script> element.
+If you want a literal '</script>' in the output, you must use
+'<lp5 endscript/>'. Hmmm, maybe better to use element name 'lp-5'
+to be compatible with custom elements. Can avoid problem with
+attributes requiring values by just using specific element:
+
+    <lp-5-script/> => </script>
+
+The external storage for an article is an HTML <template>,
+where the code section (if any) is a <script> element.
+Our output div must display the contents of the code section
+literally, so any HTML will be translated to text.
+
+Except, certain custom HTML elements alter the output.
+
+<lp-5 ref="refid"/>  <- insert text of referenced section
+
+Names are a separate and important data structure. For each
+code section name, create an array of articles of that name.
+The empty name will therefore be an array of the root articles.
+
+For each root article
+    for each article reference it contains
+        replace reference with concatenated text of all articles of that name
 
 
 2023/05/27
@@ -234,8 +318,8 @@ https://stackoverflow.com/questions/338110/avoiding-a-javascript-race-condition
 
 
 
-arch
-====
+architecture
+============
 
 Surrendering control of the controller makes it hard to enforce any
 constraints. For example, suppose the UI has a button called "Foo" and
@@ -739,7 +823,8 @@ Maybe I'm just talking about #ifdef/#else.
 Navigation Pane
 ===============
 WEB is essentially linear and flat. He lets you mark sections to identify
-that they appear in TOC.
+that they appear in TOC. That is problematic when you want to
+have multiple programmers and version control.
 
 
 Section Name
@@ -752,6 +837,11 @@ try to derive meaningful name if user didn't supply it.
 
 Note that if there is code in the section, we will DEMAND a name
 for it, since otherwise it cannot be referenced.
+
+Note also that more than one section can have the same name,
+and this is a common case, since it is how one, for example,
+scatters global variables across more than one article and
+then has them automatically gathered together to emit.
 
 
 misc

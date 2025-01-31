@@ -1,0 +1,25 @@
+<template>
+    <section>
+        <h2>lp5: The Program</h2>
+        <div>
+            <p>
+                lp5 is written in <q>vanilla</q> HTML5.
+                It is self-contained, so you can copy it
+                (<code>lp5.html</code>)
+                to your local filesystem and run it on a
+                machine that isn't connected to the internet.
+            </p>
+        </div>
+    </section>
+    <section>
+        <script type="text/plain">
+            <!doctype html>
+            <html lang="en">
+                <head>
+                </head>
+                <body>
+                </body>
+            </html>
+        </script>
+    </section>
+</template>

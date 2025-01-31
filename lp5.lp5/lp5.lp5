@@ -1,13 +1,23 @@
+
 <template>
-    <ul>
-        <li id="1.lp5"/>
-        <li id="3.lp5"/>
-        <li id="4.lp5"/>
-        <li id="2.lp5"/>
-    </ul>
+    <ul style="display: none;">
+        <li id="1.lp5">
+        </li><li id="3.lp5">
+        </li><li id="4.lp5">
+        </li><li id="2.lp5">
+    </li></ul>
     <section>
-        <h2>lp5 - decompositional explanatory programming.</h2>
-        <div>
-        </div>
+        <h2>lp5 - Divide, Connect, Explain</h2>
+<div>
+</div>
+
+    </section>
+    <section>
+        <h2></h2>
+        <script type="text/plain">
+
+
+        </script>
     </section>
 </template>
+                             

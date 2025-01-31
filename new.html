@@ -4,6 +4,35 @@
         <meta charset="utf-8" >
         <title>lp5</title>
         <script>
+         function showFatalError(message) {
+             // 1) Show a big overlay blocking the page
+             const overlay = document.createElement("div");
+             overlay.style.position = "fixed";
+             overlay.style.top = "0";
+             overlay.style.left = "0";
+             overlay.style.width = "100%";
+             overlay.style.height = "100%";
+             overlay.style.backgroundColor = "rgba(0,0,0,0.8)";
+             overlay.style.color = "white";
+             overlay.style.fontSize = "1.2em";
+             overlay.style.zIndex = "999999";
+             overlay.style.display = "flex";
+             overlay.style.flexDirection = "column";
+             overlay.style.justifyContent = "center";
+             overlay.style.alignItems = "center";
+
+             overlay.innerHTML = `
+                 <h1>Fatal Error</h1>
+                 <p>${message}</p>
+             `;
+             document.body.appendChild(overlay);
+
+             // 2) Also log to console for developers
+             console.error("FATAL ERROR:", message);
+
+             // 3) Throw an error so that no further code in this call stack runs
+             throw new Error("FATAL: " + message);
+         }
         </script>
         <style class="contextMenu">
          article:focus {
@@ -529,73 +558,73 @@
                     <nav id="LP5-Toc" data-id="pane">
                     </nav>
                     <script>
-                        const iView = require('iView');
-                        const model = require('model');
-                        const {command}         = require('controller');
+                     const iView = require('iView');
+                     const model = require('model');
+                     const {command}         = require('controller');
 
-                        const createFreeElement = require('createFreeElement');
-                        function clickHandler(event){
-                        event.preventDefault();
-                        let path = event.composedPath();
-                        // was click inside TOC element?
-                        let a = path.find((node,index)=>{
-                        return node.tagName == 'A'
-                        && index +2 < path.length
-                        && path[index+1].tagName == 'LI'
-                        && path[index+2].tagName == 'UL'
-                        && path[index+3].id == 'LP5-Toc'
-                        ;
-                        });
-                        if(a && a.id){
-                        const argv = ['showArticle', a.id.substring(1) ];
-                        command(argv);
-                        }
-                        }
-                        function init(){
-                        const {pane} = require('dataID');
-                        pane.addEventListener('click', clickHandler);
-                        };
-                        function getTitle(li){
-                        let ID = li.getAttribute('id');
-                        }
-                        function renderChildTOC(article){
-                        console.assert(article.ulNode);
-                        let ul    = createFreeElement('ul');
+                     const createFreeElement = require('createFreeElement');
+                     function clickHandler(event){
+                         event.preventDefault();
+                         let path = event.composedPath();
+                         // was click inside TOC element?
+                         let a = path.find((node,index)=>{
+                             return node.tagName == 'A'
+                                 && index +2 < path.length
+                                 && path[index+1].tagName == 'LI'
+                                 && path[index+2].tagName == 'UL'
+                                 && path[index+3].id == 'LP5-Toc'
+                             ;
+                         });
+                         if(a && a.id){
+                             const argv = ['showArticle', a.id.substring(1) ];
+                             command(argv);
+                         }
+                     }
+                     function init(){
+                         const {pane} = require('dataID');
+                         pane.addEventListener('click', clickHandler);
+                     };
+                     function getTitle(li){
+                         let ID = li.getAttribute('id');
+                     }
+                     function renderChildTOC(article){
+                         console.assert(article.ulNode);
+                         let ul    = createFreeElement('ul');
 
-                        article.ulNode.querySelectorAll('li').forEach((entry)=>{
-                        let li           = createFreeElement('li');
-                        let id           = entry.getAttribute('id');
-                        let a            = createFreeElement('a');
-                        li.appendChild(a);
-                        let childArticle = model.articles.fromURL(id);
-                        a.setAttribute('href', "#"+childArticle.articleNode.id);
-                        console.assert(childArticle, {id:id});
-                        if(childArticle.titleNode)
-                        a.innerText = childArticle.titleNode.innerText;
-                        else
-                        a.innerText = "< no title >";
-                        ul.appendChild(li);
-                        if(childArticle.ulNode)
-                        ul.appendChild(renderChildTOC(childArticle));
-                        });
-                        return ul;
-                        }
-                        function renderTOC(){
-                        console.log("render toc: ", model.rootTOC);
-                        let article = model.rootTOC;
-                        if(article && article.ulNode){
-                        let ul = renderChildTOC(article);
-                        let tocRootNode = iView.rootNode.shadowRoot.querySelector('#LP5-Toc');
-                        console.assert(tocRootNode && tocRootNode.id == "LP5-Toc");
-                        tocRootNode.replaceChildren(ul);
-                        }
-                        return;
-                        };
-                        function handleEvent(event){
-                        console.assert(false);
-                        }
-                        let result = {init:init, render:renderTOC, handleEvent:handleEvent};
-                        return result;
+                         article.ulNode.querySelectorAll('li').forEach((entry)=>{
+                             let li           = createFreeElement('li');
+                             let id           = entry.getAttribute('id');
+                             let a            = createFreeElement('a');
+                             li.appendChild(a);
+                             let childArticle = model.articles.fromURL(id);
+                             a.setAttribute('href', "#"+childArticle.articleNode.id);
+                             console.assert(childArticle, {id:id});
+                             if(childArticle.titleNode)
+                                 a.innerText = childArticle.titleNode.innerText;
+                             else
+                                 a.innerText = "< no title >";
+                             ul.appendChild(li);
+                             if(childArticle.ulNode)
+                                 ul.appendChild(renderChildTOC(childArticle));
+                         });
+                         return ul;
+                     }
+                     function renderTOC(){
+                         console.log("render toc: ", model.rootTOC);
+                         let article = model.rootTOC;
+                         if(article && article.ulNode){
+                             let ul = renderChildTOC(article);
+                             let tocRootNode = iView.rootNode.shadowRoot.querySelector('#LP5-Toc');
+                             console.assert(tocRootNode && tocRootNode.id == "LP5-Toc");
+                             tocRootNode.replaceChildren(ul);
+                         }
+                         return;
+                     };
+                     function handleEvent(event){
+                         console.assert(false);
+                     }
+                     let result = {init:init, render:renderTOC, handleEvent:handleEvent};
+                     return result;
                     </script>
                 </template>
                 <template data-name="sourceDiv" id="LP5-Source">
@@ -720,7 +749,7 @@
                         <div data-id="outputDiv">
                         </div>
                         <script>
-                         let model = require('model');
+                         let model       = require('model');
                          let {outputDiv} = require('dataID');
                          const createFreeElement = require('createFreeElement');
 
@@ -732,6 +761,12 @@
                              let sval  = "'[^'\n\r]*'";
                              let value = `(?:${sval}|${dval})`;
                              attributeRegex  = new RegExp(`^\s*(${id})=(${value})\s*`);
+                         }
+                         function indexArticles(){
+                             const result = {}
+                             for(const article of model.articles){
+                                 
+                             }
                          }
                          function findRoots(article){
                              let result = [];
@@ -837,35 +872,51 @@
                              }
                              return str.slice(pos);
                          }
-                         // renderArticle() - create display version of an article.
+                         // renderArticle() - create 'code' output from an article.
                          function renderArticle(article, node){
                              console.log("renderArticle ", article);
-                             let output = createFreeElement('SPAN');
-                             output.dataset.ref = article.URL;
-                             let codeSerial     = article.getCodeSerial();
-                             let emit           = emitOutput(node);
-                             let posStart       = 0;
-                             //                             while(posStartTag != -1){
-                             let matches = codeSerial.matchAll(startTagRegex);
-                             for(const match of matches){
-                                 console.warn("render Article match=", match);
+                             let codeSerial = article.getCodeSerial();
+                             let output     = null;
+                             if(codeSerial){
+                                 output = createFreeElement('SPAN');
+                                 output.dataset.ref = article.URL;
+                                 let emit           = emitOutput(node);
+                                 emit.next();
+                                 let posStart       = 0;
+                                 while(true){
+                                     let posStartTag = codeSerial.indexOf("<lp5-", posStart);
+                                     if(posStartTag == -1)
+                                         break;
+                                     let posEnd      = posStartTag;
+                                     console.log(`emit.next(${posStart},${posEnd})`);
+                                     console.log(codeSerial.slice(posStart, posEnd));
+                                     emit.next(codeSerial.slice(posStart, posEnd));
+                                     posStart        = posEnd + 1;
+                                 }
+                                 emit.next(codeSerial.slice(posStart));
+                                 emit.next(null);
                              }
-                             while(true){
-                                 let posStartTag = codeSerial.indexOf("<lp5 ", posStart);
-                                 if(posStartTag == -1)
-                                     break;
-                                 let posEnd      = posStartTag;
-                                 emit.next(codeSerial.slice(posStart, posEnd));
-                                 posStart = posEnd + 1;
-                             }
-                             emit.next(codeSerial.slice(posStart));
                              console.log("returns ", output);
                              return output;
                          }
-                         // render entire Source pane from scratch.
+                         // render entire LP5-Output div from scratch.
                          function render(){
+                             console.log("going to render LP5-Output div");
+                             const articlesByName = {}
+                             let position = 0;
+                             for(const article of model.docOrder(model.rootTOC)){
+                                 const codeName = article.getCodeName();
+                                 if(codeName){
+                                     let   reference = articlesByName[codeName];
+                                     if(reference == null){
+                                         reference = [];
+                                         articlesByName[codeName] = reference;
+                                     }
+                                     reference.push(article);
+                                 }
+                             }
                              let article = model.rootTOC;
-                             outputDiv.replaceChildren();
+                             outputDiv.replaceChildren(); // empty the div
                              if(article && article.ulNode){
                                  let roots = findRoots(article);
                                  console.log("roots = ", roots);
@@ -924,7 +975,7 @@
                          if(c.nodeName != 'SCRIPT'){
                              findBadTemplate(c);
                              if(/\<\//.test(c.innerText)){
-                                 console.log("Element contains a close tag?");
+                                 console.log("Element contains a close tag?", e);
                                  console.assert(!c, c);
                              }
                              if(c.content){
@@ -934,7 +985,7 @@
                      });
              }
              
-             findBadTemplate(document);
+//             findBadTemplate(document);
 
              class RelativeCodeRanges {
                  #ranges;    // array of {relPos, length}
@@ -1083,6 +1134,11 @@
                                  return article;
                          return null;
                      }
+                     fromError(parent, url, error){
+                         let result = this.newArticle(parent, url);
+                         console.log("fromError returns ", result);
+                         return result;
+                     }
                      // create article from serial string
                      fromSerial(parent, URL, text){
                          let result = this.newArticle(parent, URL);
@@ -1181,7 +1237,6 @@
                              console.log(`    name='${name}', code='${code}'`);
                          }
                          console.log("    returns ", result);
-                         console.log(result);
                          return result;
                      }
                      getCodeText(){
@@ -1213,6 +1268,7 @@
                      }
                      addChildBefore(newChildArticle, siblingArticle){
                          console.assert(this.ulNode);
+                         console.log("addChildBefore", newChildArticle, siblingArticle);
                          let stuff = this.#prepareForChild(newChildArticle,siblingArticle);
                          stuff.siblingNode.before(stuff.li);
                      }
@@ -1530,7 +1586,7 @@ ${codeText}
                  }
                  const currentViewName = views.currentView
                                        ? views.currentView.name : "";
-                 console.log(">>>>>>>>>>>>>>>>>>>>>>enter controller ",
+                 console.log(`>>>>>>>>>>>>>>>>>>enter controller {${currentViewName}}`,
                              controller.state, model.articles.length, arguments.length);
                  console.log(event);
                  if(event.type == 'error'){
@@ -1558,9 +1614,9 @@ ${codeText}
                  }
                  console.assert(!controller.inSync);
                  controller.inSync = true;
-                 if(controller.state == 'evalTemplates'){
-                     views.evalTemplates();
-                 }
+//                 if(controller.state == 'evalTemplates'){
+//                     views.evalTemplates();
+//                 }
                  try {
                  switch(controller.state){
                      case 'Crash' :
@@ -1575,12 +1631,12 @@ ${codeText}
                          console.assert(event.type == 'load', event);
                          asyncSchedule(loadDirParentHandle, model);
                          views.loadTemplates();
-//                         views.change('home');
-                         controller.nextState = 'AwaitDirHandleLoad';
-                         controller.state = 'evalTemplates';
+                         views.change('home');
+                         controller.state = 'AwaitDirHandleLoad';
+//                         controller.state     = 'evalTemplates';
                          break;
-                     case 'AwaitDirHandleLoad' :
-                         break;
+//                     case 'AwaitDirHandleLoad' :
+//                         break;
                      case 'AwaitDirHandleLoad' :
                          console.assert(event.type == 'asyncComplete');
                          views.push('SelectParent');
@@ -1597,7 +1653,7 @@ ${codeText}
                          } else if(event.type == 'click') {
                              // let the view handle clicks
                          } else if(event.type == 'close') {
-                             console.log("Clse event came in");
+                             console.log("'close' event came in");
                          } else {
                              console.assert(false, event);
                          }
@@ -1763,7 +1819,7 @@ ${codeText}
                          break;
                      case 'EditingSection' :
                          if(event.type == 'close') {
-                             console.log("Clse event came in");
+                             console.log("'close' event came in");
                              controller.state = 'home';
                              controller.state = 'openProject';
                              asyncSchedule(model.openProject.bind(model), model.rootTOC.URL);
@@ -1782,6 +1838,8 @@ ${codeText}
                          if(event.type == 'asyncComplete')
                              controller.state = 'home';
                          break;
+//                     case 'evalTemplates' : // already handled above, outside try
+//                         break;
                      default:
                          console.log("Can't happen, unknown state: ", controller.state);
                          console.assert(false);
@@ -1844,19 +1902,21 @@ ${codeText}
                  'ContextMenu',
                  'Crash',
                  'EditingSection',
+                 'evalTemplates',
                  'home',
                  'load',
                  'openProject',
+                 'PickOrCreateProject',
                  'SelectParent',
                  'SelectingParent',
                  'SelectingParentHashChanged',
                  'test',
-                 'PickOrCreateProject',
              ]);
+             // assert the 'state' property of controller must be defined in controller.states
              Object.defineProperty(controller, 'state', {
                  get() { return controller.state_; },
                  set(val) {
-                     console.assert(controller.states.has(val), val);
+                     console.assert(controller.states.has(val), `${val} is not defined in controller.states`);
                      controller.state_ = val;
                  }
              });
@@ -1865,7 +1925,7 @@ ${codeText}
              controller.state  = 'load';
 
              function scopedEval(script, iView){
-                 //                 console.log("scopedEval ", iView, script);
+                 console.log("scopedEval ", iView, script);
                  for(const element of iView.rootNode.shadowRoot.querySelectorAll("[data-ID]")){
                      console.log("Found data-id of ", element.dataset.id);
                      iView.dataID[element.dataset.id] = element;
@@ -1931,8 +1991,9 @@ ${codeText}
                              console.assert(false);
                      }
                  }
+                 let sourceMap = "\n//# sourceURL=" + iView.name + "\n";
                  return new Function(
-                     "require", '"use strict";' + script)(
+                     "require", '"use strict";' + script + sourceMap)(
                          require);
                  return new Function(...(Object.keys(globalEnv)),
                                      '"use strict";' + script)(
@@ -1962,11 +2023,16 @@ ${codeText}
                          }
                      );
                  },
+                 evalTemplates(){
+                     console.log("evalTemplates!")
+                     this.loadTemplates()
+                 },
                  loadTemplates(rootElement=document, parentView=null){
                      console.log("views.loadTemplates()", rootElement);
-                     console.log(rootElement.querySelectorAll('template').length);
+                     let templates = rootElement.querySelectorAll('template');
+                     console.log(`${templates.length} templates in document`);
 
-                     rootElement.querySelectorAll('template').forEach((t)=>{
+                     templates.forEach((t)=>{
                          let templateName = t.dataset.name;
                          console.assert(t.dataset.name);
 
@@ -2310,7 +2376,7 @@ ${codeText}
                      for(const entry of ulNode.querySelectorAll(':scope > li')){
                          console.log(entry);
                          let id     = entry.getAttribute('id');
-                         yield* this.docOrder(this.articleFromURL(id));
+                         yield* this.docOrder(this.articles.fromURL(id));
                      }
              };
              model.codeOrder = function*(queue = null){
@@ -2331,23 +2397,43 @@ ${codeText}
                  return true;
              }
              model.loadResource = async function(url){
-                 let text = null;
+                 let result = { loaded : true, url : url }
                  try {
                      const fileHandle = await this.dirHandle.getFileHandle(url);
                      console.assert(fileHandle);
+                     // open, load file into string, close
                      const file = await fileHandle.getFile();
-                     text = await file.text();
-                 } catch (e) {
-                     console.log("loadResource failed ", e);
+                     result.text = await file.text();
+                 } catch (error) {
+                     result.error  = error;
+                     result.loaded = false;
                  }
-                 return text;
+                 return result;
              }
              model.loadArticle = async function(dirHandle, filename, parent){
-                 let text = await this.loadResource(filename);
-                 let result = this.articles.fromSerial(parent, filename, text);
-                 //                 result.articleNode.id = `article-${this.articles.length}`;
-                 
-                 return result;
+                 const articleText = await this.loadResource(filename);
+                 let text = articleText.text;
+                 if(!articleText.loaded){
+                     text = `
+<template>
+    <section>
+    <h2>FAILED LOAD OF "URL": ERROR</h2>
+<div style="background-color: #ffcccc; border: 2px solid #ffcc00; padding: 10px; margin: 10px 0; font-family: sans-serif;">
+           <p>
+<span style="font-size: 24px;">&#9888;</span>MSG
+           </p>
+       </div>
+
+    </section>
+</template>`;
+                     text = text.replace(/URL/, articleText.url);
+                     text = text.replace(/ERROR/, articleText.error.name);
+                     text = text.replace(/MSG/, articleText.error.message);
+                     
+                     
+                 }
+
+                 return this.articles.fromSerial(parent, filename, text);
              }
              model.loadTOC = async function(dirHandle, name, parent=null){
                  console.log("loadTOC ", name);
@@ -2370,7 +2456,7 @@ ${codeText}
                  } else
                      console.log(`in loadTOC, article "${name}" has NO ul`);
                  console.log(`loadTOC(${name}) returns `, article);
-                 return article;
+                     return article;
              }
 
              model.openProject = async function(name){

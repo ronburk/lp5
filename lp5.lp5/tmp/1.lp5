@@ -1,0 +1,183 @@
+<template>
+    <section>
+        <h2>Overview</h2>
+        <div>
+            <p>
+                lp5 is a browser-based text editor and preprocessor
+                designed to enable a different style of creating
+                software.
+                The programmer uses lp5 to create a <q>web</q>
+                of small, self-contained, interlinked text
+                segments that include:
+                code, documentation, tests, etc.
+                When successful, the result is as you see here:
+                a hypertext system that
+                <ul>
+                    <li>explains the code</li>
+                    <li>contains the code</li>
+                    <li>can generate the external files needed to build the code</li>
+                </ul>
+            </p>
+            <p>
+                What is this <q>different style</q> of programming that
+                lp5 lets you explore?
+                It is a style in which <em>explanation</em> is
+                a primary goal from the very beginning.
+                It is a style of <b>small parts, simply related</b>:
+                in normal code, the unit of modularity is
+                essentially the function,
+                but lp5 permits modularizing any piece of code,
+                however small, as you will see.
+                <span hidden="hidden">
+                    Whereas normal programming might call for
+                    breaking a large function into smaller pieces
+                    for clarity, in lp5 you simply write
+                    (and document) those smaller pieces separately
+                    and let lp5 put them back together when
+                    creating the source code the compiler will see.
+                    It is a style that lets you organize for clarity,
+                    rather than to meet the constraints of the
+                    programming language you are using.
+                </span>
+            </p>
+            <p>
+                lp5 programming is characterized by two words:
+                decompositional and explanatory.
+                Decomposition is a (perhaps <q>the</q>) fundamental tool
+                for conquering complexity. No matter what your target
+                programming language (HTML5, C++, Python, etc.),
+                the lp5 preprocessor provides a novel
+                additional technique for breaking
+                the problem down:
+                code can be arbitrarily broken down and ordered;
+                an embedded directed graph allows lp5
+                to mechanically reconstruct the order/composition that the
+                target programming language requires.
+            </p>
+            <p>
+                The other half of lp5's impact on coding comes from
+                encouraging and enabling you to explain the code you are writing.
+                This exploits a simple but powerful phenomenon of the
+                human mind:
+                <b>if you focus on explaining your code,
+                    you will write different code.</b>
+            </p>
+            <p>
+                lp5 is <em>not</em>:
+                <ul>
+                    <li><b>for beginners:</b>
+                        a preprocessor
+                        (especially if it deprives you of your favorite IDE)
+                        adds an extra level
+                        of separation between the programmer
+                        and other programming tools.
+                        The extra complexity, e.g., in tracing
+                        errors to their source (the compiler?
+                        lp5? your source?) is tolerable for
+                        experienced programmers, but a discouraging
+                        extra burden for a beginner.
+                    </li>
+                    <li><b>for faster coding:</b>
+                        though it may produce <em>better</em> code,
+                        and could save time in the long run.
+                        Explaining software
+                        is a significant extra constraint and takes
+                        extra up-front time.
+                        <blockquote>
+                            It is easier to write only a program,
+                            because the programmer can settle for correct
+                            and efficient code even if it is hard to
+                            understand. &mdash;Martin Ruckert,
+                            <a href="https://www.google.com/books/edition/Understanding_MP3/MN34-91z6qAC?hl=en&gbpv=1&pg=PT7&printsec=frontcover">Understanding MP3</a>
+                        </blockquote>
+                        We might speculate that lp5 facilitates
+                        better
+                        <a href="https://dl.acm.org/doi/10.1145/2960310.2960334">
+                            self-regulation
+                        </a>
+                        during the programming process.
+                        Of course, the time cost equation changes when
+                        someone else
+                        (possibly your future self)
+                        has to work on your code and finds
+                        ready coherent explanations rather than
+                        having to reverse-engineer concepts and intent
+                        from weak artifacts like version control commit messages.
+                    </li>
+                    <li><b>"Literate Programming":</b>
+                        those few
+                        <a href="#2.lp5">experienced with Knuth's work</a>
+                        will
+                        quickly note how lp5 is related but different.
+                        For everyone else,
+                        history suggests the phrase "literate programming"
+                        has been extremely unhelpful in
+                        promulgating the best
+                        ideas hidden behind it (decomposition/explanation),
+                        so we eschew that language here.
+                    </li>
+                </ul>
+            </p>
+            <p>
+                An lp5 program consists of a series of
+                <q>sections,</q>
+                where each section contains documentation
+                or code fragments or both
+                (the section you are currently reading
+                happens to contain only
+                documentation, no code).
+            </p>
+            <p>
+                The order of the sections is the order the
+                author deems most conducive to explaining
+                the code,
+                and is independent of the order of the code
+                in the final HTML output
+                (which is produced by asking lp5 to <q>compile</q>).
+                Most lp5 sections are quite short
+                and often contain not much more than a dozen
+                lines of code.
+                Simple parts, simply related:
+                fundamental to lp5.
+            </p>
+            <b>documentation fragments:</b>
+            <p>
+                The documentation portion of a section is
+                written in normal HTML.
+                The first headline element
+                (<code>&lt;h1&gt;</code>, <code>&lt;h2&gt;</code>, etc.),
+                if any,
+                in the documentation portion of the section
+                will be copied to the <q>table of contents</q>
+                pane on the left,
+                with appropriate indentation.
+                There, you can click on the headline text of a section to scroll
+                to that section of your code.
+            </p>
+            <b>code fragments:</b>
+            <p>
+                The code fragment portion of a section is written
+                in a language nearly identical to HTML5,
+                except that the code fragment may have a <em>name</em>,
+                and the code fragment may contain references to other
+                named code fragments.
+            </p>
+            <p>
+                Unnamed code fragments form the root of a directed
+                graph that is traversed to produce the final output HTML.
+                As each code fragment is copied to the output,
+                any reference to another code fragment causes the
+                copying to recurse.
+            </p>
+            <p>
+                Code fragments that share the same name will
+                be combined together in the output in the order
+                they appeared in the lp5 source sections.
+                This greatly alleviates the need to think of
+                unique names for each logical group of global variables,
+                CSS declarations, etc.
+            </p>
+
+        </div>
+    </section>
+</template>

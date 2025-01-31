@@ -2,7 +2,7 @@
 <template>
     
     <section>
-        <h2>Overview2</h2>
+        <h2>Overview</h2>
 <div>
     <p>
         lp5 is a browser-based text editor and preprocessor
@@ -17,7 +17,7 @@
         </p><ul>
             <li>explains the code</li>
             <li>contains the code</li>
-            <li>can generate the external files needed to build the code</li>
+            <li>generates "normal" files containing the code</li>
         </ul>
     <p></p>
     <p>
@@ -80,8 +80,7 @@
                 extra burden for a beginner.
             </li>
             <li><b>for faster coding:</b>
-                though it may produce <em>better</em> code,
-                and could save time in the long run.
+                though it may produce <em>better</em> code that saves time in the long run.
                 Explaining software
                 is a significant extra constraint and takes
                 extra up-front time.
@@ -186,6 +185,7 @@
     <section>
         <h2></h2>
         <script type="text/plain">
+
 
         </script>
     </section>
