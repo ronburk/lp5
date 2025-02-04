@@ -8,32 +8,37 @@
              const result = {
                  name:       "",
                  isStart:    true,
+                 emptyTag:   false,
                  attributes: [],
                  nextPos:    startPos,
                  errorPos:   -1
              };
-             const tagPattern = /<\s*([A-Za-z_:][A-Za-z0-9:._-]*)\s*/y;
+             const tagPattern = /<(\/)?\s*([A-Za-z_:][A-Za-z0-9:._-]*)\s*/y;
              tagPattern.lastIndex = startPos;
              let  match = tagPattern.exec(str);
-             console.log(match);
              PARSE:{
                  if(!match) break PARSE;
-                 result.name = match[1];
+                 if(match[1]) result.isStart = false;
+                 result.name = match[2];
                  result.nextPos = tagPattern.lastIndex;
-                 const attrPattern = /([A-Za-z_:][A-Za-z0-9:._-]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^>\s]+)))?\s*/y;
+                 const attrPattern = /\s*([A-Za-z_:][A-Za-z0-9:._-]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^>\s]+)))?\s*/y;
                  attrPattern.lastIndex = tagPattern.lastIndex;
                  while ((match = attrPattern.exec(str)) !== null) {
                      const attrName = match[1];
                      const attrValue = match[2] || match[3] || match[4] || null;
                      result.attributes.push({name:attrName, value:attrValue});
-                     console.log(`Name: ${attrName}, Value: ${attrValue}`);
+                     result.nextPos = attrPattern.lastIndex;
                  }
-                 if(!/^\s*>/.test(str.slice(attrPattern.lastIndex))) break PARSE;
+                 const trailing = /^\s*(\/)?\s*>/.exec(str.slice(result.nextPos));
+                 if (!trailing){
+                     console.warn("couldn't match end of tag");
+                     break PARSE;
+                 }
+                 result.emptyTag = trailing[1] === "/";
+                 result.nextPos += trailing[0].length;
                  return result;
              }
-
-             result.errorPos = startPos;
-             return result;
+             return null;
          }
          /* parseCode() - break code into text and directives.
           *
@@ -44,7 +49,7 @@
              const result = [];
              const scriptText = scriptNode.childNodes[0].textContent;
              console.log(`scriptText = '${scriptText}'`);
-             const tagPattern = /<\/?\s*lp5-/y;  // lp5 start or end tag
+             const tagPattern = /<(\/)?\s*lp5-/g;  // lp5 start or end tag
              let   posStart     = 0;
              let   posNext      = 0;
              let   length       = scriptText.length;
@@ -57,12 +62,14 @@
                      posNext     = length;
                  else
                      posNext = match.index;
+                 console.warn("pattern match was ", match);
                  if(posStart < posNext)
                      result.push(scriptText.substring(posStart, posNext));
                  if(match){
                      const tagDescriptor = parseTag(scriptText, match.index);
+                     console.warn("parseTag() returns ", tagDescriptor);
                      if(tagDescriptor){
-                         result.push(scriptText.substring(posNext, tagDescriptor.nextPos));
+                         result.push(tagDescriptor);
                          posNext = tagDescriptor.nextPos;
                      }
                      else{
@@ -71,9 +78,9 @@
                      }
                  }
              }
-                 console.warn("parseCode() returns ", result);
+             console.warn("<<<<<<<<<<parseCode() returns ", result);
              return result;
-             }
+         }
          function showFatalError(message) {
              // 1) Show a big overlay blocking the page
              const overlay = document.createElement("div");
@@ -952,20 +959,18 @@
                                  output.dataset.ref = article.URL;
                                  let emit           = emitOutput(node);
                                  emit.next();
-                                 let posStart       = 0;
-                                 while(true){
-                                     let posStartTag = codeSerial.indexOf("<lp5-", posStart);
-                                     if(posStartTag == -1)
-                                         break;
-                                     const match = parseTag(codeSerial, posStartTag);
-                                     console.log("parseTag = ", match);
-                                     let posEnd      = posStartTag;
-                                     console.log(`emit.next(${posStart},${posEnd})`);
-                                     console.log(codeSerial.slice(posStart, posEnd));
-                                     emit.next(codeSerial.slice(posStart, posEnd));
-                                     posStart        = posEnd + 1;
+                                 const parsed = article.codeParsed;
+                                 for(const item of parsed){
+                                     if(typeof item === 'string')
+                                         emit.next(item);
+                                     else{
+                                         if(item.name == 'lp5-endscript')
+                                             emit.next('<' + '/script>');
+                                         else if(item.name == 'lp5-'){
+                                             console.warn("got lp5-!!!");
+                                         }
+                                     }
                                  }
-                                 emit.next(codeSerial.slice(posStart));
                                  emit.next(null);
                              }
                              console.log("returns ", output);
@@ -974,26 +979,14 @@
                          // render entire LP5-Output div from scratch.
                          function render(){
                              console.log("going to render LP5-Output div");
-                             const articlesByName = {}
-                             let position = 0;
+                             outputDiv.replaceChildren(); // empty the div
+
                              for(const article of model.docOrder(model.rootTOC)){
                                  const codeName = article.getCodeName();
-                                 if(codeName){
-                                     let   reference = articlesByName[codeName];
-                                     if(reference == null){
-                                         reference = [];
-                                         articlesByName[codeName] = reference;
-                                     }
-                                     reference.push(article);
-                                 }
-                             }
-                             const article = model.rootTOC;
-                             outputDiv.replaceChildren(); // empty the div
-                             if(article && article.ulNode){
-                                 const roots = findRoots(article);
-                                 console.log("roots = ", roots);
-                                 for(const root of roots){
-                                     outputDiv.appendChild(renderArticle(root, outputDiv));
+                                 if(!codeName){
+                                     const node = renderArticle(article, outputDiv);
+                                     if(node)
+                                         outputDiv.appendChild(node);
                                  }
                              }
                          }
