@@ -4,6 +4,76 @@
         <meta charset="utf-8" >
         <title>lp5</title>
         <script>
+         function parseTag(str, startPos){
+             const result = {
+                 name:       "",
+                 isStart:    true,
+                 attributes: [],
+                 nextPos:    startPos,
+                 errorPos:   -1
+             };
+             const tagPattern = /<\s*([A-Za-z_:][A-Za-z0-9:._-]*)\s*/y;
+             tagPattern.lastIndex = startPos;
+             let  match = tagPattern.exec(str);
+             console.log(match);
+             PARSE:{
+                 if(!match) break PARSE;
+                 result.name = match[1];
+                 result.nextPos = tagPattern.lastIndex;
+                 const attrPattern = /([A-Za-z_:][A-Za-z0-9:._-]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^>\s]+)))?\s*/y;
+                 attrPattern.lastIndex = tagPattern.lastIndex;
+                 while ((match = attrPattern.exec(str)) !== null) {
+                     const attrName = match[1];
+                     const attrValue = match[2] || match[3] || match[4] || null;
+                     result.attributes.push({name:attrName, value:attrValue});
+                     console.log(`Name: ${attrName}, Value: ${attrValue}`);
+                 }
+                 if(!/^\s*>/.test(str.slice(attrPattern.lastIndex))) break PARSE;
+                 return result;
+             }
+
+             result.errorPos = startPos;
+             return result;
+         }
+         /* parseCode() - break code into text and directives.
+          *
+          * returns an array, where each element is either a string
+          * of literal text or an lp5 tag descriptor.
+          */
+         function parseCode(scriptNode){
+             const result = [];
+             const scriptText = scriptNode.childNodes[0].textContent;
+             console.log(`scriptText = '${scriptText}'`);
+             const tagPattern = /<\/?\s*lp5-/y;  // lp5 start or end tag
+             let   posStart     = 0;
+             let   posNext      = 0;
+             let   length       = scriptText.length;
+             let   match;
+             while(posNext < length){
+                 posStart             = posNext;
+                 tagPattern.lastIndex = posStart;
+                 match                = tagPattern.exec(scriptText);
+                 if(match == null)
+                     posNext     = length;
+                 else
+                     posNext = match.index;
+                 if(posStart < posNext)
+                     result.push(scriptText.substring(posStart, posNext));
+                 if(match){
+                     const tagDescriptor = parseTag(scriptText, match.index);
+                     if(tagDescriptor){
+                         result.push(scriptText.substring(posNext, tagDescriptor.nextPos));
+                         posNext = tagDescriptor.nextPos;
+                     }
+                     else{
+                         result.push("BAD LP5 TAG:<");
+                         ++posNext;
+                     }
+                 }
+             }
+                 console.warn("parseCode() returns ", result);
+             return result;
+             }
          function showFatalError(message) {
              // 1) Show a big overlay blocking the page
              const overlay = document.createElement("div");
@@ -887,6 +957,8 @@
                                      let posStartTag = codeSerial.indexOf("<lp5-", posStart);
                                      if(posStartTag == -1)
                                          break;
+                                     const match = parseTag(codeSerial, posStartTag);
+                                     console.log("parseTag = ", match);
                                      let posEnd      = posStartTag;
                                      console.log(`emit.next(${posStart},${posEnd})`);
                                      console.log(codeSerial.slice(posStart, posEnd));
@@ -915,12 +987,12 @@
                                      reference.push(article);
                                  }
                              }
-                             let article = model.rootTOC;
+                             const article = model.rootTOC;
                              outputDiv.replaceChildren(); // empty the div
                              if(article && article.ulNode){
-                                 let roots = findRoots(article);
+                                 const roots = findRoots(article);
                                  console.log("roots = ", roots);
-                                 for(let root of roots){
+                                 for(const root of roots){
                                      outputDiv.appendChild(renderArticle(root, outputDiv));
                                  }
                              }
@@ -1156,7 +1228,7 @@
                          console.log("nChild = ", nChild);
                          let   iChild = 0;
                          let   topLevelNode = childElements[iChild];
-                         if(nChild && topLevelNode.tagName == 'UL'){
+                         if(nChild && topLevelNode.tagName == 'UL'){ // table of contents links
                              topLevelNode.style.display = 'none';
                              result.ulNode = topLevelNode;
                              result.articleNode.appendChild(result.ulNode);
@@ -1165,7 +1237,7 @@
                          }
                          console.log("topLevelNode", topLevelNode);
                          if(nChild && topLevelNode.tagName == 'SECTION'
-                            && !topLevelNode.querySelector('script')){
+                            && !topLevelNode.querySelector('script')){ // documentation (HTML)
                              result.titleNode = topLevelNode.querySelector(
                                  ':scope > h2:first-child');
                              result.docSectionNode = topLevelNode;
@@ -1174,7 +1246,7 @@
                              --nChild
                          }
                          if(nChild && topLevelNode.tagName == 'SECTION'
-                            && topLevelNode.querySelector('script')){
+                            && topLevelNode.querySelector('script')){ // code (text with <lp5 mods)
                              let nth = 1;
                              result.codeNameNode = topLevelNode.querySelector(
                                  `:scope > h2:nth-child(${nth})`);
@@ -1183,6 +1255,7 @@
                              result.codeSectionNode = topLevelNode;
                              result.scriptNode      = topLevelNode
                                  .querySelector(`:scope >script:nth-child(${nth})`);
+                             result.codeParsed   = parseCode(result.scriptNode);
                              result.codeTextNode = createFreeElement('div');
                              result.codeTextNode.classList.add('LP5-Code');
                              result.codeSectionNode.appendChild(result.codeTextNode);
@@ -1805,11 +1878,18 @@ ${codeText}
                                              inline  : 'nearest',
                                          };
                                          console.log(options);
+                                         console.log(href);
+                                         console.log(href.substring(1));
+                                         const article = model.articles.fromURL(href.substring(1));
                                          //                                         let destination = model.anchorNameToNode.get(href);
                                          let destination = document.getElementById(href.substring(1));
                                          //                                     let destination = document.querySelector(`a[name="${href}"]`);
-                                         console.assert(destination);
-                                         destination.scrollIntoView(true);
+                                         if(destination)
+                                             destination.scrollIntoView(true);
+                                         else{
+                                             console.assert(`${href.substring(1)} not found`);
+                                         }
+                                         console.assert(false);
                                      } else {
                                          window.open(href, '_blank');
                                      }
@@ -2429,8 +2509,6 @@ ${codeText}
                      text = text.replace(/URL/, articleText.url);
                      text = text.replace(/ERROR/, articleText.error.name);
                      text = text.replace(/MSG/, articleText.error.message);
-                     
-                     
                  }
 
                  return this.articles.fromSerial(parent, filename, text);

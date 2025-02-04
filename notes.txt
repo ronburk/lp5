@@ -1,3 +1,10 @@
+2025/01/31
+Make code links work.
+
+<lp5-ref ref="url"/>
+
+
+
 2025/01/30
 The problem of getting full SyntaxError info back from
 an eval or "new Function" remains annoying.
