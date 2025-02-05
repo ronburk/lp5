@@ -1312,6 +1312,10 @@
                          }
                          return result;
                      }
+                     #ensureTOC(){
+                         if(!this.ulNode)
+                             this.ulNode = createFreeElement('ul');
+                     }
                      #prepareForChild(newChildArticle, siblingArticle=null){
                          if(!this.ulNode)
                              this.ulNode = createFreeElement('ul');
