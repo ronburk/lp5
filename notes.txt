@@ -1,3 +1,7 @@
+2025/02/06
+Switch to URLs everywhere, no more article-x.
+
+
 2025/02/04
 addChildAfter() fails because stuff.siblingNode is apparently null.
 I was trying to append after 4.lp5, which contains the main code.

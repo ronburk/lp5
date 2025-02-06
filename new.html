@@ -1169,7 +1169,8 @@
                          console.assert(URL);
                          let newArticle = new Article(secret, parent, URL);
                          if(newArticle){
-                             newArticle.articleNode.id = `article-${this.length}`;
+//                             newArticle.articleNode.id = `article-${this.length}`;
+                             newArticle.articleNode.id = URL;
                              this.#array.push(newArticle);
                          }
                          return newArticle;
@@ -1312,18 +1313,20 @@
                          }
                          return result;
                      }
+                     #articleID(){
+                         return this.URL.replace(/^(\d+)\.lp5$/, "article-$1");
+                     }
                      #ensureTOC(){
                          if(!this.ulNode)
                              this.ulNode = createFreeElement('ul');
                      }
                      #prepareForChild(newChildArticle, siblingArticle=null){
-                         if(!this.ulNode)
-                             this.ulNode = createFreeElement('ul');
                          let result = {};
                          result.li = createFreeElement('li', {id:newChildArticle.URL});
                          if(siblingArticle){
-                             result.siblingNode = this.ulNode.querySelector(
-                                 '#'+siblingArticle.URL);
+                             const selector = `[id="${siblingArticle.#articleID()}"]`;
+                             console.log(selector);
+                             result.siblingNode = this.ulNode.querySelector(selector);
                              console.assert(result.siblingNode);
                          } else {
                              result.siblingNode = null;
@@ -1337,15 +1340,16 @@
                          console.log("after addFirstChild: ", this);
                      }
                      addChildBefore(newChildArticle, siblingArticle){
-                         console.assert(this.ulNode);
                          console.log("addChildBefore", newChildArticle, siblingArticle);
+                         this.#ensureTOC();
                          let stuff = this.#prepareForChild(newChildArticle,siblingArticle);
                          stuff.siblingNode.before(stuff.li);
                      }
                      addChildAfter(newChildArticle, siblingArticle){
-                         console.assert(this.ulNode);
+                         console.log("addChildAfter", newChildArticle, siblingArticle);
+                         this.#ensureTOC();
                          let stuff = this.#prepareForChild(newChildArticle,siblingArticle);
-                         stuff.siblingNode.before(stuff.li);
+                         stuff.siblingNode.after(stuff.li);
                      }
                      toSerial(){
                          function val(node){
@@ -1808,7 +1812,7 @@ ${codeText}
                                  views.push(
                                      'ArticleContextMenu',
                                      model.articles.fromArticleNode(articleNode));
-                                 //                                 event.preventDefault();
+                                 event.preventDefault();
                                  controller.state = 'ContextMenu';
                              }
                              break;
@@ -2434,9 +2438,9 @@ ${codeText}
                  if(location == 0)
                      parentArticle.addFirstChild(newArticle);
                  else if(location == -1)
-                     parentArticle.addChildBefore(newArticle);
+                     parentArticle.addChildBefore(newArticle, targetArticle);
                  else if(location == 1)
-                     parentArticle.addChildAfter(newArticle);
+                     parentArticle.addChildAfter(newArticle, targetArticle);
                  else
                      console.assert(false);
 
