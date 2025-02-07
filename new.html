@@ -856,31 +856,33 @@
                          // coroutine to emit output as children of the given node.
                          // yield to us either strings or HTML nodes.
                          // adjacent strings will be coalesced into one text node.
-                         function *emitOutput(parentNode){
+                         //                         function *emitOutput(parentNode){
+                         function *spanEmitter(){
+                             let span = createFreeElement('SPAN');
                              let text = "";
                              function emitAccumulated(){
                                  if(text.length){
                                      let textNode = document.createTextNode(text);
-                                     parentNode.appendChild(textNode);
+                                     span.appendChild(textNode);
                                      text = "";
                                  }
                              }
                              // the caller yields output stuff to us.
                              // we want to coalesce adjacent stuff that is 'string'
                              // into one text node
-                             let stuff = null;
+                             let stuff;
                              while((stuff = yield) != null){
-                                 console.log("stuff = ", stuff);
                                  if(typeof stuff === 'string')
                                      text += stuff;
                                  else {
                                      emitAccumulated();
                                      console.assert(stuff.nodeType); // must be a Node
-                                     ParentNode.appendChild(stuff);
+                                     span.appendChild(stuff);
                                  }
                              }
                              // caller is done yielding stuff to us
                              emitAccumulated();
+                             return span;
                          }
                          //                         function  parseStartTag(str, len, posStart){
                          function  parseStartTag(str, startTagRegex){
@@ -949,32 +951,48 @@
                              }
                              return str.slice(pos);
                          }
+                         
                          // renderArticle() - create 'code' output from an article.
-                         function renderArticle(article, node){
+                         function renderArticle(article){
                              console.log("renderArticle ", article);
-                             let codeSerial = article.getCodeSerial();
-                             let output     = null;
-                             if(codeSerial){
-                                 output = createFreeElement('SPAN');
-                                 output.dataset.ref = article.URL;
-                                 let emit           = emitOutput(node);
-                                 emit.next();
-                                 const parsed = article.codeParsed;
-                                 for(const item of parsed){
-                                     if(typeof item === 'string')
-                                         emit.next(item);
-                                     else{
-                                         if(item.name == 'lp5-endscript')
-                                             emit.next('<' + '/script>');
-                                         else if(item.name == 'lp5-'){
-                                             console.warn("got lp5-!!!");
+                             let emit         = spanEmitter();
+                             emit.next(); // prime the pump
+                             
+                             function getCodeReference(item){
+                                 let result = null;
+                                 if(item.name == 'lp5-')
+                                     if(item.attributes.length == 1){
+                                         const ref = item.attributes[0];
+                                         if(ref.name == 'ref'){
+                                             const target = model.articles.fromURL(ref.value);
+                                             if(target){
+                                                 // result = target.codeTextNode;
+                                                 result = renderArticle(target);
+                                             } else
+                                                 result = "missing reference!!!";
                                          }
                                      }
-                                 }
-                                 emit.next(null);
+                                 return result;
                              }
-                             console.log("returns ", output);
-                             return output;
+                             const parsed = article.codeParsed;
+                             for(const item of parsed){
+                                 if(typeof item === 'string')
+                                     emit.next(item);
+                                 else{
+                                     const codeRef = getCodeReference(item);
+                                     if(codeRef){
+                                         emit.next(codeRef);
+                                     } else if(item.name == 'lp5-endscript'){
+                                         emit.next('<' + '/script>');
+                                     } else
+                                         console.warn(false, item);
+                                 }
+                             }
+                             let span = emit.next(null); // finalize span
+                             span = span.value;
+                             span.dataset.ref = article.URL;
+
+                             return span;
                          }
                          // render entire LP5-Output div from scratch.
                          function render(){
@@ -982,11 +1000,11 @@
                              outputDiv.replaceChildren(); // empty the div
 
                              for(const article of model.docOrder(model.rootTOC)){
-                                 const codeName = article.getCodeName();
-                                 if(!codeName){
-                                     const node = renderArticle(article, outputDiv);
-                                     if(node)
-                                         outputDiv.appendChild(node);
+                                 console.log("...", article.getCodeSerial());
+                                 console.log("...", article.getCodeName());
+                                 if(article.getCodeSerial() && !article.getCodeName()){
+                                     outputDiv.appendChild(renderArticle(article));
+                                     
                                  }
                              }
                          }
@@ -1183,22 +1201,11 @@
                      }
                      // locate article from its DOM node
                      fromArticleNode(node){
-                         // the article node ID contains the article #
-                         let id = node.id;
-                         console.assert(id);
-                         id = node.id.replace(/^article-/,'');
-                         console.assert(id >= 0);
-                         console.assert(id < this.length);
-                         let result = this.#array[id];
-                         console.assert(result, {id:id});
-                         return result;
+                         return this.#array.find(article => article.URL === node.id);
                      }
                      // locate article from its URL
                      fromURL(url){
-                         for(const article of this.#array)
-                             if(article.URL == url)
-                                 return article;
-                         return null;
+                         return this.#array.find(article => article.URL === url);
                      }
                      fromError(parent, url, error){
                          let result = this.newArticle(parent, url);
@@ -1288,22 +1295,21 @@
                      }
                      getCodeSerial(){
                          let result = null;
-                         if(this.scriptNode)
-                             result = this.scriptNode.innerHTML;
+                         let script = this.scriptNode;
+                         if(script)
+                             if(script.innerText.trim() != "")
+                                 result = this.scriptNode.innerHTML;
                          return result;
                      }
                      getCodeName(){
-                         console.log("getCodeName() ", this);
                          let result = null;
                          if(this.codeNameNode){
                              console.log("    got codeNameNode");
                              let name = this.codeNameNode.innerText.trim();
                              let code = this.codeTextNode.innerText.trim();
-                             if(code)
+                             if(code && name != "")
                                  result = name;
-                             console.log(`    name='${name}', code='${code}'`);
                          }
-                         console.log("    returns ", result);
                          return result;
                      }
                      getCodeText(){
@@ -1314,7 +1320,8 @@
                          return result;
                      }
                      #articleID(){
-                         return this.URL.replace(/^(\d+)\.lp5$/, "article-$1");
+//                         return this.URL.replace(/^(\d+)\.lp5$/, "article-$1");
+                         return this.URL;
                      }
                      #ensureTOC(){
                          if(!this.ulNode)
@@ -1946,6 +1953,7 @@ ${codeText}
                  'hashchange',
                  'input',
                  'load',
+//                 'mousemove',
                  'reload',
                  'saveArticle',
                  'selectProject',

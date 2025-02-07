@@ -38,9 +38,11 @@
     <head>
         <meta charset="utf-8" >
         <title>lp5</title>
+        <style>
+            <lp5- ref="14.lp5"/>
+        </style>
     </head>
     <body>
-        <lp5- ref="a"/>
         <script>
         <lp5-endscript/>
     </body>

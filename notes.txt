@@ -1,6 +1,35 @@
+2025/02/07
+Why are no-code articles getting rendered into the output pane?
+3.lp5 is getting rendered. It has an empty <h2> and a script
+node that contains only whitespace. Fixed.
+
+Why no output from code articles into the output pane? The
+span elements are correctly inserted, but nothing else. Was
+missing an emit.next(null) to flush. But now output is in wrong
+order. Innermost appears before outermost.
+
+No, outermost stuff got emitted into innermost span. Hmmm.
+
+
+
+
+
 2025/02/06
+
 Switch to URLs everywhere, no more article-x.
 
+I want to store code references as URLs, so that the
+name of the code resides in a single place; changing
+the name of the code then automatically affects everywhere
+the name is "rendered".  But what about multiple articles
+with the same code "name"?
+
+How about: code name can be either text or a code reference.
+If it's a code reference, then this code has the same name
+as the referred-to code section.
+
+
+[ ] Fix article render to render lp5 refs.
 
 2025/02/04
 addChildAfter() fails because stuff.siblingNode is apparently null.
