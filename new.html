@@ -330,6 +330,7 @@
                  if(article.codeSectionNode){
                      value = article.scriptNode.childNodes[0].textContent;
                      codeText.value = Article.unindentCode(value);
+                     codeName.value = article.codeNameNode.innerHTML;
                  }
              }
              function respond(iView, event){
@@ -974,8 +975,8 @@
                                      }
                                  return result;
                              }
-                             const parsed = article.codeParsed;
-                             for(const item of parsed){
+//                             const parsed = article.codeParsed;
+                             for(const item of article.codeParsed){
                                  if(typeof item === 'string')
                                      emit.next(item);
                                  else{
@@ -1252,7 +1253,7 @@
                              result.codeNameNode = topLevelNode.querySelector(
                                  `:scope > h2:nth-child(${nth})`);
                              if(result.codeNameNode)
-                             ++nth;
+                                 ++nth;
                              result.codeSectionNode = topLevelNode;
                              result.scriptNode      = topLevelNode
                                  .querySelector(`:scope >script:nth-child(${nth})`);

@@ -1,3 +1,9 @@
+BUGS
+====
+if listing x.lp5 from DOS box then save of edit will silently fail!
+
+
+
 2025/02/07
 Why are no-code articles getting rendered into the output pane?
 3.lp5 is getting rendered. It has an empty <h2> and a script
@@ -9,7 +15,10 @@ missing an emit.next(null) to flush. But now output is in wrong
 order. Innermost appears before outermost.
 
 No, outermost stuff got emitted into innermost span. Hmmm.
+Fixed.
 
+code name not being shown in edit box. Fixed.
+code name not being saved from edit box.
 
 
 
