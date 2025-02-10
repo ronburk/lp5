@@ -1,8 +1,26 @@
 BUGS
 ====
-if listing x.lp5 from DOS box then save of edit will silently fail!
+[ ] if listing x.lp5 from DOS box then save of edit will silently fail!
+[ ] Output render algorithm is wrong. When encountering a reference to
+    code named "foo code", it fails to gather all articles named "foo code"
+    (and in source order).
 
+2025/02/09
+Shared code section names are a wrinkle. I would like to link via
+URL, but URLs must be unique and code section names may not be
+unique. A code link really means: insert all the code sections with
+this name, in ToC order.
 
+If you want to rename a code section, you have to think about whether
+it shares a name with other code sections. Did you want to rename
+them all?
+
+[X] add a model.update() function to do work required when part of model changes.
+
+2025/02/08
+[X] change code div to <section>
+[X] Get the code section title, if any, rendered in style.
+[ ] make += appear instead of =, when appropriate.
 
 2025/02/07
 Why are no-code articles getting rendered into the output pane?
@@ -18,7 +36,14 @@ No, outermost stuff got emitted into innermost span. Hmmm.
 Fixed.
 
 code name not being shown in edit box. Fixed.
-code name not being saved from edit box.
+code name not being saved from edit box. Fixed.
+
+Render code links in the source pane symbolically.
+Problem is this should happen during render, not during
+load from disk. Referred-to article may not be there yet
+during load. Code link references now rendered in source pane.
+
+Render code section names in source pane.
 
 
 

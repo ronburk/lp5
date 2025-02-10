@@ -40,6 +40,22 @@
              }
              return null;
          }
+         function classifyTag(tagDescriptor){
+             tagDescriptor.type = null;
+             if(tagDescriptor.name == 'lp5-'){
+                 if(tagDescriptor.emptyTag)
+                     if(tagDescriptor.attributes.length == 1)
+                         if(tagDescriptor.attributes[0].name == 'ref'){
+                             tagDescriptor.type = 'ref';
+                             tagDescriptor.value = tagDescriptor.attributes[0].value;
+                         }
+             } else if(tagDescriptor.name == 'lp5-endscript'){
+                 if(tagDescriptor.attributes.length == 0)
+                     if(tagDescriptor.emptyTag)
+                         tagDescriptor.type = 'endscript';
+             }
+             return tagDescriptor.type;
+         }
          /* parseCode() - break code into text and directives.
           *
           * returns an array, where each element is either a string
@@ -69,6 +85,8 @@
                      const tagDescriptor = parseTag(scriptText, match.index);
                      console.warn("parseTag() returns ", tagDescriptor);
                      if(tagDescriptor){
+                         let typename = classifyTag(tagDescriptor);
+//                         console.assert(false, typename);
                          result.push(tagDescriptor);
                          posNext = tagDescriptor.nextPos;
                      }
@@ -742,6 +760,11 @@
                          font-family: "Verdana", "Arial", Gadget, sans-serif;
                          white-space: normal;
                      }
+                     .LP5-Code-Def {
+                         background-color: #F0F0F5;
+                         font-family: "Verdana", "Arial", Gadget, sans-serif;
+                         white-space: normal;
+                     }
                      .LP5-CodeName {
                          font-family: "Arial", Gadget, sans-serif;
                          background-color: #F9FFF0;
@@ -753,6 +776,16 @@
                          /*             background-color: #FFFFEB; */
                      }
 
+                     .LP5-CodeRef::before {
+                         content: "\3008"; /* left angle bracket */
+                     }
+                     .LP5-CodeRef::after {
+                         content: "\3009"; /* right angle bracket */
+                     }
+                     .LP5-CodeRef {
+                         background-color: lightyellow;
+                     }
+
                     </style>
                     <div id="LP5-Source" data-id="outerDiv">
                         <div class="wdrag" data-id="drag" ></div>
@@ -760,6 +793,7 @@
                     <script>
                      const {drag, outerDiv} = require('dataID');
                      const {model, Article} = require('model, Article');
+                     const createFreeElement = require('createFreeElement');
                      function init(){
                      };
                      function massageCode(text){
@@ -784,17 +818,55 @@
                          }
                          return result;
                      }
-                     function renderSection(res){
-                         console.log("renderSection ", res);
-                         let {docSectionNode, ulNode} = res;
+                     let codeNameToArticle = null;
+                     function renderArticle(article){
+                         console.log("source pane renderArticle ", article);
+                         let {docSectionNode, ulNode} = article;
                          if(docSectionNode){
                              console.log("Appending article node");
-                             outerDiv.appendChild(res.articleNode);
+                             outerDiv.appendChild(article.articleNode);
                              
-                             if(res.scriptNode){
+                             if(article.scriptNode){
                                  console.log("   got script node ");
-                                 res.codeTextNode.innerText = Article.unindentCode(
-                                     res.scriptNode.innerText);
+//                                 article.codeTextNode.innerText = Article.unindentCode(
+//                                     article.scriptNode.innerText);
+                                 article.codeTextNode.replaceChildren();
+                                 let codeName = article.getCodeName();
+                                 if(codeName){
+                                     const nameCount = codeNameToArticle[codeName];
+                                     let   equals = "\u2261";
+                                     if(nameCount > 1 )
+                                         equals = "+\u2261";
+                                     const codeHeader = createFreeElement('DIV');
+                                     codeHeader.classList.add('LP5-Code-Def');
+                                     codeHeader.appendChild(
+                                         document.createTextNode(
+                                             "\u3008"+codeName+"\u3009"+equals));
+                                     article.codeTextNode.appendChild(codeHeader);
+                                 }
+
+                                 for(const item of article.codeParsed){
+                                     if(typeof item === 'string')
+                                         article.codeTextNode.appendChild(document.createTextNode(item));
+                                     else if(item.type == 'ref'){
+                                         const span = createFreeElement("SPAN");
+                                         span.classList.add('LP5-CodeRef');
+                                         const target = model.articles.fromURL(item.value);
+                                         let refText = null;
+                                         if(target)
+                                             refText = target.getCodeName();
+                                         if(refText == null)
+                                             refText = item.value;
+                                         console.warn("refText = ", refText);
+                                         span.appendChild(document.createTextNode(refText));
+                                         article.codeTextNode.appendChild(span);
+                                     }
+                                     else if(item.type == 'endscript')
+                                         article.codeTextNode.appendChild(document.createTextNode("<" + "/script>"));
+                                     else
+                                         console.warn(false, item);
+                                 }
+                                 
                              }
                          }
                          if(ulNode){
@@ -804,18 +876,24 @@
                                  let id = li.getAttribute('id');
                                  console.assert(id, ulNode);
                                  //                                 let res = model.resources.get(id);
-                                 let res = model.articles.fromURL(id);
-                                 console.assert(res, id);
-                                 renderSection(res);
+                                 let article = model.articles.fromURL(id);
+                                 console.assert(article, id);
+                                 renderArticle(article);
                              });
                          }
                      }
                      function renderSource(){
                          console.log("render source: ", model.rootTOC);
+                         codeNameToArticle = {};
+                         for(const article of model.docOrder(model.rootTOC)){
+                             const name = article.getCodeName();
+                             if(name)
+                                 codeNameToArticle[name] = (codeNameToArticle[name] || 0) + 1;
+                         }
                          if(model.rootTOC){
                              outerDiv.replaceChildren();
                              outerDiv.appendChild(drag);
-                             renderSection(model.rootTOC);
+                             renderArticle(model.rootTOC);
                          }
                      };
                      let result = {init:init, render:renderSource};
@@ -858,13 +936,11 @@
                          // yield to us either strings or HTML nodes.
                          // adjacent strings will be coalesced into one text node.
                          //                         function *emitOutput(parentNode){
-                         function *spanEmitter(){
-                             let span = createFreeElement('SPAN');
+                         function *spanEmitter(span){
                              let text = "";
                              function emitAccumulated(){
                                  if(text.length){
-                                     let textNode = document.createTextNode(text);
-                                     span.appendChild(textNode);
+                                     span.append(text);
                                      text = "";
                                  }
                              }
@@ -877,8 +953,10 @@
                                      text += stuff;
                                  else {
                                      emitAccumulated();
-                                     console.assert(stuff.nodeType); // must be a Node
-                                     span.appendChild(stuff);
+                                     if(Array.isArray(stuff))
+                                         span.append(...stuff);
+                                     else
+                                         span.append(stuff);
                                  }
                              }
                              // caller is done yielding stuff to us
@@ -952,11 +1030,23 @@
                              }
                              return str.slice(pos);
                          }
-                         
+                         function appendArray(node, array){
+                             if(array.length > 0)
+                                 node.append(...array);
+                         }
+                         function renderArticles(codeName = ""){
+                             const articleArray = model.articlesFromName[codeName];
+                             const result       = [];
+                             for(const article of articleArray)
+                                 result.push(renderArticle(article));
+                             return result;
+                         }
                          // renderArticle() - create 'code' output from an article.
                          function renderArticle(article){
                              console.log("renderArticle ", article);
-                             let emit         = spanEmitter();
+                             let result = []; // always return (possibly empty) array
+                             let span   = createFreeElement('SPAN');
+                             let emit   = spanEmitter(span);
                              emit.next(); // prime the pump
                              
                              function getCodeReference(item){
@@ -967,15 +1057,13 @@
                                          if(ref.name == 'ref'){
                                              const target = model.articles.fromURL(ref.value);
                                              if(target){
-                                                 // result = target.codeTextNode;
-                                                 result = renderArticle(target);
+                                                 result = renderArticles(target.getCodeName());
                                              } else
                                                  result = "missing reference!!!";
                                          }
                                      }
                                  return result;
                              }
-//                             const parsed = article.codeParsed;
                              for(const item of article.codeParsed){
                                  if(typeof item === 'string')
                                      emit.next(item);
@@ -989,21 +1077,29 @@
                                          console.warn(false, item);
                                  }
                              }
-                             let span = emit.next(null); // finalize span
-                             span = span.value;
+                             emit.next(null); // finalize span
                              span.dataset.ref = article.URL;
-
                              return span;
                          }
                          // render entire LP5-Output div from scratch.
                          function render(){
                              console.log("going to render LP5-Output div");
                              outputDiv.replaceChildren(); // empty the div
+                             outputDiv.append(...renderArticles());
 
+                             if(false)
                              for(const article of model.docOrder(model.rootTOC)){
-                                 console.log("...", article.getCodeSerial());
-                                 console.log("...", article.getCodeName());
+                                 let codeSerial = article.getCodeSerial();
+                                 let codeName   = article.getCodeName();
+                                 console.log("...", codeSerial);
+                                 console.log("...", codeName);
+
+                                 if(!codeSerial)
+                                     console.warn("Won't render: no codeSerial");
+                                 if(codeName)
+                                     console.warn("Won't render: has codeName");
                                  if(article.getCodeSerial() && !article.getCodeName()){
+                                     console.log("Render that article!", article);
                                      outputDiv.appendChild(renderArticle(article));
                                      
                                  }
@@ -1252,16 +1348,15 @@
                              let nth = 1;
                              result.codeNameNode = topLevelNode.querySelector(
                                  `:scope > h2:nth-child(${nth})`);
-                             if(result.codeNameNode)
-                                 ++nth;
+                             if(result.codeNameNode)++nth;
                              result.codeSectionNode = topLevelNode;
                              result.scriptNode      = topLevelNode
                                  .querySelector(`:scope >script:nth-child(${nth})`);
                              result.codeParsed   = parseCode(result.scriptNode);
-                             result.codeTextNode = createFreeElement('div');
+                             result.codeTextNode = createFreeElement('section');
                              result.codeTextNode.classList.add('LP5-Code');
-                             result.codeSectionNode.appendChild(result.codeTextNode);
-                             result.articleNode.appendChild(result.codeSectionNode);
+                             //                             result.codeSectionNode.appendChild(result.codeTextNode);
+                             result.articleNode.appendChild(result.codeTextNode);
                              topLevelNode = childElements[0];
                              --nChild;
                          }
@@ -1300,17 +1395,16 @@
                          if(script)
                              if(script.innerText.trim() != "")
                                  result = this.scriptNode.innerHTML;
+                         console.log("getCodeSerial() returns ", result);
                          return result;
                      }
                      getCodeName(){
-                         let result = null;
+                         let result = "";
                          if(this.codeNameNode){
-                             console.log("    got codeNameNode");
                              let name = this.codeNameNode.innerText.trim();
-                             let code = this.codeTextNode.innerText.trim();
-                             if(code && name != "")
                                  result = name;
                          }
+                         console.warn("getCodeName returns ", result, this);
                          return result;
                      }
                      getCodeText(){
@@ -1779,6 +1873,7 @@ ${codeText}
                      case 'openProject' : // waiting for project to open
                          console.assert(event.type == 'asyncComplete');
                          controller.state = 'home';
+                         model.updateDerivedState();
                          views.render();
                          console.log("Back from render!");
                          break;
@@ -1789,6 +1884,7 @@ ${codeText}
                              alert(event.detail);
                          } else
                              controller.state = 'home';
+                         model.updateDerivedState();
                          views.render();
                          break;
                      case 'ContextMenu' : // handle any context menu
@@ -1918,6 +2014,7 @@ ${codeText}
                              views.respond(event);
                              asyncSchedule(model.storeResource.bind(model),
                                            controller.currentArticle, event.detail);
+                             model.updateDerivedState();
                          } else {
                              console.log("controller calls respond!");
                              views.respond(event);
@@ -2385,6 +2482,30 @@ ${codeText}
              model.rootTOC          = null;
              model.projects         = {};
              model.anchorNameToNode = new Map();
+             model.updateDerivedState = function(){
+                 console.log("updateDerivedState!!!!!!");
+                 function getTocOrder(article, array=[]){
+                     array.push(article);
+                     const ulNode = article.ulNode;
+                     if(ulNode)
+                         for(const entry of ulNode.querySelectorAll(':scope > li')){
+                             let id     = entry.getAttribute('id');
+                             getTocOrder(model.articles.fromURL(id), array);
+                         }
+                     return array;
+                 }
+                 model.tocOrder = getTocOrder(model.rootTOC);
+                 console.log("updateDerivedState!!!!!! tocOrder = ", model.tocOrder);
+                 model.articlesFromName = {};
+                 for(const article of model.tocOrder){
+                     console.log("checking article: ", article);
+                     if(article.getCodeSerial()){
+                         console.log("pushing code article ", article);
+                         (model.articlesFromName[article.getCodeName()] ??= []).
+                                                      push(article);
+                     }
+                 }
+             }
              model.createUniqueFile = async function (){
                  let handle = await this.storage.createUniqueFile(
                      "%d.lp5", this.nextArticleID);
@@ -2457,6 +2578,7 @@ ${codeText}
                  serial = parentArticle.toSerial();
                  console.log("write changed article", parentArticle, serial);
                  await model.storage.write(parentArticle.URL,serial);
+                 model.updateDerivedState();
              };
              model.docOrder = function*(article){
                  console.assert(this.articles); // detect bogus 'this'
@@ -2468,7 +2590,7 @@ ${codeText}
                          let id     = entry.getAttribute('id');
                          yield* this.docOrder(this.articles.fromURL(id));
                      }
-             };
+             }
              model.codeOrder = function*(queue = null){
                  if(queue === null){ // if initial iteration
                      queue = [];
@@ -2479,7 +2601,6 @@ ${codeText}
                          }
                  }
              }
-
              model.storeResource = async function(articleNode, serial){
                  console.log("storeResource ", articleNode, serial);
                  let article = this.articles.fromArticleNode(articleNode);
@@ -2520,7 +2641,6 @@ ${codeText}
                      text = text.replace(/ERROR/, articleText.error.name);
                      text = text.replace(/MSG/, articleText.error.message);
                  }
-
                  return this.articles.fromSerial(parent, filename, text);
              }
              model.loadTOC = async function(dirHandle, name, parent=null){
