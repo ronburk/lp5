@@ -1058,8 +1058,10 @@
                                              const target = model.articles.fromURL(ref.value);
                                              if(target){
                                                  result = renderArticles(target.getCodeName());
-                                             } else
-                                                 result = "missing reference!!!";
+                                             } else{
+                                                 // ref value wasn't URL, maybe text
+                                                 result = renderArticles(ref.value);
+                                             }
                                          }
                                      }
                                  return result;

@@ -1,9 +1,14 @@
 BUGS
 ====
 [ ] if listing x.lp5 from DOS box then save of edit will silently fail!
-[ ] Output render algorithm is wrong. When encountering a reference to
+[X] Output render algorithm is wrong. When encountering a reference to
     code named "foo code", it fails to gather all articles named "foo code"
     (and in source order).
+
+2025/02/10
+[X] Switch to <lp-ref>text of ref</lp-ref>. No, ref="text or URL".
+
+
 
 2025/02/09
 Shared code section names are a wrinkle. I would like to link via
