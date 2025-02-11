@@ -7,8 +7,10 @@ BUGS
 
 2025/02/10
 [X] Switch to <lp-ref>text of ref</lp-ref>. No, ref="text or URL".
+[X] Pretty up indentation.
 
-
+Identation: if a code ref is preceeded by only white space, then that
+is the indentation level for the rendered code.
 
 2025/02/09
 Shared code section names are a wrinkle. I would like to link via

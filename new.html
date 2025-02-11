@@ -86,7 +86,12 @@
                      console.warn("parseTag() returns ", tagDescriptor);
                      if(tagDescriptor){
                          let typename = classifyTag(tagDescriptor);
-//                         console.assert(false, typename);
+                         // console.assert(false, typename);
+                         if(tagDescriptor.type === 'ref'){
+                             const lineStart = scriptText.lastIndexOf('\n', match.index)+1;
+                             const prefix = scriptText.substring(lineStart, match.index);
+                             tagDescriptor.indent = /^[ ]*$/.test(prefix) ? prefix.length : 0;
+                         }
                          result.push(tagDescriptor);
                          posNext = tagDescriptor.nextPos;
                      }
@@ -1034,16 +1039,16 @@
                              if(array.length > 0)
                                  node.append(...array);
                          }
-                         function renderArticles(codeName = ""){
+                         function renderArticles(codeName = "", indent=0){
                              const articleArray = model.articlesFromName[codeName];
                              const result       = [];
                              for(const article of articleArray)
-                                 result.push(renderArticle(article));
+                                 result.push(renderArticle(article, indent));
                              return result;
                          }
                          // renderArticle() - create 'code' output from an article.
-                         function renderArticle(article){
-                             console.log("renderArticle ", article);
+                         function renderArticle(article, indent){
+                             console.log("renderArticle ", article, indent);
                              let result = []; // always return (possibly empty) array
                              let span   = createFreeElement('SPAN');
                              let emit   = spanEmitter(span);
@@ -1057,19 +1062,20 @@
                                          if(ref.name == 'ref'){
                                              const target = model.articles.fromURL(ref.value);
                                              if(target){
-                                                 result = renderArticles(target.getCodeName());
+                                                 result = renderArticles(target.getCodeName(), indent + item.indent);
                                              } else{
                                                  // ref value wasn't URL, maybe text
-                                                 result = renderArticles(ref.value);
+                                                 result = renderArticles(ref.value, indent + item.indent);
                                              }
                                          }
                                      }
                                  return result;
                              }
+                             const indentSpace = " ".repeat(indent);
                              for(const item of article.codeParsed){
-                                 if(typeof item === 'string')
-                                     emit.next(item);
-                                 else{
+                                 if(typeof item === 'string'){
+                                     emit.next(item.replace(/\n/g, "\n" + indentSpace));
+                                 }else{
                                      const codeRef = getCodeReference(item);
                                      if(codeRef){
                                          emit.next(codeRef);
@@ -1558,7 +1564,6 @@ ${codeText}
                  while(child=from.firstChild)
                      to.appendChild(child);
              }
-
 
              async function openDB(){
                  return new Promise((resolve, reject) => {
