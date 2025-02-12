@@ -615,7 +615,7 @@
                 <div id="LP5-Menu">
                     <ul>
                         <li id="LP5-Menu-Reload" tabindex="0">Reload</li>
-                        <li id="LP5-Menu-Compile">Compile</li>
+                        <li id="LP5-Menu-Export">Export</li>
                         <li>Menu 3</li>
                         <li id="LP5-Menu-Test">Test</li>
                     </ul>
@@ -926,7 +926,7 @@
                          function indexArticles(){
                              const result = {}
                              for(const article of model.articles){
-                                 
+//???                                 
                              }
                          }
                          function findRoots(article){
@@ -1749,6 +1749,10 @@ ${codeText}
 
              function controller(event){
                  const { model, views, asyncSchedule } = controller;
+                 if(controller.crashed){
+                     event.preventDefault();
+                     return;
+                 }
                  if(event.type == 'asyncComplete' && event.detail instanceof Error){
                      views.push('Crash', event.detail);
                      controller.state = 'Crash';
@@ -1773,41 +1777,61 @@ ${codeText}
                              controller.state, model.articles.length, arguments.length);
                  console.log(event);
                  if(event.type == 'error'){
-                     if(false){
+                     console.log("Alright, we got an error event");
+                     const error = event.error;
+                     let   detail   = "";
+                     if(error instanceof SyntaxError){
+                         console.log("    and it's a SyntaxError");
                          const {lineno,colno} = event;
                          // if it's text we are eval'ing
                          if(controller.script){
+                             if(controller.scriptName)
+                                 detail += `${controller.scriptName}, line ${lineno}:\n`;
+                             else
+                                 detail += `Line ${lineno}:\n`;
                              let line = controller.script.split('\n')[lineno-3];
-                             console.log(line);
+                             detail += line + '\n';
                              let marker = "-".repeat(colno-1)+"^";
-                             console.log(marker);
+                             detail += marker + '\n';
+                         }
+                         if(error.stack){
+                             var stack = error.stack.toString().split(/\r\n|\n/);
+                             const msg = error.message;
+                             if (msg === '') {
+                                 msg = '""';
+                             }
+                             detail += msg + '          [' + stack[1] + ']';
                          }
                          console.log(event.message);
-                         //                     console.log(event);
-                         var stack = event.stack.toString().split(/\r\n|\n/);
-                         if (msg === '') {
-                             msg = '""';
-                         }
-                         console.log(msg, '          [' + stack[1] + ']');        
                      }
+                     event.preventDefault();
+                     console.log("calling crash");
+                     controller.crash(detail);
+                     return;
+                     controller.deferEvent('Crash', detail);
+//                     document.dispatchEvent(new CustomEvent('crash', {detail:detail}));
                      controller.state = 'Crash';
+                     event.preventDefault();
                      // we are likely already inside a controller call, so return
                      console.log(" return with inSync=", controller.inSync);
+                     // if we were in the controller, we got blown out by error.
+                     controller.inSync = false;
+                     console.log("<<<<<<<<<<<<<<<<<<<<<<<<<exit early controller: ", controller.state);
                      return;
-                 }
-                 console.assert(!controller.inSync);
+                 } else
+                     console.assert(!controller.inSync);
                  controller.inSync = true;
 //                 if(controller.state == 'evalTemplates'){
 //                     views.evalTemplates();
 //                 }
-                 try {
+//                 try {
                  switch(controller.state){
                      case 'Crash' :
                          console.log("crash.");
-                         controller.state = 'Crashed';
+                         controller.state = 'Crash';
                          views.push('Crash');
                          break;
-                     case 'Crashed' :
+                     case 'Crash' :
                          console.log("crashed.");
                          break;
                      case 'load' :
@@ -2037,11 +2061,11 @@ ${codeText}
                          console.log("Can't happen, unknown state: ", controller.state);
                          console.assert(false);
                  }
-                 } catch(e) {
-                     console.error("error!", e);
-                     if(e instanceof SyntaxError)
-                         throw(e);
-                 }
+//                 } catch(e) {
+//                     console.error("error!", e);
+//                     if(e instanceof SyntaxError)
+//                         throw(e);
+//                 }
                  controller.inSync = false;
                  console.log("<<<<<<<<<<<<<<<<<<<<<<<<<exit controller: ", controller.state);
              }
@@ -2058,14 +2082,49 @@ ${codeText}
                  'hashchange',
                  'input',
                  'load',
-//                 'mousemove',
+                 //                 'mousemove',
                  'reload',
                  'saveArticle',
                  'selectProject',
+                 'SyntaxError',
              ].forEach(e=>window.addEventListener(
                  e,
                  controller,
                  true));
+
+             controller.crashed = false;
+             controller.crash = function(message){
+                 controller.crashed = true;
+                 const overlay = document.createElement("div");
+                 // Style the overlay to cover the entire viewport and block user interaction.
+                 Object.assign(overlay.style, {
+                     position: "fixed",
+                     top: "0",
+                     left: "0",
+                     width: "100%",
+                     height: "100%",
+                     backgroundColor: "rgba(0,0,0,0.9)",
+                     color: "white",
+                     fontSize: "1.2em",
+                     zIndex: "999999",
+                     display: "flex",
+                     flexDirection: "column",
+                     justifyContent: "center",
+                     alignItems: "center",
+                     overflow: "auto"  // In case the error info is long.
+                 });
+                 
+             overlay.innerText = message;
+             
+             document.body.appendChild(overlay);
+             // Disable user interactions on the rest of the page.
+             document.body.style.pointerEvents = "none";
+         }
+
+             controller.deferEvent = function(eventName, eventDetail) {
+                 const event = new CustomEvent(eventName, { detail: eventDetail });
+                 Promise.resolve().then(() => document.dispatchEvent(event));
+             }
 
              controller.asyncSchedule = function(func, ...args){
                  async function notifyWhenDone(){
@@ -2119,9 +2178,8 @@ ${codeText}
              controller.state  = 'load';
 
              function scopedEval(script, iView){
-                 console.log("scopedEval ", iView, script);
+                 console.log("scopedEval ", iView ); //, script);
                  for(const element of iView.rootNode.shadowRoot.querySelectorAll("[data-ID]")){
-                     console.log("Found data-id of ", element.dataset.id);
                      iView.dataID[element.dataset.id] = element;
                  }
                  let dataID = iView.rootNode.dataset.id;
@@ -2189,9 +2247,10 @@ ${codeText}
                  return new Function(
                      "require", '"use strict";' + script + sourceMap)(
                          require);
-                 return new Function(...(Object.keys(globalEnv)),
-                                     '"use strict";' + script)(
-                                         ...globalEnv);
+//                 return new Function(...(Object.keys(globalEnv)),
+//                                     '"use strict";' + script)(
+//                                         ...globalEnv);
+
              }
              // interface to a view
              const viewInterface = {
@@ -2252,8 +2311,6 @@ ${codeText}
                          if(t.className)
                              rootNode.className = t.className;
                          const shadow   = rootNode.attachShadow({mode:'open',delegatesFocus:true});
-                         console.log("t.content is [${t.content.children.length}]",
-                                     t.content);
                          let styleClass = t.dataset.style;
                          if(styleClass){
                              let styleClasses = document.getElementsByClassName(styleClass);
@@ -2303,6 +2360,7 @@ ${codeText}
                                  }
                              }else{
                                  controller.script = script;
+                                 controller.scriptName = iView.name;
                                  if(false)
                                      window.addEventListener('error', (errorEvent) => {
                                          const { lineno, colno } = errorEvent;
@@ -2388,7 +2446,7 @@ ${codeText}
                  push(dialogName, ...args) {
                      console.log("views.push ", dialogName);
                      ++this.inProgress;
-                     console.assert(this.currentView);
+//                     console.assert(this.currentView);
                      this.stack.push(this.currentView);
                      const iView = this.views[dialogName];
                      this.setBody(iView);
@@ -2474,7 +2532,7 @@ ${codeText}
 
              controller.compile = function(resource){
                  let output = '';
-                 
+                 console.assert(false);
                  return output;
              }
 

@@ -5,6 +5,25 @@ BUGS
     code named "foo code", it fails to gather all articles named "foo code"
     (and in source order).
 
+[ ] get export working
+    [ ] change "compile" to "export"
+
+2025/02/11
+How should the output file be specified? Simplest is ask user
+in dialog when they press "Export". No, simpler is possible.
+
+The roots of the export are unnamed code sections. So if multiple
+output files are allowed, then each unnamed code section must
+specify an output file.
+
+Decision: do you have to specify an output file if there's only
+one?
+Simplest: No. if there is any content with no specified output
+file, export will ask for an output file.
+
+Derailed into trying to fix up error handling to give syntax
+errors correctly and then crash.
+
 2025/02/10
 [X] Switch to <lp-ref>text of ref</lp-ref>. No, ref="text or URL".
 [X] Pretty up indentation.
