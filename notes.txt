@@ -5,8 +5,19 @@ BUGS
     code named "foo code", it fails to gather all articles named "foo code"
     (and in source order).
 
-[ ] get export working
-    [ ] change "compile" to "export"
+[X] get export working
+    [X] change "compile" to "export"
+    [X] form model.outputText
+
+[ ] shift-click on article code highlights span in output
+
+2025/02/13
+Want view to have access to parent view.
+
+2025/02/12
+Is the output pane identical to the output file? Let's say
+it is for now. 
+
 
 2025/02/11
 How should the output file be specified? Simplest is ask user

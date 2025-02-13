@@ -1094,6 +1094,7 @@
                              console.log("going to render LP5-Output div");
                              outputDiv.replaceChildren(); // empty the div
                              outputDiv.append(...renderArticles());
+                             model.outputText = outputDiv.innerText;
 
                              if(false)
                              for(const article of model.docOrder(model.rootTOC)){
@@ -1209,11 +1210,13 @@
                      let fileHandle = null;
                      let writable   = null;
                      try {
-                         fileHandle = await this.dirHandle.getFileHandle(name);
+                         fileHandle = await this.dirHandle.getFileHandle(name, {create:true});
                          console.log("Got fileHandle ", fileHandle);
                      } catch(err) {
                          console.log(`Storage.write(${name}) `, err);
                      }
+                     const value =await fileHandle.queryPermission({mode:'readwrite'});
+                     console.log("permissions = ", value);
                      try {
                          writable = await fileHandle.createWritable();
                      } catch(err) {
@@ -1729,6 +1732,17 @@ ${codeText}
                  return true;
              }
 
+             async function writeOutput(model){
+                 console.log("writeOutput", model);
+                 let {dirParentHandle} = model;
+                 if(!dirParentHandle){
+                     console.log("can't write output, dirParentHandle not set.");
+                     console.assert(false, model);
+                 }
+                 let result = false;
+                 
+                 await model.storage.write("lp5.html", model.outputText);
+             }
              async function test(model){
                  console.log("TEST!");
                  let {dirParentHandle} = model;
@@ -1821,10 +1835,7 @@ ${codeText}
                  } else
                      console.assert(!controller.inSync);
                  controller.inSync = true;
-//                 if(controller.state == 'evalTemplates'){
-//                     views.evalTemplates();
-//                 }
-//                 try {
+
                  switch(controller.state){
                      case 'Crash' :
                          console.log("crash.");
@@ -1840,7 +1851,6 @@ ${codeText}
                          views.loadTemplates();
                          views.change('home');
                          controller.state = 'AwaitDirHandleLoad';
-//                         controller.state     = 'evalTemplates';
                          break;
 //                     case 'AwaitDirHandleLoad' :
 //                         break;
@@ -1926,7 +1936,7 @@ ${codeText}
                              if(argv[0] == 'createArticle'){
                                  console.log(`createArticle(${argv[1]})`);
                                  asyncSchedule(
-                                     model.createEmptyArticle, argv[1], argv[2]);
+                                 model.createEmptyArticle, argv[1], argv[2]);
                              }
                              views.pop();
                              controller.state = 'AwaitAsyncComplete';
@@ -1988,6 +1998,19 @@ ${codeText}
                                  controller.currentArticle = articleNode;
                                  event.preventDefault();
                                  articleNode.focus();
+                                 if(event.shiftKey){
+                                     const article    = model.articles.fromArticleNode(articleNode);
+                                     console.log("article.URL = ", article.URL);
+                                     const outputSpan = document.querySelector(
+                                         '#LP5-Output [data-ref="' + article.URL + '"]'
+                                     );
+                                     if (outputSpan) {
+                                         console.log("found outputSpan");
+                                         outputSpan.classList.add('highlighted');
+                                         // Optionally scroll it into view:
+                                         outputSpan.scrollIntoView({ behavior: "smooth", block: "center" });
+                                     }
+                                 }
                              }
 
                              let target = path[0];
@@ -2003,6 +2026,9 @@ ${codeText}
                              }else if(target.id == 'LP5-Menu-Test'){
                                  controller.state = 'test';
                                  asyncSchedule(test, model);
+                             }else if(target.id == 'LP5-Menu-Export'){
+                                 controller.state = 'Export';
+                                 asyncSchedule(writeOutput, model);
                              }else if(target.tagName == 'A'){
                                  const href=target.getAttribute('href');
                                  if(href){
@@ -2051,21 +2077,19 @@ ${codeText}
                              views.respond(event);
                          }
                          break;
+                     case 'Export' :
+                         console.log("EXPORTTTTTTTTTTTTTTTTTTTTTTTTTTTT");
+                         controller.state = 'home';
+                         break;
                      case 'test' :
                          if(event.type == 'asyncComplete')
                              controller.state = 'home';
                          break;
-//                     case 'evalTemplates' : // already handled above, outside try
-//                         break;
                      default:
                          console.log("Can't happen, unknown state: ", controller.state);
                          console.assert(false);
                  }
-//                 } catch(e) {
-//                     console.error("error!", e);
-//                     if(e instanceof SyntaxError)
-//                         throw(e);
-//                 }
+
                  controller.inSync = false;
                  console.log("<<<<<<<<<<<<<<<<<<<<<<<<<exit controller: ", controller.state);
              }
@@ -2155,6 +2179,7 @@ ${codeText}
                  'ContextMenu',
                  'Crash',
                  'EditingSection',
+                 'Export',
                  'evalTemplates',
                  'home',
                  'load',
@@ -2559,8 +2584,10 @@ ${codeText}
                          }
                      return array;
                  }
+                 // array of articles in Table of Contents order
                  model.tocOrder = getTocOrder(model.rootTOC);
                  console.log("updateDerivedState!!!!!! tocOrder = ", model.tocOrder);
+                 // hash that makes code section names to articles (in ToC order)
                  model.articlesFromName = {};
                  for(const article of model.tocOrder){
                      console.log("checking article: ", article);
