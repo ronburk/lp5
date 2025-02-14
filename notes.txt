@@ -9,10 +9,18 @@ BUGS
     [X] change "compile" to "export"
     [X] form model.outputText
 
-[ ] shift-click on article code highlights span in output
+[ ] some event on selected articles code highlights span in output
+    [x] start detecting keydown events.
+    [ ] add ctrl panel to top of output pane.
+    [ ] event makes source pane notify 'home' view.
 
 2025/02/13
-Want view to have access to parent view.
+Want view to have access to parent view. require() can only
+obtain things as they were defined when scopedEval() was called.
+
+starting to think about interface as more inkscape like, buttons and
+such to keep view state visible.
+
 
 2025/02/12
 Is the output pane identical to the output file? Let's say

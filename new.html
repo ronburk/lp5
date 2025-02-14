@@ -799,7 +799,31 @@
                      const {drag, outerDiv} = require('dataID');
                      const {model, Article} = require('model, Article');
                      const createFreeElement = require('createFreeElement');
+                     function articleNodeFromClick(event){
+                         let result = null;
+                         let path   = event.composedPath();
+                         console.log("path is ", path);
+
+                         // has to be article node and direct child of source pane
+                         result = path.find((node, index)=>{
+                             return node.tagName == 'ARTICLE'
+                                 && index+1 < path.length
+                                 && path[index+1].id == 'LP5-Source'
+                             ;
+                         });
+                         return result;
+                     }
+
+                     function clickHandler(event){
+                         console.log(":::::: source pane clickHandler ", event);
+                         const articleNode = articleNodeFromClick(event);
+                         articleNode.focus();
+                         console.log(" clicked article ", articleNode);
+                     }
                      function init(){
+                         console.log("***** adding click handler in source");
+                         outerDiv.addEventListener('click', clickHandler,
+                         { composed: true, bubble: true });
                      };
                      function massageCode(text){
                          console.log("massageCode ", text);
@@ -902,12 +926,16 @@
                          }
                      };
                      let result = {init:init, render:renderSource};
+                     console.log("back from source init!!!!!!!!!");
                      return result;
                     </script>
                 </template>
                 <div id="LP5-Output">
                     <template data-name="outputDiv">
                         <div data-id="outputDiv">
+                            <div data-id="outputPanel">
+                                <p>my panel!</p>
+                            </div>
                         </div>
                         <script>
                          let model       = require('model');
@@ -1797,6 +1825,7 @@ ${codeText}
                      if(error instanceof SyntaxError){
                          console.log("    and it's a SyntaxError");
                          const {lineno,colno} = event;
+
                          // if it's text we are eval'ing
                          if(controller.script){
                              if(controller.scriptName)
@@ -1817,6 +1846,8 @@ ${codeText}
                              detail += msg + '          [' + stack[1] + ']';
                          }
                          console.log(event.message);
+                     } else {
+                         detail = event.message + error.stack.toString();
                      }
                      event.preventDefault();
                      console.log("calling crash");
@@ -1967,7 +1998,20 @@ ${codeText}
                              if(args[0] == 'showArticle'){
                                  
                              }
+                         }else if(event.type == 'keydown'){
+function getDeepActiveElement() {
+    let active = document.activeElement;
+    while (active && active.shadowRoot && active.shadowRoot.activeElement) {
+        active = active.shadowRoot.activeElement;
+    }
+    return active;
+         }
+
+                             console.log("keydown, active", event, document.activeElement);
+                             console.log("path =  ", event.composedPath());
+                             console.log("deep =  ", getDeepActiveElement());
                          }else if(event.type == 'click'){
+                             console.log(" it's a click");
                              {
                                  let body = document.getElementsByClassName('lp5-body')[0];
                                  if(false){
@@ -1981,6 +2025,7 @@ ${codeText}
                                  }
                              }
                              let path   = event.composedPath();
+                             console.log("path = ", path);
                              console.log(path);
                              let paneNode = path.find((node, index)=>{
                                  return node.id && node.id.substring(0,4) == 'LP5-';
@@ -1996,8 +2041,8 @@ ${codeText}
                              });
                              if(articleNode){
                                  controller.currentArticle = articleNode;
-                                 event.preventDefault();
-                                 articleNode.focus();
+//                                 event.preventDefault();
+//                                 articleNode.focus();
                                  if(event.shiftKey){
                                      const article    = model.articles.fromArticleNode(articleNode);
                                      console.log("article.URL = ", article.URL);
@@ -2105,6 +2150,7 @@ ${codeText}
                  'error',
                  'hashchange',
                  'input',
+                 'keydown',
                  'load',
                  //                 'mousemove',
                  'reload',
@@ -2234,13 +2280,11 @@ ${codeText}
                  };
                  function require(thing){
                      let things = thing.split(/[ ,]+/);
-                     console.log("things = ", things);
                      let final  = [];
                      things.forEach(function requireFirstLoop(i){
                          if(i.length)
                              final.push(i);
                      });
-                     console.log("final is ", final);
                      // if it was simply require('singleItem')
                      if(final.length == 1){
                          if(thing in globalEnv)
@@ -2349,8 +2393,8 @@ ${codeText}
 
                          const iView    = structuredClone(viewInterface);
                          iView.name     = t.dataset.name; // data-name='xxx'
+                         iView.parentView = parentView;
                          console.log(`template named ${iView.name}, parent `, parentView);
-                         
                          // if this is a child template
                          if(parentView){
                              iView.rootNode = rootNode;
@@ -2386,19 +2430,17 @@ ${codeText}
                              }else{
                                  controller.script = script;
                                  controller.scriptName = iView.name;
-                                 if(false)
-                                     window.addEventListener('error', (errorEvent) => {
-                                         const { lineno, colno } = errorEvent;
-                                         console.log(`Error thrown at: ${lineno}:${colno}`);
-                                         // Don't pollute the console with additional info:
-                                         errorEvent.preventDefault();
-                                     });
-                                 iView.notify   = scopedEval(scriptNode.innerHTML, iView);
+                                 iView.notify  = scopedEval(scriptNode.innerHTML, iView);
+                                 Object.freeze(iView);
+
+                                 console.log("notify set to eval", iView);
+                                 console.log("parent is ", parentView);
                                  controller.script = null;
                              }
                              console.assert(iView.notify.hasOwnProperty('init'));
                              console.assert(iView.notify.hasOwnProperty('render'));
                          } else {
+                             console.log("notify set to null!");
                              iView.notify = null;
                          }
                          // two templates with same name is a mistake
@@ -2428,7 +2470,7 @@ ${codeText}
                  },
                  change(viewName) {
                      console.log(`views.change(${viewName})`);
-                                         ++this.inProgress;
+                     this.inProgress++;
                      // get interface to incoming view
                      const newView = this.views[viewName];
                      //                 this.currentView = this.views[viewName];
@@ -2448,7 +2490,9 @@ ${codeText}
                          console.log("   (no notify function!)");
                      }
                      if(iView.children)
-                         Object.keys(iView.children).forEach((i)=>this.init(i, ...args));
+                         Object.keys(iView.children).forEach(childName => {
+                             this.init(iView.children[childName], ...args);
+                         });
                  },
                  respond(...args){
                      let iView = this.currentView;
