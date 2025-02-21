@@ -930,201 +930,202 @@
                      return result;
                     </script>
                 </template>
-                <div id="LP5-Output">
-                    <template data-name="outputDiv">
-                        <div data-id="outputDiv">
-                            <div data-id="outputPanel">
-                                <p>my panel!</p>
-                            </div>
+                <template data-name="outputDiv" id="LP5-Output">
+                    <div>
+                        <div data-id="outputUI">
+                            My ui!
                         </div>
-                        <script>
-                         let model       = require('model');
-                         let {outputDiv} = require('dataID');
-                         const createFreeElement = require('createFreeElement');
+                        <div data-id="outputDiv">
+                        </div>
+                    </div>
+                    <script>
+                     let model       = require('model');
+                     let {outputDiv} = require('dataID');
+                     const createFreeElement = require('createFreeElement');
 
-                         let startTagRegex = /<lp5\s*((\/>)|(>)|([A-Za-z_]))/g;
-                         let attributeRegex = null;
-                         function init(iView){
-                             let id    = "[_a-zA-Z]\w*";
-                             let dval  = '"[^"\n\r]*"';
-                             let sval  = "'[^'\n\r]*'";
-                             let value = `(?:${sval}|${dval})`;
-                             attributeRegex  = new RegExp(`^\s*(${id})=(${value})\s*`);
+                     let startTagRegex = /<lp5\s*((\/>)|(>)|([A-Za-z_]))/g;
+                     let attributeRegex = null;
+                     function init(iView){
+                         let id    = "[_a-zA-Z]\w*";
+                         let dval  = '"[^"\n\r]*"';
+                         let sval  = "'[^'\n\r]*'";
+                         let value = `(?:${sval}|${dval})`;
+                         attributeRegex  = new RegExp(`^\s*(${id})=(${value})\s*`);
+                     }
+                     function indexArticles(){
+                         const result = {}
+                         for(const article of model.articles){
+                             //???                                 
                          }
-                         function indexArticles(){
-                             const result = {}
-                             for(const article of model.articles){
-//???                                 
+                     }
+                     function findRoots(article){
+                         let result = [];
+                         if(article.getCodeName() !== null)
+                             result.push(article);
+                         for(let child of article.children)
+                             result = result.concat(findRoots(child));
+                         return result;
+                     }
+                     // coroutine to emit output as children of the given node.
+                     // yield to us either strings or HTML nodes.
+                     // adjacent strings will be coalesced into one text node.
+                     //                         function *emitOutput(parentNode){
+                     function *spanEmitter(span){
+                         let text = "";
+                         function emitAccumulated(){
+                             if(text.length){
+                                 span.append(text);
+                                 text = "";
                              }
                          }
-                         function findRoots(article){
-                             let result = [];
-                             if(article.getCodeName() !== null)
-                                 result.push(article);
-                             for(let child of article.children)
-                                 result = result.concat(findRoots(child));
-                             return result;
-                         }
-                         // coroutine to emit output as children of the given node.
-                         // yield to us either strings or HTML nodes.
-                         // adjacent strings will be coalesced into one text node.
-                         //                         function *emitOutput(parentNode){
-                         function *spanEmitter(span){
-                             let text = "";
-                             function emitAccumulated(){
-                                 if(text.length){
-                                     span.append(text);
-                                     text = "";
-                                 }
+                         // the caller yields output stuff to us.
+                         // we want to coalesce adjacent stuff that is 'string'
+                         // into one text node
+                         let stuff;
+                         while((stuff = yield) != null){
+                             if(typeof stuff === 'string')
+                                 text += stuff;
+                             else {
+                                 emitAccumulated();
+                                 if(Array.isArray(stuff))
+                                     span.append(...stuff);
+                                 else
+                                     span.append(stuff);
                              }
-                             // the caller yields output stuff to us.
-                             // we want to coalesce adjacent stuff that is 'string'
-                             // into one text node
-                             let stuff;
-                             while((stuff = yield) != null){
-                                 if(typeof stuff === 'string')
-                                     text += stuff;
-                                 else {
-                                     emitAccumulated();
-                                     if(Array.isArray(stuff))
-                                         span.append(...stuff);
-                                     else
-                                         span.append(stuff);
-                                 }
-                             }
-                             // caller is done yielding stuff to us
-                             emitAccumulated();
-                             return span;
                          }
-                         //                         function  parseStartTag(str, len, posStart){
-                         function  parseStartTag(str, startTagRegex){
-                             let result = null;
-                             let startMatch = startTagRegex.exec(str);
-                             if(startMatch !== null){
-                                 result = {
-                                     startPos: startTagRegex.index,
-                                 };
-                                 
-                                 let pos = posStart + "<lp5".length;
-                                 if(pos < len){
-                                     console.log("fun");
-                                     
-                                 }
-                                 return pos;
-                             }
-                             return result;
-                         }
-                         /* yields: { type:, value: }
-                          *     0 - text string
-                          *     1 - parsed lp5 element
-                          *
-                          * value.attributes, where .name contains value of that attr
-                          * value.outer, outer string
-                          * value.inner, inner string
-                          */
-                         function* parse(str){
-                             let posStart = 0;
-                             let posEnd   = 0;
-                             let len      = str.length;
-
-                             startTagRegex.lastIndex = 0;
-                             let match = null;
-                             while((match=parseStartTag(str,startTagRegex))!==null){
-                                 console.log("match = ", match);
-                             }
-                             let matches  = codeSerial.matchAll(startTagRegex);
-                             for(const match of matches){
-                                 if(match.index < posStart)
-                                     continue;
-                                 console.warn("parse match=", match);
-                                 let lp5Start  = match.index;
-                                 //                                 yield str.slice(posStart, posEnd);
-                                 // '>' or '/>' or first char of attribute name
-                                 let endChars = match[1];
-                             }
-
-                             let tag = "<lp5";
-                             let pos = 0;
-                             len = str.length;
-                             while(pos >= 0){
-                                 let posStartTag = str.indexOf(tag, pos);
-                                 if(posStartTag == -1)
-                                     break;
-                                 let posRover = posStartTag + tag.length;
-                                 while(posRover < len){
-                                 }
-
-                                 let posEmptyTag = str.indexOf("/>", posStartTag);
-                                 let posEndTag   = str.indexOf("</lp5>", posStartTag);
-                                 if(posEmptyTag != -1 && posEmptyTag < posEndTag){
-                                     yield str.slice(pos, posEndTag + 6);
-                                     pos = posEmptyTag + 6;
-                                 } 
-                             }
-                             return str.slice(pos);
-                         }
-                         function appendArray(node, array){
-                             if(array.length > 0)
-                                 node.append(...array);
-                         }
-                         function renderArticles(codeName = "", indent=0){
-                             const articleArray = model.articlesFromName[codeName];
-                             const result       = [];
-                             for(const article of articleArray)
-                                 result.push(renderArticle(article, indent));
-                             return result;
-                         }
-                         // renderArticle() - create 'code' output from an article.
-                         function renderArticle(article, indent){
-                             console.log("renderArticle ", article, indent);
-                             let result = []; // always return (possibly empty) array
-                             let span   = createFreeElement('SPAN');
-                             let emit   = spanEmitter(span);
-                             emit.next(); // prime the pump
+                         // caller is done yielding stuff to us
+                         emitAccumulated();
+                         return span;
+                     }
+                     //                         function  parseStartTag(str, len, posStart){
+                     function  parseStartTag(str, startTagRegex){
+                         let result = null;
+                         let startMatch = startTagRegex.exec(str);
+                         if(startMatch !== null){
+                             result = {
+                                 startPos: startTagRegex.index,
+                             };
                              
-                             function getCodeReference(item){
-                                 let result = null;
-                                 if(item.name == 'lp5-')
-                                     if(item.attributes.length == 1){
-                                         const ref = item.attributes[0];
-                                         if(ref.name == 'ref'){
-                                             const target = model.articles.fromURL(ref.value);
-                                             if(target){
-                                                 result = renderArticles(target.getCodeName(), indent + item.indent);
-                                             } else{
-                                                 // ref value wasn't URL, maybe text
-                                                 result = renderArticles(ref.value, indent + item.indent);
-                                             }
+                             let pos = posStart + "<lp5".length;
+                             if(pos < len){
+                                 console.log("fun");
+                                 
+                             }
+                             return pos;
+                         }
+                         return result;
+                     }
+                     /* yields: { type:, value: }
+                      *     0 - text string
+                      *     1 - parsed lp5 element
+                      *
+                      * value.attributes, where .name contains value of that attr
+                      * value.outer, outer string
+                      * value.inner, inner string
+                      */
+                     function* parse(str){
+                         let posStart = 0;
+                         let posEnd   = 0;
+                         let len      = str.length;
+
+                         startTagRegex.lastIndex = 0;
+                         let match = null;
+                         while((match=parseStartTag(str,startTagRegex))!==null){
+                             console.log("match = ", match);
+                         }
+                         let matches  = codeSerial.matchAll(startTagRegex);
+                         for(const match of matches){
+                             if(match.index < posStart)
+                                 continue;
+                             console.warn("parse match=", match);
+                             let lp5Start  = match.index;
+                             //                                 yield str.slice(posStart, posEnd);
+                             // '>' or '/>' or first char of attribute name
+                             let endChars = match[1];
+                         }
+
+                         let tag = "<lp5";
+                         let pos = 0;
+                         len = str.length;
+                         while(pos >= 0){
+                             let posStartTag = str.indexOf(tag, pos);
+                             if(posStartTag == -1)
+                                 break;
+                             let posRover = posStartTag + tag.length;
+                             while(posRover < len){
+                             }
+
+                             let posEmptyTag = str.indexOf("/>", posStartTag);
+                             let posEndTag   = str.indexOf("</lp5>", posStartTag);
+                             if(posEmptyTag != -1 && posEmptyTag < posEndTag){
+                                 yield str.slice(pos, posEndTag + 6);
+                                 pos = posEmptyTag + 6;
+                             } 
+                         }
+                         return str.slice(pos);
+                     }
+                     function appendArray(node, array){
+                         if(array.length > 0)
+                             node.append(...array);
+                     }
+                     function renderArticles(codeName = "", indent=0){
+                         const articleArray = model.articlesFromName[codeName];
+                         const result       = [];
+                         for(const article of articleArray)
+                             result.push(renderArticle(article, indent));
+                         return result;
+                     }
+                     // renderArticle() - create 'code' output from an article.
+                     function renderArticle(article, indent){
+                         console.log("renderArticle ", article, indent);
+                         let result = []; // always return (possibly empty) array
+                         let span   = createFreeElement('SPAN');
+                         let emit   = spanEmitter(span);
+                         emit.next(); // prime the pump
+                         
+                         function getCodeReference(item){
+                             let result = null;
+                             if(item.name == 'lp5-')
+                                 if(item.attributes.length == 1){
+                                     const ref = item.attributes[0];
+                                     if(ref.name == 'ref'){
+                                         const target = model.articles.fromURL(ref.value);
+                                         if(target){
+                                             result = renderArticles(target.getCodeName(), indent + item.indent);
+                                         } else{
+                                             // ref value wasn't URL, maybe text
+                                             result = renderArticles(ref.value, indent + item.indent);
                                          }
                                      }
-                                 return result;
-                             }
-                             const indentSpace = " ".repeat(indent);
-                             for(const item of article.codeParsed){
-                                 if(typeof item === 'string'){
-                                     emit.next(item.replace(/\n/g, "\n" + indentSpace));
-                                 }else{
-                                     const codeRef = getCodeReference(item);
-                                     if(codeRef){
-                                         emit.next(codeRef);
-                                     } else if(item.name == 'lp5-endscript'){
-                                         emit.next('<' + '/script>');
-                                     } else
-                                         console.warn(false, item);
                                  }
-                             }
-                             emit.next(null); // finalize span
-                             span.dataset.ref = article.URL;
-                             return span;
+                             return result;
                          }
-                         // render entire LP5-Output div from scratch.
-                         function render(){
-                             console.log("going to render LP5-Output div");
-                             outputDiv.replaceChildren(); // empty the div
-                             outputDiv.append(...renderArticles());
-                             model.outputText = outputDiv.innerText;
+                         const indentSpace = " ".repeat(indent);
+                         for(const item of article.codeParsed){
+                             if(typeof item === 'string'){
+                                 emit.next(item.replace(/\n/g, "\n" + indentSpace));
+                             }else{
+                                 const codeRef = getCodeReference(item);
+                                 if(codeRef){
+                                     emit.next(codeRef);
+                                 } else if(item.name == 'lp5-endscript'){
+                                     emit.next('<' + '/script>');
+                                 } else
+                                     console.warn(false, item);
+                             }
+                         }
+                         emit.next(null); // finalize span
+                         span.dataset.ref = article.URL;
+                         return span;
+                     }
+                     // render entire LP5-Output div from scratch.
+                     function render(){
+                         console.log("going to render LP5-Output div");
+                         outputDiv.replaceChildren(); // empty the div
+                         outputDiv.append(...renderArticles());
+                         model.outputText = outputDiv.innerText;
 
-                             if(false)
+                         if(false)
                              for(const article of model.docOrder(model.rootTOC)){
                                  let codeSerial = article.getCodeSerial();
                                  let codeName   = article.getCodeName();
@@ -1141,12 +1142,11 @@
                                      
                                  }
                              }
-                         }
-                         let result = {init:init, render:render};
-                         return result;
-                        </script>
-                    </template>
-                </div>
+                     }
+                     let result = {init:init, render:render};
+                     return result;
+                    </script>
+                </template>
                 
                 <div id="LP5-Footer">
                     <template data-name="footerDiv" >

@@ -14,6 +14,15 @@ BUGS
     [ ] add ctrl panel to top of output pane.
     [ ] event makes source pane notify 'home' view.
 
+2025/02/21 sick but working
+
+
+2025/02/14
+How shall the sub-views communicate with the parent view? Suppose the
+child view contains a reference to the parent view. Then the communication
+could just be function calls.
+
+
 2025/02/13
 Want view to have access to parent view. require() can only
 obtain things as they were defined when scopedEval() was called.
@@ -288,6 +297,18 @@ the 'home' view, then the detail of which pane it is going to are hidden.
 
 So, the point of events going through the controller is mainly to
 detect any event that is inappropriate for the current controller.state.
+
+feature: article references
+===========================
+allowing you to insert a reference to an article at a particular
+place in the ToC order, but have that reference ignored during
+output generation
+
+
+feature: custom article set view
+===================================
+Suppose I want to just show all the articles containing a <template>
+declaration.
 
 feature: category list
 ======================
