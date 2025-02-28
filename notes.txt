@@ -14,6 +14,53 @@ BUGS
     [ ] add ctrl panel to top of output pane.
     [ ] event makes source pane notify 'home' view.
 
+2025/02/27
+[ ] unwanted white space at start of code.
+[ ] show url of selected article.
+
+
+2025/02/26
+iView.eventListen(function)
+iView.eventEmit(name [, value])
+
+OK, did some cleanup, learned some CSS I really didn't want to learn.
+
+2025/02/25
+Send selection notify to footer pane.
+
+What if you put data-event="event_name" to automatically get an
+event listener added on that element? The event listener passes its
+info to the .notify.eventHandler() for that script.
+
+What is mechanism to send an event to a parent?
+    iView.dispatchEvent()  <= does dispatchEvent on appropriate parent element
+
+What is mechanism for parent to declare routing to itself or children?
+Send this event(name) to that child(name).
+
+source Selection
+
+<event name="Selection" to="footer"/>
+<event listen="click"/>
+
+Well, suppose we want to use builtin funcs as much as possible,
+and use the builtin event system. A pane wants to emit a Select
+event. It targets the topmost div, and anybody who wants to receive
+that adds a listener on the topmost div.
+
+So, really what I want is a thin interface that lets me refer to
+a shared element for broadcasting/receiving events.
+
+iView.emitEvent(from, name, value);
+iView.listenEvent(name
+
+
+2025/02/24 still sick but got sleep last night!
+Want to 
+
+2025/02/22 still sick
+
+
 2025/02/21 sick but working
 
 

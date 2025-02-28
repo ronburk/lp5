@@ -1,139 +1,143 @@
 <!doctype html>
 <html lang="en">
+    <style>
+     body, html { height : 100%; margin: 0; }
+    </style>
     <head>
         <meta charset="utf-8" >
         <title>lp5</title>
         <script>
-         function parseTag(str, startPos){
-             const result = {
-                 name:       "",
-                 isStart:    true,
-                 emptyTag:   false,
-                 attributes: [],
-                 nextPos:    startPos,
-                 errorPos:   -1
-             };
-             const tagPattern = /<(\/)?\s*([A-Za-z_:][A-Za-z0-9:._-]*)\s*/y;
-             tagPattern.lastIndex = startPos;
-             let  match = tagPattern.exec(str);
-             PARSE:{
-                 if(!match) break PARSE;
-                 if(match[1]) result.isStart = false;
-                 result.name = match[2];
-                 result.nextPos = tagPattern.lastIndex;
-                 const attrPattern = /\s*([A-Za-z_:][A-Za-z0-9:._-]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^>\s]+)))?\s*/y;
-                 attrPattern.lastIndex = tagPattern.lastIndex;
-                 while ((match = attrPattern.exec(str)) !== null) {
-                     const attrName = match[1];
-                     const attrValue = match[2] || match[3] || match[4] || null;
-                     result.attributes.push({name:attrName, value:attrValue});
-                     result.nextPos = attrPattern.lastIndex;
+             function parseTag(str, startPos){
+                 const result = {
+                     name:       "",
+                     isStart:    true,
+                     emptyTag:   false,
+                     attributes: [],
+                     nextPos:    startPos,
+                     errorPos:   -1
+                 };
+                 const tagPattern = /<(\/)?\s*([A-Za-z_:][A-Za-z0-9:._-]*)\s*/y;
+                 tagPattern.lastIndex = startPos;
+                 let  match = tagPattern.exec(str);
+                 PARSE:{
+                     if(!match) break PARSE;
+                     if(match[1]) result.isStart = false;
+                     result.name = match[2];
+                     result.nextPos = tagPattern.lastIndex;
+                     const attrPattern = /\s*([A-Za-z_:][A-Za-z0-9:._-]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^>\s]+)))?\s*/y;
+                     attrPattern.lastIndex = tagPattern.lastIndex;
+                     while ((match = attrPattern.exec(str)) !== null) {
+                         const attrName = match[1];
+                         const attrValue = match[2] || match[3] || match[4] || null;
+                         result.attributes.push({name:attrName, value:attrValue});
+                         result.nextPos = attrPattern.lastIndex;
+                     }
+                     const trailing = /^\s*(\/)?\s*>/.exec(str.slice(result.nextPos));
+                     if (!trailing){
+                         console.warn("couldn't match end of tag");
+                         break PARSE;
+                     }
+                     result.emptyTag = trailing[1] === "/";
+                     result.nextPos += trailing[0].length;
+                     return result;
                  }
-                 const trailing = /^\s*(\/)?\s*>/.exec(str.slice(result.nextPos));
-                 if (!trailing){
-                     console.warn("couldn't match end of tag");
-                     break PARSE;
+                 return null;
+             }
+             function classifyTag(tagDescriptor){
+                 tagDescriptor.type = null;
+                 if(tagDescriptor.name == 'lp5-'){
+                     if(tagDescriptor.emptyTag)
+                         if(tagDescriptor.attributes.length == 1)
+                             if(tagDescriptor.attributes[0].name == 'ref'){
+                                 tagDescriptor.type = 'ref';
+                                 tagDescriptor.value = tagDescriptor.attributes[0].value;
+                             }
+                 } else if(tagDescriptor.name == 'lp5-endscript'){
+                     if(tagDescriptor.attributes.length == 0)
+                         if(tagDescriptor.emptyTag)
+                             tagDescriptor.type = 'endscript';
                  }
-                 result.emptyTag = trailing[1] === "/";
-                 result.nextPos += trailing[0].length;
+                 return tagDescriptor.type;
+             }
+             /* parseCode() - break code into text and directives.
+              *
+              * returns an array, where each element is either a string
+              * of literal text or an lp5 tag descriptor.
+              */
+             function parseCode(scriptNode){
+                 const result = [];
+                 const scriptText = scriptNode.childNodes[0].textContent;
+                 scriptText = scriptText.replace(/^[ \t]*\n/, '');
+                 console.log(`scriptText = '${scriptText}'`, scriptNode);
+                 const tagPattern = /<(\/)?\s*lp5-/g;  // lp5 start or end tag
+                 let   posStart     = 0;
+                 let   posNext      = 0;
+                 let   length       = scriptText.length;
+                 let   match;
+                 while(posNext < length){
+                     posStart             = posNext;
+                     tagPattern.lastIndex = posStart;
+                     match                = tagPattern.exec(scriptText);
+                     if(match == null)
+                         posNext     = length;
+                     else
+                         posNext = match.index;
+                     console.warn("pattern match was ", match);
+                     if(posStart < posNext)
+                         result.push(scriptText.substring(posStart, posNext));
+                     if(match){
+                         const tagDescriptor = parseTag(scriptText, match.index);
+                         console.warn("parseTag() returns ", tagDescriptor);
+                         if(tagDescriptor){
+                             let typename = classifyTag(tagDescriptor);
+                             // console.assert(false, typename);
+                             if(tagDescriptor.type === 'ref'){
+                                 const lineStart = scriptText.lastIndexOf('\n', match.index)+1;
+                                 const prefix = scriptText.substring(lineStart, match.index);
+                                 tagDescriptor.indent = /^[ ]*$/.test(prefix) ? prefix.length : 0;
+                             }
+                             result.push(tagDescriptor);
+                             posNext = tagDescriptor.nextPos;
+                         }
+                         else{
+                             result.push("BAD LP5 TAG:<");
+                         ++posNext;
+                         }
+                     }
+                 }
+                 console.warn("<<<<<<<<<<parseCode() returns ", result);
                  return result;
              }
-             return null;
-         }
-         function classifyTag(tagDescriptor){
-             tagDescriptor.type = null;
-             if(tagDescriptor.name == 'lp5-'){
-                 if(tagDescriptor.emptyTag)
-                     if(tagDescriptor.attributes.length == 1)
-                         if(tagDescriptor.attributes[0].name == 'ref'){
-                             tagDescriptor.type = 'ref';
-                             tagDescriptor.value = tagDescriptor.attributes[0].value;
-                         }
-             } else if(tagDescriptor.name == 'lp5-endscript'){
-                 if(tagDescriptor.attributes.length == 0)
-                     if(tagDescriptor.emptyTag)
-                         tagDescriptor.type = 'endscript';
+             function showFatalError(message) {
+                 // 1) Show a big overlay blocking the page
+                 const overlay = document.createElement("div");
+                 overlay.style.position = "fixed";
+                 overlay.style.top = "0";
+                 overlay.style.left = "0";
+                 overlay.style.width = "100%";
+                 overlay.style.height = "100%";
+                 overlay.style.backgroundColor = "rgba(0,0,0,0.8)";
+                 overlay.style.color = "white";
+                 overlay.style.fontSize = "1.2em";
+                 overlay.style.zIndex = "999999";
+                 overlay.style.display = "flex";
+                 overlay.style.flexDirection = "column";
+                 overlay.style.justifyContent = "center";
+                 overlay.style.alignItems = "center";
+
+                 overlay.innerHTML = `
+                     <h1>Fatal Error</h1>
+                     <p>${message}</p>
+                 `;
+                 document.body.appendChild(overlay);
+
+                 // 2) Also log to console for developers
+                 console.error("FATAL ERROR:", message);
+
+                 // 3) Throw an error so that no further code in this call stack runs
+                 throw new Error("FATAL: " + message);
              }
-             return tagDescriptor.type;
-         }
-         /* parseCode() - break code into text and directives.
-          *
-          * returns an array, where each element is either a string
-          * of literal text or an lp5 tag descriptor.
-          */
-         function parseCode(scriptNode){
-             const result = [];
-             const scriptText = scriptNode.childNodes[0].textContent;
-             console.log(`scriptText = '${scriptText}'`);
-             const tagPattern = /<(\/)?\s*lp5-/g;  // lp5 start or end tag
-             let   posStart     = 0;
-             let   posNext      = 0;
-             let   length       = scriptText.length;
-             let   match;
-             while(posNext < length){
-                 posStart             = posNext;
-                 tagPattern.lastIndex = posStart;
-                 match                = tagPattern.exec(scriptText);
-                 if(match == null)
-                     posNext     = length;
-                 else
-                     posNext = match.index;
-                 console.warn("pattern match was ", match);
-                 if(posStart < posNext)
-                     result.push(scriptText.substring(posStart, posNext));
-                 if(match){
-                     const tagDescriptor = parseTag(scriptText, match.index);
-                     console.warn("parseTag() returns ", tagDescriptor);
-                     if(tagDescriptor){
-                         let typename = classifyTag(tagDescriptor);
-                         // console.assert(false, typename);
-                         if(tagDescriptor.type === 'ref'){
-                             const lineStart = scriptText.lastIndexOf('\n', match.index)+1;
-                             const prefix = scriptText.substring(lineStart, match.index);
-                             tagDescriptor.indent = /^[ ]*$/.test(prefix) ? prefix.length : 0;
-                         }
-                         result.push(tagDescriptor);
-                         posNext = tagDescriptor.nextPos;
-                     }
-                     else{
-                         result.push("BAD LP5 TAG:<");
-                         ++posNext;
-                     }
-                 }
-             }
-             console.warn("<<<<<<<<<<parseCode() returns ", result);
-             return result;
-         }
-         function showFatalError(message) {
-             // 1) Show a big overlay blocking the page
-             const overlay = document.createElement("div");
-             overlay.style.position = "fixed";
-             overlay.style.top = "0";
-             overlay.style.left = "0";
-             overlay.style.width = "100%";
-             overlay.style.height = "100%";
-             overlay.style.backgroundColor = "rgba(0,0,0,0.8)";
-             overlay.style.color = "white";
-             overlay.style.fontSize = "1.2em";
-             overlay.style.zIndex = "999999";
-             overlay.style.display = "flex";
-             overlay.style.flexDirection = "column";
-             overlay.style.justifyContent = "center";
-             overlay.style.alignItems = "center";
-
-             overlay.innerHTML = `
-                 <h1>Fatal Error</h1>
-                 <p>${message}</p>
-             `;
-             document.body.appendChild(overlay);
-
-             // 2) Also log to console for developers
-             console.error("FATAL ERROR:", message);
-
-             // 3) Throw an error so that no further code in this call stack runs
-             throw new Error("FATAL: " + message);
-         }
-        </script>
+            </script>
         <style class="contextMenu">
          article:focus {
              outline: 3px solid orange;
@@ -178,6 +182,7 @@
          div.epigraph  hr { width:100%; display:none;}
         </style>
         <style>
+
          pre code {
              background-color: #eee;
              border: 1px solid #999;
@@ -538,7 +543,7 @@
                      "menu menu menu"
                      "toc source output"
                      "footer footer footer";
-                 grid-template-rows: 60px 3fr 60px;
+                 grid-template-rows: 60px 1fr 60px;
                  grid-template-columns: 1fr 3fr 1fr;
                  grid-gap: 10px;
                  height: 100vh;
@@ -557,9 +562,10 @@
                  background-color: #FFFFEB;
                  grid-area: source;
                  min-height: 0;
-                 overflow: auto;
+                 overflow-y: auto;
                  display: flex;
                  flex-flow: column;
+                 
                  /*             align-items: stretch; */
              }
 
@@ -579,6 +585,10 @@
              #LP5-Output{
                  grid-area: output;
                  white-space: pre-wrap;
+                 height: 100%;
+                 overflow: auto;
+                 margin: 0;
+                 display: grid;
              }
              #LP5-Menu {
                  height:50px;
@@ -603,7 +613,16 @@
              }
             </style>
             <script>
+             const iView = this;
+
+             function routeEvent(fromView, eventName, eventDetail){
+                 console.error("home.iView.route");
+                 console.error(fromView, eventName, eventDetail);
+                 iView.children["footer"]
+             }
              function init(thisView){
+                 iView.routeEvent = routeEvent;
+                 console.error("setting route field", iView);
                  console.warn(thisView, thisView.views);
              }
              function render(iView, message){
@@ -622,6 +641,7 @@
                 </div>
                 <template data-name="tableOfContents" id="LP5-Toc">
                     <style>
+                     #LP5-Toc { overflow: auto; }
                      #LP5-Toc li {
                          list-style-type: none;
                          padding-left: 0;
@@ -659,11 +679,12 @@
                     <nav id="LP5-Toc" data-id="pane">
                     </nav>
                     <script>
-                     const iView = require('iView');
+                     //                     const iView = require('iView');
+                     const iView = this;
                      const model = require('model');
                      const {command}         = require('controller');
 
-                     const createFreeElement = require('createFreeElement');
+                     //                     const createFreeElement = require('createFreeElement');
                      function clickHandler(event){
                          event.preventDefault();
                          let path = event.composedPath();
@@ -690,12 +711,12 @@
                      }
                      function renderChildTOC(article){
                          console.assert(article.ulNode);
-                         let ul    = createFreeElement('ul');
+                         let ul    = document.createElement('ul');
 
                          article.ulNode.querySelectorAll('li').forEach((entry)=>{
-                             let li           = createFreeElement('li');
+                             let li           = document.createElement('li');
                              let id           = entry.getAttribute('id');
-                             let a            = createFreeElement('a');
+                             let a            = document.createElement('a');
                              li.appendChild(a);
                              let childArticle = model.articles.fromURL(id);
                              a.setAttribute('href', "#"+childArticle.articleNode.id);
@@ -798,7 +819,8 @@
                     <script>
                      const {drag, outerDiv} = require('dataID');
                      const {model, Article} = require('model, Article');
-                     const createFreeElement = require('createFreeElement');
+                     const iView          = this;
+
                      function articleNodeFromClick(event){
                          let result = null;
                          let path   = event.composedPath();
@@ -818,12 +840,16 @@
                          console.log(":::::: source pane clickHandler ", event);
                          const articleNode = articleNodeFromClick(event);
                          articleNode.focus();
-                         console.log(" clicked article ", articleNode);
+                         console.log(" clicked article ", articleNode, iView);
+                         iView.eventPublish("SelectArticle", articleNode);
                      }
                      function init(){
                          console.log("***** adding click handler in source");
                          outerDiv.addEventListener('click', clickHandler,
-                         { composed: true, bubble: true });
+                                                   { composed: true, bubble: true });
+                         iView.routeEvent = function(){
+                             console.warn("source pane routeEvent hit!");
+                         };
                      };
                      function massageCode(text){
                          console.log("massageCode ", text);
@@ -857,8 +883,8 @@
                              
                              if(article.scriptNode){
                                  console.log("   got script node ");
-//                                 article.codeTextNode.innerText = Article.unindentCode(
-//                                     article.scriptNode.innerText);
+                                 //                                 article.codeTextNode.innerText = Article.unindentCode(
+                                 //                                     article.scriptNode.innerText);
                                  article.codeTextNode.replaceChildren();
                                  let codeName = article.getCodeName();
                                  if(codeName){
@@ -866,7 +892,7 @@
                                      let   equals = "\u2261";
                                      if(nameCount > 1 )
                                          equals = "+\u2261";
-                                     const codeHeader = createFreeElement('DIV');
+                                     const codeHeader = document.createElement('DIV');
                                      codeHeader.classList.add('LP5-Code-Def');
                                      codeHeader.appendChild(
                                          document.createTextNode(
@@ -878,7 +904,7 @@
                                      if(typeof item === 'string')
                                          article.codeTextNode.appendChild(document.createTextNode(item));
                                      else if(item.type == 'ref'){
-                                         const span = createFreeElement("SPAN");
+                                         const span = document.createElement("SPAN");
                                          span.classList.add('LP5-CodeRef');
                                          const target = model.articles.fromURL(item.value);
                                          let refText = null;
@@ -931,10 +957,10 @@
                     </script>
                 </template>
                 <template data-name="outputDiv" id="LP5-Output">
-                    <div>
-                        <div data-id="outputUI">
-                            My ui!
-                        </div>
+                    <style>
+                     #root { display: flex; flex-direction: column; }
+                    </style>
+                    <div id="root">
                         <div data-id="outputDiv">
                         </div>
                     </div>
@@ -1158,18 +1184,27 @@
                             <span data-id="ref"></span>
                         </div>
                         <script>
-                         const model = require('model');
-                         const iView = require('iView');
-                         const {span, ref} = iView.dataID;
+                         const model          = require('model');
+                         const iView          = require('iView');
+                         const {span, ref}    = iView.dataID;
+                         let   selectionCount = 0;
 
                          function init(){
                              if(navigator.webdriver)
                                  span.innerText = "webdriver";
+                             iView.eventListen("SelectArticle", selectArticle);
                          };
                          function render(){
+                             console.error("footer render!");
                              let message = model.articles.length + " articles.";
+                             message += " " + selectionCount + " selected.";
                              span.innerText = message;
                          };
+                         function selectArticle(event){
+                             console.error("footer selectArticle()", event);
+                             selectionCount = 1;
+                             render();
+                         }
                          return {init:init, render:render};
                         </script>
                     </template>
@@ -1202,7 +1237,7 @@
                      });
              }
              
-//             findBadTemplate(document);
+             //             findBadTemplate(document);
 
              class RelativeCodeRanges {
                  #ranges;    // array of {relPos, length}
@@ -1323,7 +1358,7 @@
                          console.assert(URL);
                          let newArticle = new Article(secret, parent, URL);
                          if(newArticle){
-//                             newArticle.articleNode.id = `article-${this.length}`;
+                             //                             newArticle.articleNode.id = `article-${this.length}`;
                              newArticle.articleNode.id = URL;
                              this.#array.push(newArticle);
                          }
@@ -1441,9 +1476,8 @@
                          let result = "";
                          if(this.codeNameNode){
                              let name = this.codeNameNode.innerText.trim();
-                                 result = name;
+                             result = name;
                          }
-                         console.warn("getCodeName returns ", result, this);
                          return result;
                      }
                      getCodeText(){
@@ -1454,7 +1488,7 @@
                          return result;
                      }
                      #articleID(){
-//                         return this.URL.replace(/^(\d+)\.lp5$/, "article-$1");
+                         //                         return this.URL.replace(/^(\d+)\.lp5$/, "article-$1");
                          return this.URL;
                      }
                      #ensureTOC(){
@@ -1643,7 +1677,7 @@ ${codeText}
 
              // load any previously stored handle to our parent directory
              async function loadDirParentHandle(model){
-                 console.log("loadHandles()");
+                 console.log("loadDirParentHandle()");
                  let db = await openDB();
                  let handle = await getDB(db, "handle");
                  console.log(handle);
@@ -1769,6 +1803,7 @@ ${codeText}
                  }
                  let result = false;
                  
+                 // temporarily hard-coded
                  await model.storage.write("lp5.html", model.outputText);
              }
              async function test(model){
@@ -1853,8 +1888,8 @@ ${codeText}
                      console.log("calling crash");
                      controller.crash(detail);
                      return;
-                     controller.deferEvent('Crash', detail);
-//                     document.dispatchEvent(new CustomEvent('crash', {detail:detail}));
+//                     controller.deferEvent('Crash', detail);
+                     //                     document.dispatchEvent(new CustomEvent('crash', {detail:detail}));
                      controller.state = 'Crash';
                      event.preventDefault();
                      // we are likely already inside a controller call, so return
@@ -1869,9 +1904,10 @@ ${codeText}
 
                  switch(controller.state){
                      case 'Crash' :
+                         controller.crash(event.detail);
                          console.log("crash.");
                          controller.state = 'Crash';
-                         views.push('Crash');
+//                         views.push('Crash');
                          break;
                      case 'Crash' :
                          console.log("crashed.");
@@ -1879,14 +1915,14 @@ ${codeText}
                      case 'load' :
                          console.assert(event.type == 'load', event);
                          asyncSchedule(loadDirParentHandle, model);
-                         views.loadTemplates();
-                         views.change('home');
                          controller.state = 'AwaitDirHandleLoad';
                          break;
-//                     case 'AwaitDirHandleLoad' :
-//                         break;
+                         //                     case 'AwaitDirHandleLoad' :
+                         //                         break;
                      case 'AwaitDirHandleLoad' :
                          console.assert(event.type == 'asyncComplete');
+                         views.loadTemplates();
+                         views.change('home');
                          views.push('SelectParent');
                          controller.state = 'SelectParent';
                          break;
@@ -1967,7 +2003,7 @@ ${codeText}
                              if(argv[0] == 'createArticle'){
                                  console.log(`createArticle(${argv[1]})`);
                                  asyncSchedule(
-                                 model.createEmptyArticle, argv[1], argv[2]);
+                                     model.createEmptyArticle, argv[1], argv[2]);
                              }
                              views.pop();
                              controller.state = 'AwaitAsyncComplete';
@@ -1999,13 +2035,13 @@ ${codeText}
                                  
                              }
                          }else if(event.type == 'keydown'){
-function getDeepActiveElement() {
-    let active = document.activeElement;
-    while (active && active.shadowRoot && active.shadowRoot.activeElement) {
-        active = active.shadowRoot.activeElement;
-    }
-    return active;
-         }
+                             function getDeepActiveElement() {
+                                 let active = document.activeElement;
+                                 while (active && active.shadowRoot && active.shadowRoot.activeElement) {
+                                     active = active.shadowRoot.activeElement;
+                                 }
+                                 return active;
+                             }
 
                              console.log("keydown, active", event, document.activeElement);
                              console.log("path =  ", event.composedPath());
@@ -2041,8 +2077,8 @@ function getDeepActiveElement() {
                              });
                              if(articleNode){
                                  controller.currentArticle = articleNode;
-//                                 event.preventDefault();
-//                                 articleNode.focus();
+                                 //                                 event.preventDefault();
+                                 //                                 articleNode.focus();
                                  if(event.shiftKey){
                                      const article    = model.articles.fromArticleNode(articleNode);
                                      console.log("article.URL = ", article.URL);
@@ -2147,6 +2183,7 @@ function getDeepActiveElement() {
                  'closeDialog',
                  'contextmenu',
                  'command',
+                 'DataCloneError',
                  'error',
                  'hashchange',
                  'input',
@@ -2156,11 +2193,21 @@ function getDeepActiveElement() {
                  'reload',
                  'saveArticle',
                  'selectProject',
+                 'SelectArticle',
                  'SyntaxError',
+                 'unhandledrejection',
              ].forEach(e=>window.addEventListener(
                  e,
                  controller,
                  true));
+             window.onerror = function(message, file, lineNumber) {
+                 var browser_ = encodeURI(navigator.appVersion);
+                 var error_ = encodeURI("msg:"+ message + "\n\tfile:"+file+"\n\tln:"+lineNumber);
+                 var user_ = encodeURI("");
+
+                 console.warn(error_);
+                 return false;
+             }
 
              controller.crashed = false;
              controller.crash = function(message){
@@ -2184,41 +2231,63 @@ function getDeepActiveElement() {
                      overflow: "auto"  // In case the error info is long.
                  });
                  
-             overlay.innerText = message;
-             
-             document.body.appendChild(overlay);
-             // Disable user interactions on the rest of the page.
-             document.body.style.pointerEvents = "none";
-         }
+                 overlay.innerText = message;
+                 
+                 document.body.appendChild(overlay);
+                 // Disable user interactions on the rest of the page.
+                 document.body.style.pointerEvents = "none";
+             }
 
-             controller.deferEvent = function(eventName, eventDetail) {
+             controller.deferEvent = function(target, eventName, eventDetail) {
+                 console.assert(target);
+                 console.warn("deferEvent " + eventName, eventDetail);
                  const event = new CustomEvent(eventName, { detail: eventDetail });
-                 Promise.resolve().then(() => document.dispatchEvent(event));
+                 queueMicrotask(()=> target.dispatchEvent(event));
              }
 
              controller.asyncSchedule = function(func, ...args){
+                 function createErrorEvent(error) {
+                     return new ErrorEvent('error', {
+                         error: error,
+                         message: error.message,
+                         filename: document.location.href,  // You can use the current file URL
+                         lineno: 1,  // Adjust based on your error location
+                         colno: 1    // Adjust based on your error location
+                     });
+                 }
+
                  async function notifyWhenDone(){
                      try {
                          controller.asyncComplete(await func(...args));
                      }catch(err){
-                         controller.asyncComplete(err);
+                         console.error(err);
+                         controller.asyncComplete(createErrorEvent(err));
                      }
                  }
                  setTimeout(notifyWhenDone);
              }
+             controller.asyncComplete = function(value){
+                 console.log("inside asyncComplete");
+                 queueMicrotask(
+                     function controller_asyncComplete() {
+                         let event = null;
+                         if(value instanceof Event)
+                             event = value;
+                         else
+                             event = new CustomEvent('asyncComplete', { detail:value});
+                         console.error("value for compelte is ", value);
+                         console.error("event from complete is ", event);
+                         document.dispatchEvent(event);
+                     });
+                 console.log("exit asyncComplete");
+
+                 //                 setTimeout(controller_asyncComplete);
+             };
              controller.command = function(args){
                  console.warn("function args =", args);
                  setTimeout(()=>document.dispatchEvent(
                      new CustomEvent('command',{ detail:args })));
              }
-             controller.asyncComplete = function(value){
-                 function controller_asyncComplete() {
-                     console.log("inside asyncComplete");
-                     document.dispatchEvent(
-                         new CustomEvent('asyncComplete', { detail:value}));
-                 }
-                 setTimeout(controller_asyncComplete);
-             };
              controller.states = new Set([
                  'AwaitAsyncComplete',
                  'AwaitDirHandleLoad',
@@ -2314,22 +2383,71 @@ function getDeepActiveElement() {
                  }
                  let sourceMap = "\n//# sourceURL=" + iView.name + "\n";
                  return new Function(
-                     "require", '"use strict";' + script + sourceMap)(
-                         require);
-//                 return new Function(...(Object.keys(globalEnv)),
-//                                     '"use strict";' + script)(
-//                                         ...globalEnv);
-
+                     "require", '"use strict";' + script + sourceMap).call(
+                         iView, require);
              }
-             // interface to a view
-             const viewInterface = {
-                 name         : "",
-                 dialogNode   : null,
-                 notify       : null,
-                 children     : {},
-                 rootNode     : null,
-                 dataID       : {},
-             };
+             class View {
+                 constructor(name = "", parentView = null) {
+                     this.name = name;           // Name of the view
+                     this.parentView = parentView; // Reference to the parent view
+                     this.dialogNode = null;     // DOM node for dialogs (if any)
+                     this.notify = null;         // Object with methods like init/render
+                     this.children = {};         // Each view gets its own children container
+                     this.rootNode = null;       // Root DOM node for this view
+                     this.dataID = {};           // Container for any data-id mappings
+                 }
+
+                 routeEvent(fromView, eventName, detail) {
+                     console.warn(`Unhandled: ${this.name} received event '${eventName}' from ${fromView.name}`);
+                 }
+
+                 eventListen(eventName, listener){
+                     let iView = this;
+                     while(iView.parentView)
+                         iView = iView.parentView;
+                     iView.rootNode.addEventListener(eventName, listener);
+                 }
+
+                 eventPublish(eventName, eventDetail){
+                     let iView = this;
+                     while(iView.parentView)
+                         iView = iView.parentView;
+                     controller.deferEvent(iView.rootNode, eventName, eventDetail);
+                 }
+
+                 // Emit an event up to the parent view.
+                 emitEvent(name, detail) {
+                     if(!this.parentView)
+                         console.warn("can't emit view event, no parent view", this);
+                     else if(typeof this.parentView.routeEvent !== 'function')
+                         console.warn("can't emit view event, parent view has no router", this.parentView);
+                     else {
+                         console.log(`routing event ${name}`);
+                         this.parentView.routeEvent(this, name, detail);
+                     }
+                 }
+
+                 // Optional: initialize the view (and recursively its children).
+                 init(...args) {
+                     if (this.notify && typeof this.notify.init === "function") {
+                         this.notify.init(this, ...args);
+                     }
+                     for (const childName in this.children) {
+                         this.children[childName].init(...args);
+                     }
+                 }
+
+                 // Optional: render the view (and recursively its children).
+                 render(...args) {
+                     if (this.notify && typeof this.notify.render === "function") {
+                         this.notify.render(this, ...args);
+                     }
+                     for (const childName in this.children) {
+                         this.children[childName].render(...args);
+                     }
+                 }
+             }
+
              controller.views = {
                  views       : {},
                  listeners   : {},
@@ -2391,9 +2509,7 @@ function getDeepActiveElement() {
                          copyChildElements(t.content, shadow);
                          console.log("rootNode is ", rootNode);
 
-                         const iView    = structuredClone(viewInterface);
-                         iView.name     = t.dataset.name; // data-name='xxx'
-                         iView.parentView = parentView;
+                         const iView = new View(t.dataset.name, parentView);
                          console.log(`template named ${iView.name}, parent `, parentView);
                          // if this is a child template
                          if(parentView){
@@ -2431,8 +2547,6 @@ function getDeepActiveElement() {
                                  controller.script = script;
                                  controller.scriptName = iView.name;
                                  iView.notify  = scopedEval(scriptNode.innerHTML, iView);
-                                 Object.freeze(iView);
-
                                  console.log("notify set to eval", iView);
                                  console.log("parent is ", parentView);
                                  controller.script = null;
@@ -2515,7 +2629,7 @@ function getDeepActiveElement() {
                  push(dialogName, ...args) {
                      console.log("views.push ", dialogName);
                      ++this.inProgress;
-//                     console.assert(this.currentView);
+                     //                     console.assert(this.currentView);
                      this.stack.push(this.currentView);
                      const iView = this.views[dialogName];
                      this.setBody(iView);
@@ -2638,7 +2752,7 @@ function getDeepActiveElement() {
                      if(article.getCodeSerial()){
                          console.log("pushing code article ", article);
                          (model.articlesFromName[article.getCodeName()] ??= []).
-                                                      push(article);
+                         push(article);
                      }
                  }
              }
@@ -2800,7 +2914,7 @@ function getDeepActiveElement() {
                  } else
                      console.log(`in loadTOC, article "${name}" has NO ul`);
                  console.log(`loadTOC(${name}) returns `, article);
-                     return article;
+                 return article;
              }
 
              model.openProject = async function(name){
