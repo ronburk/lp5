@@ -7,137 +7,138 @@
         <meta charset="utf-8" >
         <title>lp5</title>
         <script>
-             function parseTag(str, startPos){
-                 const result = {
-                     name:       "",
-                     isStart:    true,
-                     emptyTag:   false,
-                     attributes: [],
-                     nextPos:    startPos,
-                     errorPos:   -1
-                 };
-                 const tagPattern = /<(\/)?\s*([A-Za-z_:][A-Za-z0-9:._-]*)\s*/y;
-                 tagPattern.lastIndex = startPos;
-                 let  match = tagPattern.exec(str);
-                 PARSE:{
-                     if(!match) break PARSE;
-                     if(match[1]) result.isStart = false;
-                     result.name = match[2];
-                     result.nextPos = tagPattern.lastIndex;
-                     const attrPattern = /\s*([A-Za-z_:][A-Za-z0-9:._-]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^>\s]+)))?\s*/y;
-                     attrPattern.lastIndex = tagPattern.lastIndex;
-                     while ((match = attrPattern.exec(str)) !== null) {
-                         const attrName = match[1];
-                         const attrValue = match[2] || match[3] || match[4] || null;
-                         result.attributes.push({name:attrName, value:attrValue});
-                         result.nextPos = attrPattern.lastIndex;
-                     }
-                     const trailing = /^\s*(\/)?\s*>/.exec(str.slice(result.nextPos));
-                     if (!trailing){
-                         console.warn("couldn't match end of tag");
-                         break PARSE;
-                     }
-                     result.emptyTag = trailing[1] === "/";
-                     result.nextPos += trailing[0].length;
-                     return result;
+         window.lp5 = {};
+         function parseTag(str, startPos){
+             const result = {
+                 name:       "",
+                 isStart:    true,
+                 emptyTag:   false,
+                 attributes: [],
+                 nextPos:    startPos,
+                 errorPos:   -1
+             };
+             const tagPattern = /<(\/)?\s*([A-Za-z_:][A-Za-z0-9:._-]*)\s*/y;
+             tagPattern.lastIndex = startPos;
+             let  match = tagPattern.exec(str);
+             PARSE:{
+                 if(!match) break PARSE;
+                 if(match[1]) result.isStart = false;
+                 result.name = match[2];
+                 result.nextPos = tagPattern.lastIndex;
+                 const attrPattern = /\s*([A-Za-z_:][A-Za-z0-9:._-]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^>\s]+)))?\s*/y;
+                 attrPattern.lastIndex = tagPattern.lastIndex;
+                 while ((match = attrPattern.exec(str)) !== null) {
+                     const attrName = match[1];
+                     const attrValue = match[2] || match[3] || match[4] || null;
+                     result.attributes.push({name:attrName, value:attrValue});
+                     result.nextPos = attrPattern.lastIndex;
                  }
-                 return null;
-             }
-             function classifyTag(tagDescriptor){
-                 tagDescriptor.type = null;
-                 if(tagDescriptor.name == 'lp5-'){
-                     if(tagDescriptor.emptyTag)
-                         if(tagDescriptor.attributes.length == 1)
-                             if(tagDescriptor.attributes[0].name == 'ref'){
-                                 tagDescriptor.type = 'ref';
-                                 tagDescriptor.value = tagDescriptor.attributes[0].value;
-                             }
-                 } else if(tagDescriptor.name == 'lp5-endscript'){
-                     if(tagDescriptor.attributes.length == 0)
-                         if(tagDescriptor.emptyTag)
-                             tagDescriptor.type = 'endscript';
+                 const trailing = /^\s*(\/)?\s*>/.exec(str.slice(result.nextPos));
+                 if (!trailing){
+                     console.warn("couldn't match end of tag");
+                     break PARSE;
                  }
-                 return tagDescriptor.type;
-             }
-             /* parseCode() - break code into text and directives.
-              *
-              * returns an array, where each element is either a string
-              * of literal text or an lp5 tag descriptor.
-              */
-             function parseCode(scriptNode){
-                 const result = [];
-                 const scriptText = scriptNode.childNodes[0].textContent;
-                 scriptText = scriptText.replace(/^[ \t]*\n/, '');
-                 console.log(`scriptText = '${scriptText}'`, scriptNode);
-                 const tagPattern = /<(\/)?\s*lp5-/g;  // lp5 start or end tag
-                 let   posStart     = 0;
-                 let   posNext      = 0;
-                 let   length       = scriptText.length;
-                 let   match;
-                 while(posNext < length){
-                     posStart             = posNext;
-                     tagPattern.lastIndex = posStart;
-                     match                = tagPattern.exec(scriptText);
-                     if(match == null)
-                         posNext     = length;
-                     else
-                         posNext = match.index;
-                     console.warn("pattern match was ", match);
-                     if(posStart < posNext)
-                         result.push(scriptText.substring(posStart, posNext));
-                     if(match){
-                         const tagDescriptor = parseTag(scriptText, match.index);
-                         console.warn("parseTag() returns ", tagDescriptor);
-                         if(tagDescriptor){
-                             let typename = classifyTag(tagDescriptor);
-                             // console.assert(false, typename);
-                             if(tagDescriptor.type === 'ref'){
-                                 const lineStart = scriptText.lastIndexOf('\n', match.index)+1;
-                                 const prefix = scriptText.substring(lineStart, match.index);
-                                 tagDescriptor.indent = /^[ ]*$/.test(prefix) ? prefix.length : 0;
-                             }
-                             result.push(tagDescriptor);
-                             posNext = tagDescriptor.nextPos;
-                         }
-                         else{
-                             result.push("BAD LP5 TAG:<");
-                         ++posNext;
-                         }
-                     }
-                 }
-                 console.warn("<<<<<<<<<<parseCode() returns ", result);
+                 result.emptyTag = trailing[1] === "/";
+                 result.nextPos += trailing[0].length;
                  return result;
              }
-             function showFatalError(message) {
-                 // 1) Show a big overlay blocking the page
-                 const overlay = document.createElement("div");
-                 overlay.style.position = "fixed";
-                 overlay.style.top = "0";
-                 overlay.style.left = "0";
-                 overlay.style.width = "100%";
-                 overlay.style.height = "100%";
-                 overlay.style.backgroundColor = "rgba(0,0,0,0.8)";
-                 overlay.style.color = "white";
-                 overlay.style.fontSize = "1.2em";
-                 overlay.style.zIndex = "999999";
-                 overlay.style.display = "flex";
-                 overlay.style.flexDirection = "column";
-                 overlay.style.justifyContent = "center";
-                 overlay.style.alignItems = "center";
-
-                 overlay.innerHTML = `
-                     <h1>Fatal Error</h1>
-                     <p>${message}</p>
-                 `;
-                 document.body.appendChild(overlay);
-
-                 // 2) Also log to console for developers
-                 console.error("FATAL ERROR:", message);
-
-                 // 3) Throw an error so that no further code in this call stack runs
-                 throw new Error("FATAL: " + message);
+             return null;
+         }
+         function classifyTag(tagDescriptor){
+             tagDescriptor.type = null;
+             if(tagDescriptor.name == 'lp5-'){
+                 if(tagDescriptor.emptyTag)
+                     if(tagDescriptor.attributes.length == 1)
+                         if(tagDescriptor.attributes[0].name == 'ref'){
+                             tagDescriptor.type = 'ref';
+                             tagDescriptor.value = tagDescriptor.attributes[0].value;
+                         }
+             } else if(tagDescriptor.name == 'lp5-endscript'){
+                 if(tagDescriptor.attributes.length == 0)
+                     if(tagDescriptor.emptyTag)
+                         tagDescriptor.type = 'endscript';
              }
-            </script>
+             return tagDescriptor.type;
+         }
+         /* parseCode() - break code into text and directives.
+          *
+          * returns an array, where each element is either a string
+          * of literal text or an lp5 tag descriptor.
+          */
+         function parseCode(scriptNode){
+             const result = [];
+             let scriptText = scriptNode.childNodes[0].textContent;
+             scriptText = scriptText.replace(/^[ \t]*\n/, '');
+             console.log(`scriptText = '${scriptText}'`, scriptNode);
+             const tagPattern = /<(\/)?\s*lp5-/g;  // lp5 start or end tag
+             let   posStart     = 0;
+             let   posNext      = 0;
+             let   length       = scriptText.length;
+             let   match;
+             while(posNext < length){
+                 posStart             = posNext;
+                 tagPattern.lastIndex = posStart;
+                 match                = tagPattern.exec(scriptText);
+                 if(match == null)
+                     posNext     = length;
+                 else
+                     posNext = match.index;
+                 console.warn("pattern match was ", match);
+                 if(posStart < posNext)
+                     result.push(scriptText.substring(posStart, posNext));
+                 if(match){
+                     const tagDescriptor = parseTag(scriptText, match.index);
+                     console.warn("parseTag() returns ", tagDescriptor);
+                     if(tagDescriptor){
+                         let typename = classifyTag(tagDescriptor);
+                         // console.assert(false, typename);
+                         if(tagDescriptor.type === 'ref'){
+                             const lineStart = scriptText.lastIndexOf('\n', match.index)+1;
+                             const prefix = scriptText.substring(lineStart, match.index);
+                             tagDescriptor.indent = /^[ ]*$/.test(prefix) ? prefix.length : 0;
+                         }
+                         result.push(tagDescriptor);
+                         posNext = tagDescriptor.nextPos;
+                     }
+                     else{
+                         result.push("BAD LP5 TAG:<");
+                         ++posNext;
+                     }
+                 }
+             }
+             console.warn("<<<<<<<<<<parseCode() returns ", result);
+             return result;
+         }
+         function showFatalError(message) {
+             // 1) Show a big overlay blocking the page
+             const overlay = document.createElement("div");
+             overlay.style.position = "fixed";
+             overlay.style.top = "0";
+             overlay.style.left = "0";
+             overlay.style.width = "100%";
+             overlay.style.height = "100%";
+             overlay.style.backgroundColor = "rgba(0,0,0,0.8)";
+             overlay.style.color = "white";
+             overlay.style.fontSize = "1.2em";
+             overlay.style.zIndex = "999999";
+             overlay.style.display = "flex";
+             overlay.style.flexDirection = "column";
+             overlay.style.justifyContent = "center";
+             overlay.style.alignItems = "center";
+
+             overlay.innerHTML = `
+                 <h1>Fatal Error</h1>
+                 <p>${message}</p>
+             `;
+             document.body.appendChild(overlay);
+
+             // 2) Also log to console for developers
+             console.error("FATAL ERROR:", message);
+
+             // 3) Throw an error so that no further code in this call stack runs
+             throw new Error("FATAL: " + message);
+         }
+        </script>
         <style class="contextMenu">
          article:focus {
              outline: 3px solid orange;
@@ -530,7 +531,7 @@
                 
             </div>
         </template>
-        <template data-name="home">
+        <template data-name="home"> <!-- home page UI -->
             <style>
              article:focus {
                  outline: 3px solid orange;
@@ -562,10 +563,10 @@
                  background-color: #FFFFEB;
                  grid-area: source;
                  min-height: 0;
-                 overflow-y: auto;
+                 overflow: auto;
                  display: flex;
                  flex-flow: column;
-                 
+                 resize: horizontal;
                  /*             align-items: stretch; */
              }
 
@@ -586,9 +587,11 @@
                  grid-area: output;
                  white-space: pre-wrap;
                  height: 100%;
+                 width: fit-content;
                  overflow: auto;
                  margin: 0;
                  display: grid;
+                 resize: horizontal;
              }
              #LP5-Menu {
                  height:50px;
@@ -657,6 +660,8 @@
                      #LP5-Toc {
                          font-family: Helvetica;
                          grid-area: toc;
+                         resize: horizontal;
+
                      }
                      #LP5-Toc h1 {
                          margin: inherit;
@@ -839,6 +844,7 @@
                      function clickHandler(event){
                          console.log(":::::: source pane clickHandler ", event);
                          const articleNode = articleNodeFromClick(event);
+                         console.assert(articleNode); // ??? really does happen.
                          articleNode.focus();
                          console.log(" clicked article ", articleNode, iView);
                          iView.eventPublish("SelectArticle", articleNode);
@@ -1888,7 +1894,7 @@ ${codeText}
                      console.log("calling crash");
                      controller.crash(detail);
                      return;
-//                     controller.deferEvent('Crash', detail);
+                     //                     controller.deferEvent('Crash', detail);
                      //                     document.dispatchEvent(new CustomEvent('crash', {detail:detail}));
                      controller.state = 'Crash';
                      event.preventDefault();
@@ -1907,7 +1913,7 @@ ${codeText}
                          controller.crash(event.detail);
                          console.log("crash.");
                          controller.state = 'Crash';
-//                         views.push('Crash');
+                         //                         views.push('Crash');
                          break;
                      case 'Crash' :
                          console.log("crashed.");
@@ -2047,7 +2053,7 @@ ${codeText}
                              console.log("path =  ", event.composedPath());
                              console.log("deep =  ", getDeepActiveElement());
                          }else if(event.type == 'click'){
-                             console.log(" it's a click");
+                             console.log(" it's a click", event.srcElement);
                              {
                                  let body = document.getElementsByClassName('lp5-body')[0];
                                  if(false){
@@ -2275,10 +2281,8 @@ ${codeText}
                              event = value;
                          else
                              event = new CustomEvent('asyncComplete', { detail:value});
-                         console.error("value for compelte is ", value);
-                         console.error("event from complete is ", event);
                          document.dispatchEvent(event);
-                     });
+                 });
                  console.log("exit asyncComplete");
 
                  //                 setTimeout(controller_asyncComplete);
@@ -2752,7 +2756,7 @@ ${codeText}
                      if(article.getCodeSerial()){
                          console.log("pushing code article ", article);
                          (model.articlesFromName[article.getCodeName()] ??= []).
-                         push(article);
+                                                      push(article);
                      }
                  }
              }

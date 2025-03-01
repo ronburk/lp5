@@ -14,9 +14,23 @@ BUGS
     [ ] add ctrl panel to top of output pane.
     [ ] event makes source pane notify 'home' view.
 
-2025/02/27
-[ ] unwanted white space at start of code.
+2025/02/28
 [ ] show url of selected article.
+
+Is a selection set part of the model or part of the view?
+Probably part of the view. But I've already corrupted "view"
+so it refers to UI elements more than just "a view of the data".
+
+The user selects two articles. Then a "delete" command arrives.
+How does the "command" access the "current selection"?
+
+I have new state (selection), and I'm not sure where it belongs,
+how it should be accessible and to whom. Kinda just want to make
+it a global variable and accept that I don't yet have the best
+answers to those questions.
+
+2025/02/27
+[X] unwanted white space at start of code.
 
 
 2025/02/26
