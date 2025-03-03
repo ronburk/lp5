@@ -14,6 +14,16 @@ BUGS
     [ ] add ctrl panel to top of output pane.
     [ ] event makes source pane notify 'home' view.
 
+2025/03/02
+Crash!  What does/should articlesFromName() return if there are no matches?
+Ah, well actually, articlesFromName is not a function but an object.
+Probably it should have been a function.
+
+Undefined code references. Unreferenced code definitions.
+
+2025/02/28
+[X] Don't show empty code panel
+
 2025/02/28
 [ ] show url of selected article.
 

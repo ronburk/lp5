@@ -1,7 +1,11 @@
 <!doctype html>
 <html lang="en">
     <style>
-     body, html { height : 100%; margin: 0; }
+     body, html { display: flex; flex-direction: column; margin: 0; }
+     body > .lp5-root {
+         display: flex;
+         height: 100vh;
+     }
     </style>
     <head>
         <meta charset="utf-8" >
@@ -68,7 +72,7 @@
          function parseCode(scriptNode){
              const result = [];
              let scriptText = scriptNode.childNodes[0].textContent;
-             scriptText = scriptText.replace(/^[ \t]*\n/, '');
+             scriptText = scriptText.replace(/^[ \t\n]*/, '');
              console.log(`scriptText = '${scriptText}'`, scriptNode);
              const tagPattern = /<(\/)?\s*lp5-/g;  // lp5 start or end tag
              let   posStart     = 0;
@@ -539,40 +543,44 @@
              article:focus { background-color: yellow; }
 
              .lp5-body {
-                 display: grid;
-                 grid-template-areas:
-                     "menu menu menu"
-                     "toc source output"
-                     "footer footer footer";
-                 grid-template-rows: 60px 1fr 60px;
-                 grid-template-columns: 1fr 3fr 1fr;
-                 grid-gap: 10px;
+                 display: flex;
+                 flex-direction: column;
                  height: 100vh;
+                 width: 100%;
                  margin: 0;
              }
-             #LP5-Source div.wdrag {
-                 position: absolute;
-                 left: -4px;
-                 top: 0;
-                 bottom: 0;
-                 width: 8px;
-                 cursor: w-resize;
+             #LP5-Middle{
+                 display: flex;
+                 flex-grow: 1;
+                 width: 100%;
+                 min-height: 0;
+             }
+             #LP5-Toc {
+                 overflow: auto;
+                 height: 100%;
+                 font-family: Helvetica;
+                 resize: horizontal;
+                 width: 15%;
              }
              #LP5-Source{
                  position: relative;
                  background-color: #FFFFEB;
-                 grid-area: source;
-                 min-height: 0;
                  overflow: auto;
-                 display: flex;
-                 flex-flow: column;
                  resize: horizontal;
-                 /*             align-items: stretch; */
+                 width: 60%;
+             }
+             #LP5-Output{
+                 white-space: pre-wrap;
+                 height: 100%;
+                 width: 25%;
+                 overflow: auto;
+                 margin: 0;
              }
 
              #LP5-Footer{
-                 grid-area: footer;
                  background:#d0d0d0;
+                 height: 60px;
+                 width: 100%;
              }
              .LP5-Comment h1 {
                  margin: .2em 0 .2em 0;
@@ -583,21 +591,10 @@
              .LP5-Comment h3 {
                  margin: .1em 0 .1em 0;
              }
-             #LP5-Output{
-                 grid-area: output;
-                 white-space: pre-wrap;
-                 height: 100%;
-                 width: fit-content;
-                 overflow: auto;
-                 margin: 0;
-                 display: grid;
-                 resize: horizontal;
-             }
              #LP5-Menu {
                  height:50px;
                  background:#d0d0d0;
                  border:1px solid #b9b9b9;
-                 grid-area: menu;
              }
              #LP5-Menu ul {
                  display: flex;
@@ -642,543 +639,536 @@
                         <li id="LP5-Menu-Test">Test</li>
                     </ul>
                 </div>
-                <template data-name="tableOfContents" id="LP5-Toc">
-                    <style>
-                     #LP5-Toc { overflow: auto; }
-                     #LP5-Toc li {
-                         list-style-type: none;
-                         padding-left: 0;
-                         white-space:nowrap;
-                         overflow:hidden;
-                     }
-                     #LP5-Toc ul {
-                         padding-inline-start: 0;
-                         margin-left: 1em;
-                     }
-                     #LP5-Toc a {text-decoration: none;}
-                     #LP5-Toc a:visited { color: rgb(0,0,238); }
-                     #LP5-Toc {
-                         font-family: Helvetica;
-                         grid-area: toc;
-                         resize: horizontal;
-
-                     }
-                     #LP5-Toc h1 {
-                         margin: inherit;
-                         cursor: pointer;
-                         font-size: 18px;
-                     }
-                     #LP5-Toc h2 {
-                         text-indent: 5%;
-                         margin: inherit;
-                         cursor: pointer;
-                         font-size: 15px;
-                     }
-                     #LP5-Toc h3 {
-                         text-indent: 10%;
-                         margin: inherit;
-                         cursor: pointer;
-                         font-size: 15px;
-                     }
-                    </style>
-                    <nav id="LP5-Toc" data-id="pane">
-                    </nav>
-                    <script>
-                     //                     const iView = require('iView');
-                     const iView = this;
-                     const model = require('model');
-                     const {command}         = require('controller');
-
-                     //                     const createFreeElement = require('createFreeElement');
-                     function clickHandler(event){
-                         event.preventDefault();
-                         let path = event.composedPath();
-                         // was click inside TOC element?
-                         let a = path.find((node,index)=>{
-                             return node.tagName == 'A'
-                                 && index +2 < path.length
-                                 && path[index+1].tagName == 'LI'
-                                 && path[index+2].tagName == 'UL'
-                                 && path[index+3].id == 'LP5-Toc'
-                             ;
-                         });
-                         if(a && a.id){
-                             const argv = ['showArticle', a.id.substring(1) ];
-                             command(argv);
+                <div id="LP5-Middle">
+                    <template data-name="tableOfContents" id="LP5-Toc">
+                        <style>
+                         #LP5-Nav li {
+                             list-style-type: none;
+                             padding-left: 0;
+                             white-space:nowrap;
+                             overflow:hidden;
                          }
-                     }
-                     function init(){
-                         const {pane} = require('dataID');
-                         pane.addEventListener('click', clickHandler);
-                     };
-                     function getTitle(li){
-                         let ID = li.getAttribute('id');
-                     }
-                     function renderChildTOC(article){
-                         console.assert(article.ulNode);
-                         let ul    = document.createElement('ul');
-
-                         article.ulNode.querySelectorAll('li').forEach((entry)=>{
-                             let li           = document.createElement('li');
-                             let id           = entry.getAttribute('id');
-                             let a            = document.createElement('a');
-                             li.appendChild(a);
-                             let childArticle = model.articles.fromURL(id);
-                             a.setAttribute('href', "#"+childArticle.articleNode.id);
-                             console.assert(childArticle, {id:id});
-                             if(childArticle.titleNode)
-                                 a.innerText = childArticle.titleNode.innerText;
-                             else
-                                 a.innerText = "< no title >";
-                             ul.appendChild(li);
-                             if(childArticle.ulNode)
-                                 ul.appendChild(renderChildTOC(childArticle));
-                         });
-                         return ul;
-                     }
-                     function renderTOC(){
-                         console.log("render toc: ", model.rootTOC);
-                         let article = model.rootTOC;
-                         if(article && article.ulNode){
-                             let ul = renderChildTOC(article);
-                             let tocRootNode = iView.rootNode.shadowRoot.querySelector('#LP5-Toc');
-                             console.assert(tocRootNode && tocRootNode.id == "LP5-Toc");
-                             tocRootNode.replaceChildren(ul);
+                         #LP5-Nav ul {
+                             padding-inline-start: 0;
+                             margin-left: 1em;
                          }
-                         return;
-                     };
-                     function handleEvent(event){
-                         console.assert(false);
-                     }
-                     let result = {init:init, render:renderTOC, handleEvent:handleEvent};
-                     return result;
-                    </script>
-                </template>
-                <template data-name="sourceDiv" id="LP5-Source">
-                    <style>
-                     article:focus {
-                         outline: 3px solid orange;
-                     }
-
-                     .LP5-Section{
-                         border-bottom: 1px dotted  #a5c8ba;
-                         padding-right: 5px;
-                         padding-left: 5px;
-                         background-color: #FFFFC9;
-                         width: fit-content;
-                         /*             width: auto;*/
-                     }
-                     .LP5-Code {
-                         font-family: "Consolas", monospace;
-                         white-space: pre;
-                         background-color: #FFFFFF;
-                         border: 0;
-                         padding: 0;
-                         margin: 0;
-                         border-top: .2em solid #FFFF00;
-                         line-height: 100%;
-                     }
-                     .LP5-Code p {
-                         margin: 0;
-                     }
-                     .LP5-Code-Unref {
-                         background-color: #FFa0FF;
-                         font-family: "Verdana", "Arial", Gadget, sans-serif;
-                         white-space: normal;
-                     }
-                     .LP5-Code-Ref {
-                         background-color: #FFFFEB;
-                         font-family: "Verdana", "Arial", Gadget, sans-serif;
-                         white-space: normal;
-                     }
-                     .LP5-Code-Def {
-                         background-color: #F0F0F5;
-                         font-family: "Verdana", "Arial", Gadget, sans-serif;
-                         white-space: normal;
-                     }
-                     .LP5-CodeName {
-                         font-family: "Arial", Gadget, sans-serif;
-                         background-color: #F9FFF0;
-                         word-wrap: break-word;
-                         white-space: normal;
-                     }
-                     .LP5-CodeNameBrackets { font-family: monospace; }
-                     .LP5-Comment{
-                         /*             background-color: #FFFFEB; */
-                     }
-
-                     .LP5-CodeRef::before {
-                         content: "\3008"; /* left angle bracket */
-                     }
-                     .LP5-CodeRef::after {
-                         content: "\3009"; /* right angle bracket */
-                     }
-                     .LP5-CodeRef {
-                         background-color: lightyellow;
-                     }
-
-                    </style>
-                    <div id="LP5-Source" data-id="outerDiv">
-                        <div class="wdrag" data-id="drag" ></div>
-                    </div>
-                    <script>
-                     const {drag, outerDiv} = require('dataID');
-                     const {model, Article} = require('model, Article');
-                     const iView          = this;
-
-                     function articleNodeFromClick(event){
-                         let result = null;
-                         let path   = event.composedPath();
-                         console.log("path is ", path);
-
-                         // has to be article node and direct child of source pane
-                         result = path.find((node, index)=>{
-                             return node.tagName == 'ARTICLE'
-                                 && index+1 < path.length
-                                 && path[index+1].id == 'LP5-Source'
-                             ;
-                         });
-                         return result;
-                     }
-
-                     function clickHandler(event){
-                         console.log(":::::: source pane clickHandler ", event);
-                         const articleNode = articleNodeFromClick(event);
-                         console.assert(articleNode); // ??? really does happen.
-                         articleNode.focus();
-                         console.log(" clicked article ", articleNode, iView);
-                         iView.eventPublish("SelectArticle", articleNode);
-                     }
-                     function init(){
-                         console.log("***** adding click handler in source");
-                         outerDiv.addEventListener('click', clickHandler,
-                                                   { composed: true, bubble: true });
-                         iView.routeEvent = function(){
-                             console.warn("source pane routeEvent hit!");
-                         };
-                     };
-                     function massageCode(text){
-                         console.log("massageCode ", text);
-                         let result = text = text.replaceAll(/[&]lt;/g,'<');
-                         let lines = text.split(/\r?\n/);
-                         let indent = -1;
-                         for(let line of lines){
-                             line = line.replace(/\s+$/,'');
-                             if(line.length){
-                                 let thisIndent = line.search(/\S|$/);
-                                 if(indent == -1 || thisIndent < indent){
-                                     indent = thisIndent;
-                                 }
-                             }
+                         #LP5-Nav a {text-decoration: none;}
+                         #LP5-Nav a:visited { color: rgb(0,0,238); }
+                         #LP5-Nav h1 {
+                             margin: inherit;
+                             cursor: pointer;
+                             font-size: 18px;
                          }
-                         if(indent > 0){
-                             let space = " ".repeat(indent);
-                             let regex = new RegExp("^" + space, 'gm');
-                             result = text.replace(regex, '');
-                             console.assert(result != text);
+                         #LP5-Nav h2 {
+                             text-indent: 5%;
+                             margin: inherit;
+                             cursor: pointer;
+                             font-size: 15px;
                          }
-                         return result;
-                     }
-                     let codeNameToArticle = null;
-                     function renderArticle(article){
-                         console.log("source pane renderArticle ", article);
-                         let {docSectionNode, ulNode} = article;
-                         if(docSectionNode){
-                             console.log("Appending article node");
-                             outerDiv.appendChild(article.articleNode);
-                             
-                             if(article.scriptNode){
-                                 console.log("   got script node ");
-                                 //                                 article.codeTextNode.innerText = Article.unindentCode(
-                                 //                                     article.scriptNode.innerText);
-                                 article.codeTextNode.replaceChildren();
-                                 let codeName = article.getCodeName();
-                                 if(codeName){
-                                     const nameCount = codeNameToArticle[codeName];
-                                     let   equals = "\u2261";
-                                     if(nameCount > 1 )
-                                         equals = "+\u2261";
-                                     const codeHeader = document.createElement('DIV');
-                                     codeHeader.classList.add('LP5-Code-Def');
-                                     codeHeader.appendChild(
-                                         document.createTextNode(
-                                             "\u3008"+codeName+"\u3009"+equals));
-                                     article.codeTextNode.appendChild(codeHeader);
-                                 }
+                         #LP5-Nav h3 {
+                             text-indent: 10%;
+                             margin: inherit;
+                             cursor: pointer;
+                             font-size: 15px;
+                         }
+                        </style>
+                        <nav id="LP5-Nav" data-id="pane">
+                        </nav>
+                        <script>
+                         //                     const iView = require('iView');
+                         const iView = this;
+                         const model = require('model');
+                         const {command}         = require('controller');
 
-                                 for(const item of article.codeParsed){
-                                     if(typeof item === 'string')
-                                         article.codeTextNode.appendChild(document.createTextNode(item));
-                                     else if(item.type == 'ref'){
-                                         const span = document.createElement("SPAN");
-                                         span.classList.add('LP5-CodeRef');
-                                         const target = model.articles.fromURL(item.value);
-                                         let refText = null;
-                                         if(target)
-                                             refText = target.getCodeName();
-                                         if(refText == null)
-                                             refText = item.value;
-                                         console.warn("refText = ", refText);
-                                         span.appendChild(document.createTextNode(refText));
-                                         article.codeTextNode.appendChild(span);
-                                     }
-                                     else if(item.type == 'endscript')
-                                         article.codeTextNode.appendChild(document.createTextNode("<" + "/script>"));
-                                     else
-                                         console.warn(false, item);
-                                 }
-                                 
-                             }
-                         }
-                         if(ulNode){
-                             console.log("nested ul node", ulNode);
-                             ulNode.style.display = 'none';
-                             ulNode.querySelectorAll('li').forEach((li)=>{
-                                 let id = li.getAttribute('id');
-                                 console.assert(id, ulNode);
-                                 //                                 let res = model.resources.get(id);
-                                 let article = model.articles.fromURL(id);
-                                 console.assert(article, id);
-                                 renderArticle(article);
+                         //                     const createFreeElement = require('createFreeElement');
+                         function clickHandler(event){
+                             event.preventDefault();
+                             let path = event.composedPath();
+                             // was click inside TOC element?
+                             let a = path.find((node,index)=>{
+                                 return node.tagName == 'A'
+                                     && index +2 < path.length
+                                     && path[index+1].tagName == 'LI'
+                                     && path[index+2].tagName == 'UL'
+                                     && path[index+3].id == 'LP5-Toc'
+                                 ;
                              });
-                         }
-                     }
-                     function renderSource(){
-                         console.log("render source: ", model.rootTOC);
-                         codeNameToArticle = {};
-                         for(const article of model.docOrder(model.rootTOC)){
-                             const name = article.getCodeName();
-                             if(name)
-                                 codeNameToArticle[name] = (codeNameToArticle[name] || 0) + 1;
-                         }
-                         if(model.rootTOC){
-                             outerDiv.replaceChildren();
-                             outerDiv.appendChild(drag);
-                             renderArticle(model.rootTOC);
-                         }
-                     };
-                     let result = {init:init, render:renderSource};
-                     console.log("back from source init!!!!!!!!!");
-                     return result;
-                    </script>
-                </template>
-                <template data-name="outputDiv" id="LP5-Output">
-                    <style>
-                     #root { display: flex; flex-direction: column; }
-                    </style>
-                    <div id="root">
-                        <div data-id="outputDiv">
-                        </div>
-                    </div>
-                    <script>
-                     let model       = require('model');
-                     let {outputDiv} = require('dataID');
-                     const createFreeElement = require('createFreeElement');
-
-                     let startTagRegex = /<lp5\s*((\/>)|(>)|([A-Za-z_]))/g;
-                     let attributeRegex = null;
-                     function init(iView){
-                         let id    = "[_a-zA-Z]\w*";
-                         let dval  = '"[^"\n\r]*"';
-                         let sval  = "'[^'\n\r]*'";
-                         let value = `(?:${sval}|${dval})`;
-                         attributeRegex  = new RegExp(`^\s*(${id})=(${value})\s*`);
-                     }
-                     function indexArticles(){
-                         const result = {}
-                         for(const article of model.articles){
-                             //???                                 
-                         }
-                     }
-                     function findRoots(article){
-                         let result = [];
-                         if(article.getCodeName() !== null)
-                             result.push(article);
-                         for(let child of article.children)
-                             result = result.concat(findRoots(child));
-                         return result;
-                     }
-                     // coroutine to emit output as children of the given node.
-                     // yield to us either strings or HTML nodes.
-                     // adjacent strings will be coalesced into one text node.
-                     //                         function *emitOutput(parentNode){
-                     function *spanEmitter(span){
-                         let text = "";
-                         function emitAccumulated(){
-                             if(text.length){
-                                 span.append(text);
-                                 text = "";
+                             if(a && a.id){
+                                 const argv = ['showArticle', a.id.substring(1) ];
+                                 command(argv);
                              }
                          }
-                         // the caller yields output stuff to us.
-                         // we want to coalesce adjacent stuff that is 'string'
-                         // into one text node
-                         let stuff;
-                         while((stuff = yield) != null){
-                             if(typeof stuff === 'string')
-                                 text += stuff;
-                             else {
-                                 emitAccumulated();
-                                 if(Array.isArray(stuff))
-                                     span.append(...stuff);
+                         function init(){
+                             const {pane} = require('dataID');
+                             pane.addEventListener('click', clickHandler);
+                         };
+                         function getTitle(li){
+                             let ID = li.getAttribute('id');
+                         }
+                         function renderChildTOC(article){
+                             console.assert(article.ulNode);
+                             let ul    = document.createElement('ul');
+
+                             article.ulNode.querySelectorAll('li').forEach((entry)=>{
+                                 let li           = document.createElement('li');
+                                 let id           = entry.getAttribute('id');
+                                 let a            = document.createElement('a');
+                                 li.appendChild(a);
+                                 let childArticle = model.articles.fromURL(id);
+                                 a.setAttribute('href', "#"+childArticle.articleNode.id);
+                                 console.assert(childArticle, {id:id});
+                                 if(childArticle.titleNode)
+                                     a.innerText = childArticle.titleNode.innerText;
                                  else
-                                     span.append(stuff);
-                             }
+                                     a.innerText = "< no title >";
+                                 ul.appendChild(li);
+                                 if(childArticle.ulNode)
+                                     ul.appendChild(renderChildTOC(childArticle));
+                             });
+                             return ul;
                          }
-                         // caller is done yielding stuff to us
-                         emitAccumulated();
-                         return span;
-                     }
-                     //                         function  parseStartTag(str, len, posStart){
-                     function  parseStartTag(str, startTagRegex){
-                         let result = null;
-                         let startMatch = startTagRegex.exec(str);
-                         if(startMatch !== null){
-                             result = {
-                                 startPos: startTagRegex.index,
-                             };
-                             
-                             let pos = posStart + "<lp5".length;
-                             if(pos < len){
-                                 console.log("fun");
-                                 
+                         function renderTOC(){
+                             console.log("render toc: ", model.rootTOC);
+                             let article = model.rootTOC;
+                             if(article && article.ulNode){
+                                 let ul = renderChildTOC(article);
+                                 let tocRootNode = iView.rootNode.shadowRoot.querySelector('#LP5-Nav');
+                                 console.assert(tocRootNode && tocRootNode.id == "LP5-Nav");
+                                 tocRootNode.replaceChildren(ul);
                              }
-                             return pos;
+                             return;
+                         };
+                         function handleEvent(event){
+                             console.assert(false);
                          }
+                         let result = {init:init, render:renderTOC, handleEvent:handleEvent};
                          return result;
-                     }
-                     /* yields: { type:, value: }
-                      *     0 - text string
-                      *     1 - parsed lp5 element
-                      *
-                      * value.attributes, where .name contains value of that attr
-                      * value.outer, outer string
-                      * value.inner, inner string
-                      */
-                     function* parse(str){
-                         let posStart = 0;
-                         let posEnd   = 0;
-                         let len      = str.length;
-
-                         startTagRegex.lastIndex = 0;
-                         let match = null;
-                         while((match=parseStartTag(str,startTagRegex))!==null){
-                             console.log("match = ", match);
-                         }
-                         let matches  = codeSerial.matchAll(startTagRegex);
-                         for(const match of matches){
-                             if(match.index < posStart)
-                                 continue;
-                             console.warn("parse match=", match);
-                             let lp5Start  = match.index;
-                             //                                 yield str.slice(posStart, posEnd);
-                             // '>' or '/>' or first char of attribute name
-                             let endChars = match[1];
+                        </script>
+                    </template>
+                    <template data-name="sourceDiv" id="LP5-Source">
+                        <style>
+                         article:focus {
+                             outline: 3px solid orange;
                          }
 
-                         let tag = "<lp5";
-                         let pos = 0;
-                         len = str.length;
-                         while(pos >= 0){
-                             let posStartTag = str.indexOf(tag, pos);
-                             if(posStartTag == -1)
-                                 break;
-                             let posRover = posStartTag + tag.length;
-                             while(posRover < len){
-                             }
-
-                             let posEmptyTag = str.indexOf("/>", posStartTag);
-                             let posEndTag   = str.indexOf("</lp5>", posStartTag);
-                             if(posEmptyTag != -1 && posEmptyTag < posEndTag){
-                                 yield str.slice(pos, posEndTag + 6);
-                                 pos = posEmptyTag + 6;
-                             } 
+                         .LP5-Section{
+                             border-bottom: 1px dotted  #a5c8ba;
+                             padding-right: 5px;
+                             padding-left: 5px;
+                             background-color: #FFFFC9;
+                             width: fit-content;
+                             /*             width: auto;*/
                          }
-                         return str.slice(pos);
-                     }
-                     function appendArray(node, array){
-                         if(array.length > 0)
-                             node.append(...array);
-                     }
-                     function renderArticles(codeName = "", indent=0){
-                         const articleArray = model.articlesFromName[codeName];
-                         const result       = [];
-                         for(const article of articleArray)
-                             result.push(renderArticle(article, indent));
-                         return result;
-                     }
-                     // renderArticle() - create 'code' output from an article.
-                     function renderArticle(article, indent){
-                         console.log("renderArticle ", article, indent);
-                         let result = []; // always return (possibly empty) array
-                         let span   = createFreeElement('SPAN');
-                         let emit   = spanEmitter(span);
-                         emit.next(); // prime the pump
-                         
-                         function getCodeReference(item){
+                         .LP5-Code {
+                             font-family: "Consolas", monospace;
+                             white-space: pre;
+                             background-color: #FFFFFF;
+                             border: 0;
+                             padding: 0;
+                             margin: 0;
+                             border-top: .2em solid #FFFF00;
+                             line-height: 100%;
+                         }
+                         .LP5-Code p {
+                             margin: 0;
+                         }
+                         .LP5-Code-Unref {
+                             background-color: #FFa0FF;
+                             font-family: "Verdana", "Arial", Gadget, sans-serif;
+                             white-space: normal;
+                         }
+                         .LP5-Code-Ref {
+                             background-color: #FFFFEB;
+                             font-family: "Verdana", "Arial", Gadget, sans-serif;
+                             white-space: normal;
+                         }
+                         .LP5-Code-Def {
+                             background-color: #F0F0F5;
+                             font-family: "Verdana", "Arial", Gadget, sans-serif;
+                             white-space: normal;
+                         }
+                         .LP5-CodeName {
+                             font-family: "Arial", Gadget, sans-serif;
+                             background-color: #F9FFF0;
+                             word-wrap: break-word;
+                             white-space: normal;
+                         }
+                         .LP5-CodeNameBrackets { font-family: monospace; }
+                         .LP5-Comment{
+                             /*             background-color: #FFFFEB; */
+                         }
+
+                         .LP5-CodeRef::before {
+                             content: "\3008"; /* left angle bracket */
+                         }
+                         .LP5-CodeRef::after {
+                             content: "\3009"; /* right angle bracket */
+                         }
+                         .LP5-CodeRef {
+                             background-color: lightyellow;
+                         }
+
+                        </style>
+                        <div id="LP5-Source" data-id="outerDiv">
+                        </div>
+                        <script>
+                         const {outerDiv} = require('dataID');
+                         const {model, Article} = require('model, Article');
+                         const iView          = this;
+
+                         function articleNodeFromClick(event){
                              let result = null;
-                             if(item.name == 'lp5-')
-                                 if(item.attributes.length == 1){
-                                     const ref = item.attributes[0];
-                                     if(ref.name == 'ref'){
-                                         const target = model.articles.fromURL(ref.value);
-                                         if(target){
-                                             result = renderArticles(target.getCodeName(), indent + item.indent);
-                                         } else{
-                                             // ref value wasn't URL, maybe text
-                                             result = renderArticles(ref.value, indent + item.indent);
-                                         }
-                                     }
-                                 }
+                             let path   = event.composedPath();
+                             console.log("path is ", path);
+
+                             // has to be article node and direct child of source pane
+                             result = path.find((node, index)=>{
+                                 return node.tagName == 'ARTICLE'
+                                     && index+1 < path.length
+                                     && path[index+1].id == 'LP5-Source'
+                                 ;
+                             });
                              return result;
                          }
-                         const indentSpace = " ".repeat(indent);
-                         for(const item of article.codeParsed){
-                             if(typeof item === 'string'){
-                                 emit.next(item.replace(/\n/g, "\n" + indentSpace));
-                             }else{
-                                 const codeRef = getCodeReference(item);
-                                 if(codeRef){
-                                     emit.next(codeRef);
-                                 } else if(item.name == 'lp5-endscript'){
-                                     emit.next('<' + '/script>');
-                                 } else
-                                     console.warn(false, item);
-                             }
+
+                         function clickHandler(event){
+                             console.log(":::::: source pane clickHandler ", event);
+                             const articleNode = articleNodeFromClick(event);
+                             console.assert(articleNode); // ??? really does happen.
+                             articleNode.focus();
+                             console.log(" clicked article ", articleNode, iView);
+                             iView.eventPublish("SelectArticle", articleNode);
                          }
-                         emit.next(null); // finalize span
-                         span.dataset.ref = article.URL;
-                         return span;
-                     }
-                     // render entire LP5-Output div from scratch.
-                     function render(){
-                         console.log("going to render LP5-Output div");
-                         outputDiv.replaceChildren(); // empty the div
-                         outputDiv.append(...renderArticles());
-                         model.outputText = outputDiv.innerText;
+                         function init(){
+                             console.log("***** adding click handler in source");
+                             outerDiv.addEventListener('click', clickHandler,
+                                                       { composed: true, bubble: true });
+                             iView.routeEvent = function(){
+                                 console.warn("source pane routeEvent hit!");
+                             };
+                         };
+                         function massageCode(text){
+                             console.log("massageCode ", text);
+                             let result = text = text.replaceAll(/[&]lt;/g,'<');
+                             let lines = text.split(/\r?\n/);
+                             let indent = -1;
+                             for(let line of lines){
+                                 line = line.replace(/\s+$/,'');
+                                 if(line.length){
+                                     let thisIndent = line.search(/\S|$/);
+                                     if(indent == -1 || thisIndent < indent){
+                                         indent = thisIndent;
+                                     }
+                                 }
+                             }
+                             if(indent > 0){
+                                 let space = " ".repeat(indent);
+                                 let regex = new RegExp("^" + space, 'gm');
+                                 result = text.replace(regex, '');
+                                 console.assert(result != text);
+                             }
+                             return result;
+                         }
+                         let codeNameToArticle = null;
+                         function renderArticle(article){
+                             console.log("source pane renderArticle ", article);
+                             let {docSectionNode, ulNode} = article;
+                             if(docSectionNode){
+                                 console.log("Appending article node");
+                                 outerDiv.appendChild(article.articleNode);
+                                 
+                                 if(article.scriptNode){
+                                     console.log("   got script node ", article.codeParsed);
+                                     //                                 article.codeTextNode.innerText = Article.unindentCode(
+                                     //                                     article.scriptNode.innerText);
+                                     article.codeTextNode.replaceChildren();
+                                     let codeName = article.getCodeName();
+                                     if(codeName){
+                                         const nameCount = codeNameToArticle[codeName];
+                                         let   equals = "\u2261";
+                                         if(nameCount > 1 )
+                                             equals = "+\u2261";
+                                         const codeHeader = document.createElement('DIV');
+                                         codeHeader.classList.add('LP5-Code-Def');
+                                         codeHeader.appendChild(
+                                             document.createTextNode(
+                                                 "\u3008"+codeName+"\u3009"+equals));
+                                         article.codeTextNode.appendChild(codeHeader);
+                                     }
 
-                         if(false)
-                             for(const article of model.docOrder(model.rootTOC)){
-                                 let codeSerial = article.getCodeSerial();
-                                 let codeName   = article.getCodeName();
-                                 console.log("...", codeSerial);
-                                 console.log("...", codeName);
-
-                                 if(!codeSerial)
-                                     console.warn("Won't render: no codeSerial");
-                                 if(codeName)
-                                     console.warn("Won't render: has codeName");
-                                 if(article.getCodeSerial() && !article.getCodeName()){
-                                     console.log("Render that article!", article);
-                                     outputDiv.appendChild(renderArticle(article));
+                                     for(const item of article.codeParsed){
+                                         if(typeof item === 'string')
+                                             article.codeTextNode.appendChild(document.createTextNode(item));
+                                         else if(item.type == 'ref'){
+                                             const span = document.createElement("SPAN");
+                                             span.classList.add('LP5-CodeRef');
+                                             const target = model.articles.fromURL(item.value);
+                                             let refText = null;
+                                             if(target)
+                                                 refText = target.getCodeName();
+                                             if(refText == null)
+                                                 refText = item.value;
+                                             console.warn("refText = ", refText);
+                                             span.appendChild(document.createTextNode(refText));
+                                             article.codeTextNode.appendChild(span);
+                                         }
+                                         else if(item.type == 'endscript')
+                                             article.codeTextNode.appendChild(document.createTextNode("<" + "/script>"));
+                                         else
+                                             console.warn(false, item);
+                                     }
                                      
                                  }
                              }
-                     }
-                     let result = {init:init, render:render};
-                     return result;
-                    </script>
-                </template>
+                             if(ulNode){
+                                 console.log("nested ul node", ulNode);
+                                 ulNode.style.display = 'none';
+                                 ulNode.querySelectorAll('li').forEach((li)=>{
+                                     let id = li.getAttribute('id');
+                                     console.assert(id, ulNode);
+                                     //                                 let res = model.resources.get(id);
+                                     let article = model.articles.fromURL(id);
+                                     console.assert(article, id);
+                                     renderArticle(article);
+                                 });
+                             }
+                         }
+                         function renderSource(){
+                             console.log("render source: ", model.rootTOC);
+                             codeNameToArticle = {};
+                             for(const article of model.docOrder(model.rootTOC)){
+                                 const name = article.getCodeName();
+                                 if(name)
+                                     codeNameToArticle[name] = (codeNameToArticle[name] || 0) + 1;
+                             }
+                             if(model.rootTOC){
+                                 outerDiv.replaceChildren();
+                                 renderArticle(model.rootTOC);
+                             }
+                         };
+                         let result = {init:init, render:renderSource};
+                         console.log("back from source init!!!!!!!!!");
+                         return result;
+                        </script>
+                    </template>
+                    <template data-name="outputDiv" id="LP5-Output">
+                        <style>
+                         #root { display: flex; flex-direction: column; }
+                        </style>
+                        <div id="root">
+                            <div data-id="outputDiv">
+                            </div>
+                        </div>
+                        <script>
+                         let model       = require('model');
+                         let {outputDiv} = require('dataID');
+                         const createFreeElement = require('createFreeElement');
+
+                         let startTagRegex = /<lp5\s*((\/>)|(>)|([A-Za-z_]))/g;
+                         let attributeRegex = null;
+                         function init(iView){
+                             let id    = "[_a-zA-Z]\w*";
+                             let dval  = '"[^"\n\r]*"';
+                             let sval  = "'[^'\n\r]*'";
+                             let value = `(?:${sval}|${dval})`;
+                             attributeRegex  = new RegExp(`^\s*(${id})=(${value})\s*`);
+                         }
+                         function indexArticles(){
+                             const result = {}
+                             for(const article of model.articles){
+                                 //???                                 
+                             }
+                         }
+                         function findRoots(article){
+                             let result = [];
+                             if(article.getCodeName() !== null)
+                                 result.push(article);
+                             for(let child of article.children)
+                                 result = result.concat(findRoots(child));
+                             return result;
+                         }
+                         // coroutine to emit output as children of the given node.
+                         // yield to us either strings or HTML nodes.
+                         // adjacent strings will be coalesced into one text node.
+                         //                         function *emitOutput(parentNode){
+                         function *spanEmitter(span){
+                             let text = "";
+                             function emitAccumulated(){
+                                 if(text.length){
+                                     span.append(text);
+                                     text = "";
+                                 }
+                             }
+                             // the caller yields output stuff to us.
+                             // we want to coalesce adjacent stuff that is 'string'
+                             // into one text node
+                             let stuff;
+                             while((stuff = yield) != null){
+                                 if(typeof stuff === 'string')
+                                     text += stuff;
+                                 else {
+                                     emitAccumulated();
+                                     if(Array.isArray(stuff))
+                                         span.append(...stuff);
+                                     else
+                                         span.append(stuff);
+                                 }
+                             }
+                             // caller is done yielding stuff to us
+                             emitAccumulated();
+                             return span;
+                         }
+                         //                         function  parseStartTag(str, len, posStart){
+                         function  parseStartTag(str, startTagRegex){
+                             let result = null;
+                             let startMatch = startTagRegex.exec(str);
+                             if(startMatch !== null){
+                                 result = {
+                                     startPos: startTagRegex.index,
+                                 };
+                                 
+                                 let pos = posStart + "<lp5".length;
+                                 if(pos < len){
+                                     console.log("fun");
+                                     
+                                 }
+                                 return pos;
+                             }
+                             return result;
+                         }
+                         /* yields: { type:, value: }
+                          *     0 - text string
+                          *     1 - parsed lp5 element
+                          *
+                          * value.attributes, where .name contains value of that attr
+                          * value.outer, outer string
+                          * value.inner, inner string
+                          */
+                         function* parse(str){
+                             let posStart = 0;
+                             let posEnd   = 0;
+                             let len      = str.length;
+
+                             startTagRegex.lastIndex = 0;
+                             let match = null;
+                             while((match=parseStartTag(str,startTagRegex))!==null){
+                                 console.log("match = ", match);
+                             }
+                             let matches  = codeSerial.matchAll(startTagRegex);
+                             for(const match of matches){
+                                 if(match.index < posStart)
+                                     continue;
+                                 console.warn("parse match=", match);
+                                 let lp5Start  = match.index;
+                                 //                                 yield str.slice(posStart, posEnd);
+                                 // '>' or '/>' or first char of attribute name
+                                 let endChars = match[1];
+                             }
+
+                             let tag = "<lp5";
+                             let pos = 0;
+                             len = str.length;
+                             while(pos >= 0){
+                                 let posStartTag = str.indexOf(tag, pos);
+                                 if(posStartTag == -1)
+                                     break;
+                                 let posRover = posStartTag + tag.length;
+                                 while(posRover < len){
+                                 }
+
+                                 let posEmptyTag = str.indexOf("/>", posStartTag);
+                                 let posEndTag   = str.indexOf("</lp5>", posStartTag);
+                                 if(posEmptyTag != -1 && posEmptyTag < posEndTag){
+                                     yield str.slice(pos, posEndTag + 6);
+                                     pos = posEmptyTag + 6;
+                                 } 
+                             }
+                             return str.slice(pos);
+                         }
+                         function appendArray(node, array){
+                             if(array.length > 0)
+                                 node.append(...array);
+                         }
+                         function renderArticles(codeName = "", indent=0){
+                             const articleArray = model.articlesMatchingName(codeName);
+                             const result       = [];
+                             for(const article of articleArray)
+                                 result.push(renderArticle(article, indent));
+                             return result;
+                         }
+                         // renderArticle() - create 'code' output from an article.
+                         function renderArticle(article, indent){
+                             console.log("renderArticle ", article, indent);
+                             let result = []; // always return (possibly empty) array
+                             let span   = createFreeElement('SPAN');
+                             let emit   = spanEmitter(span);
+                             emit.next(); // prime the pump
+                             
+                             function getCodeReference(item){
+                                 let result = null;
+                                 if(item.name == 'lp5-')
+                                     if(item.attributes.length == 1){
+                                         const ref = item.attributes[0];
+                                         if(ref.name == 'ref'){
+                                             const target = model.articles.fromURL(ref.value);
+                                             if(target){
+                                                 result = renderArticles(target.getCodeName(), indent + item.indent);
+                                             } else{
+                                                 // ref value wasn't URL, maybe text
+                                                 result = renderArticles(ref.value, indent + item.indent);
+                                             }
+                                         }
+                                     }
+                                 return result;
+                             }
+                             const indentSpace = " ".repeat(indent);
+                             for(const item of article.codeParsed){
+                                 if(typeof item === 'string'){
+                                     emit.next(item.replace(/\n/g, "\n" + indentSpace));
+                                 }else{
+                                     const codeRef = getCodeReference(item);
+                                     if(codeRef){
+                                         emit.next(codeRef);
+                                     } else if(item.name == 'lp5-endscript'){
+                                         emit.next('<' + '/script>');
+                                     } else
+                                         console.warn(false, item);
+                                 }
+                             }
+                             emit.next(null); // finalize span
+                             span.dataset.ref = article.URL;
+                             return span;
+                         }
+                         // render entire LP5-Output div from scratch.
+                         function render(){
+                             console.log("going to render LP5-Output div");
+                             outputDiv.replaceChildren(); // empty the div
+                             outputDiv.append(...renderArticles());
+                             model.outputText = outputDiv.innerText;
+
+                             if(false)
+                                 for(const article of model.docOrder(model.rootTOC)){
+                                     let codeSerial = article.getCodeSerial();
+                                     let codeName   = article.getCodeName();
+                                     console.log("...", codeSerial);
+                                     console.log("...", codeName);
+
+                                     if(!codeSerial)
+                                         console.warn("Won't render: no codeSerial");
+                                     if(codeName)
+                                         console.warn("Won't render: has codeName");
+                                     if(article.getCodeSerial() && !article.getCodeName()){
+                                         console.log("Render that article!", article);
+                                         outputDiv.appendChild(renderArticle(article));
+                                         
+                                     }
+                                 }
+                         }
+                         let result = {init:init, render:render};
+                         return result;
+                        </script>
+                    </template>
+                </div> <!-- LP5-Middle -->
                 
                 <div id="LP5-Footer">
                     <template data-name="footerDiv" >
@@ -1215,13 +1205,6 @@
                         </script>
                     </template>
                 </div>
-            </div>
-        </template>
-        <!-- table of contents -->
-        <template id="lp5-new-TOC" data-name="toc">
-            <div>
-                <a href="SHA1">title override</a>
-            </div>
         </template>
         <script>
          "use strict";
@@ -2138,7 +2121,7 @@ ${codeText}
                                          else{
                                              console.assert(`${href.substring(1)} not found`);
                                          }
-                                         console.assert(false);
+//                                         console.assert(false);
                                      } else {
                                          window.open(href, '_blank');
                                      }
@@ -2497,6 +2480,7 @@ ${codeText}
                          });
 
                          const rootNode = createFreeElement('div');
+                         rootNode.classList.add('lp5-root');
                          if(t.id)
                              rootNode.id = t.id;
                          if(t.className)
@@ -2756,9 +2740,16 @@ ${codeText}
                      if(article.getCodeSerial()){
                          console.log("pushing code article ", article);
                          (model.articlesFromName[article.getCodeName()] ??= []).
-                                                      push(article);
+                                              push(article);
                      }
                  }
+             }
+             model.articlesMatchingName = function (name){
+                 const matches = model.articlesFromName[name];
+                 if(matches)
+                     return matches;
+                 else
+                     return [];
              }
              model.createUniqueFile = async function (){
                  let handle = await this.storage.createUniqueFile(
