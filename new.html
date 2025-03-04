@@ -632,12 +632,42 @@
             </script>
             <div class="lp5-body">
                 <div id="LP5-Menu">
+
                     <ul>
                         <li id="LP5-Menu-Reload" tabindex="0">Reload</li>
                         <li id="LP5-Menu-Export">Export</li>
                         <li>Menu 3</li>
                         <li id="LP5-Menu-Test">Test</li>
+                        <li>
+                            <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <!-- Define the marker for the arrowhead -->
+                                <defs>
+                                    <marker id="dotarrowhead" viewBox="0 0 10 10" refX="3" refY="5" markerWidth="4" markerHeight="4" orient="auto">
+                                        <polygon points="0,0 6,5 0,10" fill="none" stroke="black" stroke-width="2" stroke-dasharray="2,4" opacity="0.4" />
+                                    </marker>
+
+                                    <marker id="arrowhead" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+                                        <polygon points="0,0 10,5 0,10" fill="black" />
+                                    </marker>
+                                </defs>
+
+                            </svg>
+                            <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+                                <g>
+                                    <!-- Dotted vertical line on the left -->
+                                    <line x1="4" y1="4" x2="4" y2="20" stroke="black" stroke-width="2" stroke-dasharray="1,1" />
+                                    
+                                    <!-- Dotted arrow pointing right -->
+                                    <line x1="4" y1="12" x2="12" y2="12" stroke="black" stroke-width="2" stroke-dasharray="1,1" marker-end="url(#dotarrowhead)" />
+                                    <polygon points="12,12 14,10 14,14" fill="black" />
+
+                                    <!-- Solid vertical line on the right -->
+                                    <line x1="20" y1="4" x2="20" y2="20" stroke="black" stroke-width="2" />
+                                </g>
+                            </svg>
+                        </li>
                     </ul>
+
                 </div>
                 <div id="LP5-Middle">
                     <template data-name="tableOfContents" id="LP5-Toc">
