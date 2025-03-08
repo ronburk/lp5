@@ -1,5 +1,6 @@
 BUGS
 ====
+[ ] is parseCode() getting called after edit?
 [ ] if listing x.lp5 from DOS box then save of edit will silently fail!
 [X] Output render algorithm is wrong. When encountering a reference to
     code named "foo code", it fails to gather all articles named "foo code"
@@ -13,6 +14,58 @@ BUGS
     [x] start detecting keydown events.
     [ ] add ctrl panel to top of output pane.
     [ ] event makes source pane notify 'home' view.
+
+NITS
+====
+[ ] stack dump in crash does not point to right char (need fixed-width font?)
+[ ] dialog close not handled uniformly
+[ ] do dialogs have to hide the home window?
+[ ] code name header is indented by one space looks like
+
+2025/03/07
+A 'close' in 'EditingSection' results in a call to reopen
+the entire project, that's how changes to an article make it
+to the screen!
+
+So what are the data structures that contain code links?
+     model.codeNameToArticles
+     (name indexes to array of articles with that codename)
+
+
+2025/03/06
+Use View Settings to affect article display. First problem is undefined
+references. When are those detected? Can't be detected *during* load
+because need all articles loaded first.
+
+An article is "unreferenced" because it contains code, but there were
+no links to that code from anywhere. However, it must also have a code
+"name", because unnamed code sections are just the roots of the DAG.
+So... have to read all the articles and find all their code references
+to do this.  Each named code section logically is associated with
+0 or more other sections that refer to it. Can't just hot-link the name,
+because (being a macro, after all) it could have more than one
+article linking to it. Could, however, have a clickable action
+that resets the current view to be just those places that refer to this.
+
+Well, in any case, need a data structure that, for each article, shows
+all the referring articles.
+
+codeReferrers["target_name"] = [array of referring articles]
+
+So, maybe in model.updateDerivedState(). Except, parseCode() can
+really update article model with list of referrals.
+
+Suppose we have article.refersTo and article.referredFrom. How to
+see if article had undefined references? article.refersTo[x] will
+be the codename of an article that is not loaded.
+
+2025/03/05
+Move state in/out of View dialog. Where to store the state?
+Storing state in model.viewSettings. Need cleanup on event
+handling.
+
+
+2025/03/04
 
 2025/03/02
 Crash!  What does/should articlesFromName() return if there are no matches?
