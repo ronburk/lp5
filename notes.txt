@@ -22,6 +22,9 @@ NITS
 [ ] do dialogs have to hide the home window?
 [ ] code name header is indented by one space looks like
 
+2025/03/09
+articles.refersTo is not set, so undef view won't work.
+
 2025/03/07
 A 'close' in 'EditingSection' results in a call to reopen
 the entire project, that's how changes to an article make it

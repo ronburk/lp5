@@ -1077,7 +1077,7 @@
                                      
                                  }
                              }
-                             if(ulNode){
+                             if(/*ulNode*/ false){
                                  console.log("nested ul node", ulNode);
                                  ulNode.style.display = 'none';
                                  ulNode.querySelectorAll('li').forEach((li)=>{
@@ -1102,7 +1102,24 @@
                              }
                              if(model.rootTOC){
                                  outerDiv.replaceChildren();
-                                 renderArticle(model.rootTOC);
+                                 /*renderArticle(model.rootTOC); */
+                                 for(const article of model.docOrder(model.rootTOC)){
+                                     // if only showing undef
+                                     if(model.viewSettings.undef){
+                                         // undef=code refers to non-existent codename
+                                         const name = article.getCodeName();
+                                         console.log('&&&', name, article, model.articlesFromName);
+                                         for(const codeName in article.refersTo){
+                                             console.log(' &&&', codeName);
+                                             if(!model.articlesFromName[codeName]){
+                                                 renderArticle(article);
+                                                 break;
+                                             }
+                                         }
+                                     } else {
+                                         renderArticle(article);
+                                     }
+                                 }
                              }
                          };
                          let result = {init:init, render:renderSource};
@@ -1575,8 +1592,12 @@
                              result.scriptNode      = topLevelNode
                                  .querySelector(`:scope >script:nth-child(${nth})`);
                              result.codeParsed   = parseCode(result.scriptNode);
-                             result.refersTo     = result.codeParsed.
-                                                          filter(item => typeof item === 'object' && item !== null && item.type === 'ref');
+                             result.refersTo     = {}
+                             for(const item of result.codeParsed){
+                                 if(item?.type === 'ref')
+                                     result.refersTo[item.value] = true;
+                             }
+                             console.log("XXX", result.codeParsed, Object.keys(result.refersTo));
                              result.codeTextNode = createFreeElement('section');
                              result.codeTextNode.classList.add('LP5-Code');
                              //                             result.codeSectionNode.appendChild(result.codeTextNode);
@@ -2899,6 +2920,11 @@ ${codeText}
              model.anchorNameToNode = new Map();
              model.updateDerivedState = function(){
                  console.log("updateDerivedState!!!!!!");
+                 function pushArticle(object, name, article){
+                     const articles = object[name] ?? [];
+                     articles.push(article);
+                     object[name] = articles;
+                 }
                  function getTocOrder(article, array=[]){
                      array.push(article);
                      const ulNode = article.ulNode;
@@ -2913,25 +2939,32 @@ ${codeText}
                  model.tocOrder = getTocOrder(model.rootTOC);
                  console.log("updateDerivedState!!!!!! tocOrder = ", model.tocOrder);
                  // hash that makes code section names to articles (in ToC order)
-                 codeNameToArticles = {};
-                 model.articlesFromName = {};
+                 const codeNameToDefiningArticles = {}; // arrays of all the articles with a given code name
+                 const codeNameToReferringArticles = {};
+                 const articlesFromName = {};
                  for(const article of model.tocOrder){
                      console.log("checking article: ", article);
                      if(article.getCodeSerial()){
                          console.log("pushing code article ", article);
-                         (model.articlesFromName[article.getCodeName()] ??= []).
+                         (articlesFromName[article.getCodeName()] ??= []).
                                               push(article);
-                         article.refersTo = [];
-                         for(const item in article.codeParsed)
-                             if(typeof item === 'object' && item.type === 'ref')
-                                 article.refersTo.push(item.value);
                          const name = article.getCodeName();
-                         if(name){
-                             const articles = codeNameToArticles[name] ?? [];
-                             articles.push(article);
-                             codeNameToArticles[name] = articles;
+                         for(const item of article.codeParsed){
+                             console.log("YYY", name, item);
+                             if(name && item?.type === 'ref'){
+                                 pushArticle(codeNameToReferringArticles, name, article);
+                             }
                          }
-
+                         if(name)
+                             pushArticle(codeNameToDefiningArticles, name, article);
+                     }
+                 }
+                 model.codeNameToDefiningArticles  = codeNameToDefiningArticles;
+                 model.codeNameToReferringArticles = codeNameToReferringArticles;
+                 model.articlesFromName            = articlesFromName;
+                 for(const article of model.tocOrder){
+                     const name = article.getCodeName();
+                     if(name && name !== ''){
                      }
                  }
              }
