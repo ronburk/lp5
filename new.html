@@ -2847,17 +2847,8 @@ ${codeText}
                  },
                  loadTemplates(rootElement=document, parentView=null){
                      console.log("views.loadTemplates()", rootElement);
-                     let templates = rootElement.querySelectorAll('template, link[rel="template"]');
-                     console.log(`${templates.length} templates in document`);
-window.MyTemplates = {};
-
-                     templates.forEach((t)=>{
-                         let templateName = t.dataset.name;
-                         assert(t.dataset.name, `missing dataset name`, t);
-                         assert(
-                             window.MyTemplates[templateName] == null,
-                             `duplicate template name ${templateName}`);
-                         window.MyTemplates[templateName] = t;
+                     function extractScript(t){
+                         // move the <script> node to a separate variable
                          let scriptNode = null;
                          t.content.querySelectorAll('script').forEach((s)=>{
                              if(s.parentNode.nodeName != '#document-fragment'){
@@ -2871,7 +2862,22 @@ window.MyTemplates = {};
                                  }
                              }
                          });
+                         return scriptNode;
+                     }
 
+                     let templates = rootElement.querySelectorAll('template, link[rel="template"]');
+                     console.log(`${templates.length} templates in document`);
+window.MyTemplates = {};
+
+                     templates.forEach((t)=>{
+                         let templateName = t.dataset.name;
+                         // save reference to template, by name
+                         assert(t.dataset.name, `missing dataset name`, t);
+                         assert(
+                             window.MyTemplates[templateName] == null,
+                             `duplicate template name ${templateName}`);
+                         window.MyTemplates[templateName] = t;
+                         const scriptNode = extractScript(t);
                          const rootNode = createFreeElement('div');
                          rootNode.classList.add('lp5-root');
                          if(t.id)
