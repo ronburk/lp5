@@ -153,38 +153,6 @@
          }
          console.error("We end first script!");
         </script>
-        <style class="contextMenu">
-         article:focus {
-             outline: 3px solid orange;
-         }
-         article:focus { background-color: yellow; }
-         dialog:has(> ul > li) { padding:0; }
-         .lp5-context {
-             position:absolute;
-             border: 1px solid blue;
-             cursor: pointer;
-         }
-         .lp5-context ul {
-             list-style: none;
-             margin: 0;
-             padding: 0;
-         }
-         .lp5-context ul li {
-             text-transform: uppercase;
-             font-family: sans-serif;
-             display: flex;
-             justify-content: space-between;
-             border-bottom: solid 1px #dfdfdf;
-             padding: .1em;
-             margin: 0;
-         }
-         .lp5-context ul li:hover {
-             background-color: #eee;
-         }
-         .lp5-context ul li:last-child {
-             border-bottom: none;
-         }
-        </style>
         <style>
          div.epigraph  {
              display: flex;
@@ -411,9 +379,39 @@
              return { init:init, render:render };
             </script>
         </template>
-        <template data-name="ArticleContextMenu" data-style="contextMenu">
+        <template data-name="ArticleContextMenu" >
             <style>
-             :host { all: initial !important; }
+             article:focus {
+                 outline: 3px solid orange;
+             }
+             article:focus { background-color: yellow; }
+             dialog:has(> ul > li) { padding:0; }
+             .lp5-context {
+                 position:absolute;
+                 border: 1px solid blue;
+                 cursor: pointer;
+             }
+             .lp5-context ul {
+                 list-style: none;
+                 margin: 0;
+                 padding: 0;
+             }
+             .lp5-context ul li {
+                 text-transform: uppercase;
+                 font-family: sans-serif;
+                 display: flex;
+                 justify-content: space-between;
+                 border-bottom: solid 1px #dfdfdf;
+                 padding: .1em;
+                 margin: 0;
+             }
+             .lp5-context ul li:hover {
+                 background-color: #eee;
+             }
+             .lp5-context ul li:last-child {
+                 border-bottom: none;
+             }
+            :host { all: initial !important; }
             </style>
             <div>
                 <dialog id="ArticleContextMenu" class="lp5-context">
@@ -2295,7 +2293,7 @@ ${codeText}
                          let target = path[0];
                          if(target.id == 'SelectParentDirButton'
                             || target.id == 'SelectParentDirPreviousButton'){
-                             console.assert(event.type == 'click');
+//                             console.assert(event.type == 'click');
                              asyncSchedule(selectParentDir, model, target.id);
                              controller.state = 'SelectingParent';
                          } else if(event.type == 'click') {
@@ -2875,15 +2873,8 @@ ${codeText}
                              rootNode.id = t.id;
                          if(t.className)
                              rootNode.className = t.className;
+                         // give new rootNode a shadow DOM
                          const shadow   = rootNode.attachShadow({mode:'open',delegatesFocus:true});
-                         let styleClass = t.dataset.style;
-                         if(styleClass){
-                             let styleClasses = document.getElementsByClassName(styleClass);
-                             if(!styleClasses)
-                                 die(`template ${templateName} asks for missing style class ${styleClass}`);
-                             for(let s of styleClasses)
-                                 shadow.appendChild(s);
-                         }
                          copyChildElements(t.content, shadow);
                          console.log("rootNode is ", rootNode);
 
