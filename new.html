@@ -2849,10 +2849,15 @@ ${codeText}
                      console.log("views.loadTemplates()", rootElement);
                      let templates = rootElement.querySelectorAll('template, link[rel="template"]');
                      console.log(`${templates.length} templates in document`);
+window.MyTemplates = {};
 
                      templates.forEach((t)=>{
                          let templateName = t.dataset.name;
                          assert(t.dataset.name, `missing dataset name`, t);
+                         assert(
+                             window.MyTemplates[templateName] == null,
+                             `duplicate template name ${templateName}`);
+                         window.MyTemplates[templateName] = t;
                          let scriptNode = null;
                          t.content.querySelectorAll('script').forEach((s)=>{
                              if(s.parentNode.nodeName != '#document-fragment'){
@@ -2875,7 +2880,8 @@ ${codeText}
                              rootNode.className = t.className;
                          // give new rootNode a shadow DOM
                          const shadow   = rootNode.attachShadow({mode:'open',delegatesFocus:true});
-                         copyChildElements(t.content, shadow);
+                         // copyChildElements(t.content, shadow);
+                         shadow.appendChild(document.importNode(t.content, true));
                          console.log("rootNode is ", rootNode);
 
                          const iView = new View(t.dataset.name, parentView);
@@ -2885,7 +2891,7 @@ ${codeText}
                              iView.rootNode = rootNode;
                              t.replaceWith(rootNode);
                          } else {
-                             // clone template, then discard it
+                             // clone template, then remove from DOM
                              iView.rootNode = rootNode;
                              t.remove();
                              const dialogNode = iView.rootNode.shadowRoot.querySelector('dialog');
