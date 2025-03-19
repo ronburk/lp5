@@ -11,6 +11,15 @@
         <meta charset="utf-8" >
         <title>lp5</title>
         <script>
+         const originalAssert = console.assert;
+         console.assert = function(condition, message, ...optionalParams) {
+             if (!condition) {
+                 originalAssert(condition, message, ...optionalParams);
+                 throw new Error(message);
+             }
+         };
+
+
          window.lp5 = {};
          function parseTag(str, startPos){
              const result = {
@@ -142,6 +151,7 @@
              // 3) Throw an error so that no further code in this call stack runs
              throw new Error("FATAL: " + message);
          }
+         console.error("We end first script!");
         </script>
         <style class="contextMenu">
          article:focus {
@@ -210,6 +220,168 @@
 
     </head>
     <body>
+        <template data-name="treeView">
+            <!-- Hierarchical Treeview -->
+            <ul id="treeview" class="treeview" data-drag="true" data-id="treeView">
+                <li><span>Fruits</span>
+                    <ul class="nested">
+                        <li><span>Orange</span></li>
+                        <li><span>Lemon</span></li>
+                        <li><span>Melons</span>
+                            <ul class="nested">
+                                <li><span>Watermelon</span></li>
+                                <li><span>Cantaloupe</span></li>
+                            </ul>
+                        </li>
+                    </ul>
+                </li>
+                <li><span>Apple</span></li>
+                <li><span>Vegetables</span>
+                    <ul class="nested">
+                        <li><span>Carrot</span></li>
+                        <li><span>Spinach</span></li>
+                        <li><span>Broccoli</span></li>
+                    </ul>
+                </li>
+                <li><span>Potato</span></li>
+            </ul>
+
+            <p><strong>Selected Item:</strong> <span id="selected-item">None</span></p>
+
+            <script>
+             const {treeView} = require('dataID');
+             // Select the outermost UL element
+             //             const treeView = document.getElementById('treeView');
+             if(treeView.dataset.drag){
+                 console.log("Draggable!");
+                 const items = treeView.querySelectorAll('li');
+                 items.forEach(item => {
+                     item.setAttribute('draggable', 'true');
+                 });
+
+             }
+
+             function move(liFrom, liTo, relPos){
+                 console.log("move", liFrom, liTo, relPos);
+             }
+
+             let previousTarget     = null;  // Store the last hovered element
+             let currentTarget      = null;
+             (function (move){
+                 let currentDragSource  = null;
+                 let currentDropTarget  = null;
+                 let undo               = () => null;
+                 let relPos             = null;
+
+                 treeView.addEventListener('dragstart', function(event) {
+                     const li = event.target.closest('li');
+                     console.log("dragstart", li);
+                     if(li){
+                         li.classList.add('dragging');
+                         currentDragSource = li;
+                         event.dataTransfer.dropEffect    = "move";
+                         event.dataTransfer.effectAllowed = "move";
+                     }
+                 });
+
+                 treeView.addEventListener('dragenter', function(event) {
+                     event.preventDefault();  // Allow the drop
+                 });
+                 treeView.addEventListener('dragover', function(event) {
+                     event.preventDefault();  // Allow the drop
+                     const li = event.target.closest('li');
+
+                     if (li){
+                         undo();
+                         if(!li.classList.contains('dragging')){
+                             const rect    = li.getBoundingClientRect();
+                             const upper   = event.clientY < rect.top + rect.height / 2;
+                             relPos = upper ? 'before' : 'after';
+                             const dropClass = 'drop-target-' + relPos;
+                             li.classList.add(dropClass);
+                             undo =  () => li.classList.remove(dropClass);
+                         } else
+                             undo = () => null;
+                         currentDropTarget = li;
+                     }
+                 });
+
+                 // Event listener for dragend (cleanup after the drag is done)
+                 treeView.addEventListener('dragend', function(event) {
+                     const draggedItem = event.target;
+                     if (draggedItem.tagName === 'LI')
+                         draggedItem.classList.remove('dragging');
+                     undo();
+                 });
+
+
+                 // Event listener for drop events on the parent UL element
+                 treeView.addEventListener('drop', function(event) {
+                     event.preventDefault();
+                     const target = event.target.closest('li');
+                     console.log("drop", target);
+
+                     target.classList.remove('over');
+                     currentTarget = null;
+
+                     move(currentDragSource, currentDropTarget, relPos);
+                 });
+
+             })(move);
+             let selected = null;
+
+             // Add an event listener on the UL element (capture phase)
+             treeView.addEventListener('click', function(event) {
+                 const target = event.target;
+                 const li = target.closest('li');
+                 
+                 if (li) {
+                     const span = li.querySelector(':scope > span'); // Corrected querySelector
+                     const nestedUl = li.querySelector('ul'); // Check if the li contains a nested ul
+                     
+                     // Only show the triangle if the li contains a nested ul (container item)
+                     if (nestedUl) {
+                         if (target === span) {
+                             // If the clicked target is the span, select the item
+                             selectItem(span);
+                         } else {
+                             // Otherwise, toggle the expand/collapse for container items
+                             toggleList(li);
+                         }
+                     } else if (target === span) {
+                         // For non-container items, just select the item
+                         selectItem(span);
+                     }
+                 }
+             }, true); // Use capture phase to catch clicks early
+
+             // Toggle expand/collapse for nested lists
+             function toggleList(li) {
+                 const nestedList = li.querySelector('.nested');
+                 if (nestedList) {
+                     nestedList.classList.toggle('active');
+                     li.classList.toggle('expanded');
+                 }
+             }
+
+             // Function to select an item and highlight it
+             function selectItem(span) {
+                 selected?.classList.remove('selected');
+                 span.classList.add('selected');
+                 selected = span;
+             }
+
+             // On page load, ensure no nested lists are visible initially
+             window.onload = function() {
+                 //             const nestedLists = document.querySelectorAll('.nested');
+                 //             nestedLists.forEach(nested => nested.classList.remove('active')); // Ensures all nested lists are collapsed initially
+             }
+             function init(){}
+             function render(){}
+             return {init, render };
+            </script>
+
+        </template>
         <template data-name="Crash">
             <div>
                 <style>
@@ -320,6 +492,7 @@
             <dialog id="myDialog">
                 <form method="dialog">
                     <h3>View Settings</h3>
+                    <!--                    <link rel="template" href="treeView"> -->
                     <label for="searchText" data-tooltip="Enter the text to search">Search:
                         <input data-id="match" type="text" id="searchText" placeholder="Search">
                     </label>
@@ -1102,23 +1275,26 @@
                              }
                              if(model.rootTOC){
                                  outerDiv.replaceChildren();
-                                 /*renderArticle(model.rootTOC); */
+                                 const undef = model.viewSettings.undef;
+                                 const unref = model.viewSettings.unref;
+                                 const match = true /*model.viewSettings.match*/;
+
                                  for(const article of model.docOrder(model.rootTOC)){
-                                     // if only showing undef
-                                     if(model.viewSettings.undef){
-                                         // undef=code refers to non-existent codename
-                                         const name = article.getCodeName();
-                                         console.log('&&&', name, article, model.articlesFromName);
-                                         for(const codeName in article.refersTo){
-                                             console.log(' &&&', codeName);
-                                             if(!model.articlesFromName[codeName]){
-                                                 renderArticle(article);
-                                                 break;
-                                             }
-                                         }
-                                     } else {
-                                         renderArticle(article);
+                                     let visible = true;
+                                     if(undef || unref){
+                                         if(undef && article.isUnreferenced())
+                                             ;
+                                         else if(unref && article.hasUndefinedReferences())
+                                             ;
+                                         else
+                                             visible = false;
                                      }
+                                     if(visible && match){
+                                         //???
+//                                         visible = false;
+                                     }
+                                     if(visible)
+                                         renderArticle(article);
                                  }
                              }
                          };
@@ -1383,6 +1559,8 @@
                 </div>
         </template>
         <script>
+         console.error("We start again!");
+
          "use strict";
          void function(){
              // defense against malformed HTML leading to insane behavior
@@ -1634,6 +1812,15 @@
                          let titleNode        = createFreeElement('h2');
                          titleNode.innerHTML = '<h2>New_Empty_Article</h2>';
                      }
+                     hasUndefinedReferences(){
+                         let result = false;
+                         for(const codeName in this.refersTo)
+                             if(!model.articlesFromName[codeName]){
+                                 result = true;
+                                 break;
+                             }
+                         return result;
+                     }
                      getCodeSerial(){
                          let result = null;
                          let script = this.scriptNode;
@@ -1782,6 +1969,10 @@ ${codeText}
                          result = true;
                  }
                  return result;
+             }
+             function assert(condition, ...args){
+                 if(!condition)
+                     console.assert(false, ...args);
              }
              function die(msg, ...args){
                  console.log(msg);
@@ -2053,7 +2244,9 @@ ${codeText}
                          }
                          console.log(event.message);
                      } else {
-                         detail = event.message + error.stack.toString();
+                         detail = error.stack.toString();
+                         console.log("else: ", detail);
+                         detail = detail.replace(/(^|\n)\s+at console\.assert[^\n]*\n/, '$1'); 
                      }
                      event.preventDefault();
                      console.log("calling crash");
@@ -2306,7 +2499,7 @@ ${codeText}
                                          else{
                                              console.assert(`${href.substring(1)} not found`);
                                          }
-//                                         console.assert(false);
+                                         //                                         console.assert(false);
                                      } else {
                                          window.open(href, '_blank');
                                      }
@@ -2393,7 +2586,7 @@ ${codeText}
                  var error_ = encodeURI("msg:"+ message + "\n\tfile:"+file+"\n\tln:"+lineNumber);
                  var user_ = encodeURI("");
 
-                 console.warn(error_);
+//                 console.warn("window.onerror: ", error_);
                  return false;
              }
 
@@ -2408,7 +2601,7 @@ ${codeText}
                      left: "0",
                      width: "100%",
                      height: "100%",
-                     backgroundColor: "rgba(0,0,0,0.9)",
+                     backgroundColor: "rgba(100,0,0,0.9)",
                      color: "white",
                      fontSize: "1.2em",
                      zIndex: "999999",
@@ -2656,16 +2849,14 @@ ${codeText}
                  },
                  loadTemplates(rootElement=document, parentView=null){
                      console.log("views.loadTemplates()", rootElement);
-                     let templates = rootElement.querySelectorAll('template');
+                     let templates = rootElement.querySelectorAll('template, link[rel="template"]');
                      console.log(`${templates.length} templates in document`);
 
                      templates.forEach((t)=>{
                          let templateName = t.dataset.name;
-                         console.assert(t.dataset.name);
-
+                         assert(t.dataset.name, `missing dataset name`, t);
                          let scriptNode = null;
                          t.content.querySelectorAll('script').forEach((s)=>{
-                             console.log("found script ", s);
                              if(s.parentNode.nodeName != '#document-fragment'){
                                  die("script not direct child of template node", t, s);
                              } else if(s.parentNode == t.content){
@@ -2673,7 +2864,6 @@ ${codeText}
                                      die("Only one script per template!", s);
                                  } else {
                                      scriptNode = s;
-                                     console.log("    and removed script");
                                      scriptNode.remove();
                                  }
                              }
@@ -2721,26 +2911,19 @@ ${codeText}
                          //                     let script = templateRoot.querySelector('script');
                          if(scriptNode){
                              let script = scriptNode.innerHTML;
-                             if(false){
-                                 try {
-                                     // run the script to obtain its notification functions
-                                     console.log(" eval the script");
-                                     iView.notify   = scopedEval(script, iView);
-                                 } catch(error){
-                                     console.log(error);
-                                     console.log("Failed on script: ", script);
-                                     console.assert(false, error);
-                                 }
-                             }else{
-                                 controller.script = script;
-                                 controller.scriptName = iView.name;
-                                 iView.notify  = scopedEval(scriptNode.innerHTML, iView);
-                                 console.log("notify set to eval", iView);
-                                 console.log("parent is ", parentView);
-                                 controller.script = null;
-                             }
-                             console.assert(iView.notify.hasOwnProperty('init'));
-                             console.assert(iView.notify.hasOwnProperty('render'));
+                             controller.script = script;
+                             controller.scriptName = iView.name;
+                             iView.notify  = scopedEval(scriptNode.innerHTML, iView);
+                             controller.script = null;
+                             console.assert(
+                                 typeof iView.notify === 'object',
+                                 `template '${iView.name}' didn't return object.`);
+                             console.assert(
+                                 iView.notify.hasOwnProperty('init'),
+                                 `template '${iView.name}' didn't return .init()`);
+                             console.assert(
+                                 iView.notify.hasOwnProperty('render'),
+                                 `template '${iView.name}' didn't return .render()`);
                          } else {
                              console.log("notify set to null!");
                              iView.notify = null;
@@ -2947,7 +3130,7 @@ ${codeText}
                      if(article.getCodeSerial()){
                          console.log("pushing code article ", article);
                          (articlesFromName[article.getCodeName()] ??= []).
-                                              push(article);
+                           push(article);
                          const name = article.getCodeName();
                          for(const item of article.codeParsed){
                              console.log("YYY", name, item);

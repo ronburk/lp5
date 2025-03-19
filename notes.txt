@@ -22,6 +22,9 @@ NITS
 [ ] do dialogs have to hide the home window?
 [ ] code name header is indented by one space looks like
 
+2025/03/10
+fromSerial() is the only place that should initialize article.refersTo.
+
 2025/03/09
 articles.refersTo is not set, so undef view won't work.
 
