@@ -490,7 +490,7 @@
             <dialog id="myDialog">
                 <form method="dialog">
                     <h3>View Settings</h3>
-                    <!--                    <link rel="template" href="treeView"> -->
+                    <link rel="template" href="treeView">
                     <label for="searchText" data-tooltip="Enter the text to search">Search:
                         <input data-id="match" type="text" id="searchText" placeholder="Search">
                     </label>
@@ -2870,6 +2870,7 @@ ${codeText}
 window.MyTemplates = {};
 
                      templates.forEach((t)=>{
+                         console.log("    forEach template ", t);
                          let templateName = t.dataset.name;
                          // save reference to template, by name
                          assert(t.dataset.name, `missing dataset name`, t);
@@ -2878,15 +2879,13 @@ window.MyTemplates = {};
                              `duplicate template name ${templateName}`);
                          window.MyTemplates[templateName] = t;
                          const scriptNode = extractScript(t);
-                         const rootNode = createFreeElement('div');
+                         const rootNode   = createFreeElement('div');
                          rootNode.classList.add('lp5-root');
                          if(t.id)
                              rootNode.id = t.id;
                          if(t.className)
                              rootNode.className = t.className;
-                         // give new rootNode a shadow DOM
                          const shadow   = rootNode.attachShadow({mode:'open',delegatesFocus:true});
-                         // copyChildElements(t.content, shadow);
                          shadow.appendChild(document.importNode(t.content, true));
                          console.log("rootNode is ", rootNode);
 
@@ -2939,7 +2938,6 @@ window.MyTemplates = {};
                              this.loadTemplates(iView.rootNode.shadowRoot, iView);
                              this.views[iView.name] = iView;
                          } else {
-                             //                                                 parentView.children.push(iView);
                              parentView.children[iView.name] = iView;
                          }
 
