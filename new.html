@@ -188,7 +188,7 @@
 
     </head>
     <body>
-        <template data-name="treeView">
+        <template data-custom="lp5-treeview">
             <!-- Hierarchical Treeview -->
             <ul id="treeview" class="treeview" data-drag="true" data-id="treeView">
                 <li><span>Fruits</span>
@@ -217,6 +217,14 @@
             <p><strong>Selected Item:</strong> <span id="selected-item">None</span></p>
 
             <script>
+.....
+             class TreeView extends LP5Element {
+                 constructor(){
+                     super(require('template'));
+                 }
+             }
+//             document.define('lp5-treeview', TreeView);
+             
              const {treeView} = require('dataID');
              // Select the outermost UL element
              //             const treeView = document.getElementById('treeView');
@@ -233,6 +241,7 @@
                  console.log("move", liFrom, liTo, relPos);
              }
 
+             // drag-and-drop code
              let previousTarget     = null;  // Store the last hovered element
              let currentTarget      = null;
              (function (move){
@@ -490,7 +499,7 @@
             <dialog id="myDialog">
                 <form method="dialog">
                     <h3>View Settings</h3>
-                    <link rel="template" href="treeView">
+                    <lp5-treeview></lp5-treeview>
                     <label for="searchText" data-tooltip="Enter the text to search">Search:
                         <input data-id="match" type="text" id="searchText" placeholder="Search">
                     </label>
@@ -2187,7 +2196,7 @@ ${codeText}
              function controller(event){
                  const { model, views, asyncSchedule } = controller;
                  if(controller.crashed){
-                     event.preventDefault();
+//                     event.preventDefault();
                      return;
                  }
                  if(event.type == 'asyncComplete' && event.detail instanceof Error){
@@ -2614,7 +2623,7 @@ ${codeText}
                  
                  document.body.appendChild(overlay);
                  // Disable user interactions on the rest of the page.
-                 document.body.style.pointerEvents = "none";
+//                 document.body.style.pointerEvents = "none";
              }
 
              controller.deferEvent = function(target, eventName, eventDetail) {
@@ -2695,6 +2704,47 @@ ${codeText}
              controller.inSync = false;
              controller.state  = 'load';
 
+             class LP5Element extends HTMLElement {
+                 constructor(template){
+                     super();
+                     this.template = template;
+                     const content = template.content;
+                     const shadow = this.attachShadow({mode:'open',delegatesFocus:true});
+                     shadow.appendChild(document.importNode(content, true));
+                     this.elements = {};
+                     content.querySelectAll('[id]').forEach(element =>
+                         elements[element.id] = element);
+                 }
+             }
+             customElements.define('lp5-element', LP5Element);
+             
+             function scopedEval2(script, scriptName, globalEnv, scriptThis){
+                 function require(thing){
+                     // split into non-empty args
+                     let things = thing.split(/[ ,]+/).filter(i=>i.length);
+                     // if it was simply require('singleItem')
+                     if(things.length == 1){
+                         if(thing in globalEnv)
+                             return globalEnv[thing];
+                         else
+                             console.assert(false);
+                     }
+                     // else we are turning a set of sets, more or less
+                     let finalObj = {};
+                     things.forEach(function requireFinalLoop(i){
+                         console.assert(i in globalEnv, i);
+                         finalObj[i] = globalEnv[i];
+                     });
+                     return finalObj;
+                 }
+
+                 let sourceMap = "\n//# sourceURL=" + scriptName + "\n";
+console.log("before scopedEval2 return");
+                 return new Function(
+                     "require", '"use strict";' + script + sourceMap).call(
+                         scriptThis, require);
+                 
+             }
              function scopedEval(script, iView){
                  console.log("scopedEval ", iView ); //, script);
                  for(const element of iView.rootNode.shadowRoot.querySelectorAll("[data-ID]")){
@@ -2711,7 +2761,6 @@ ${codeText}
                      }
                  });
                  let globalEnv = {
-                     require           : require,
                      createFreeElement : createFreeElement,
                      controller        : controller,
                      model             : controller.model,
@@ -2726,38 +2775,22 @@ ${codeText}
                      }
                  };
                  function require(thing){
-                     let things = thing.split(/[ ,]+/);
-                     let final  = [];
-                     things.forEach(function requireFirstLoop(i){
-                         if(i.length)
-                             final.push(i);
-                     });
+                     // split into non-empty args
+                     let things = thing.split(/[ ,]+/).filter(i=>i.length);
                      // if it was simply require('singleItem')
-                     if(final.length == 1){
+                     if(things.length == 1){
                          if(thing in globalEnv)
                              return globalEnv[thing];
                          else
                              console.assert(false);
                      }
+                     // else we are turning a set of sets, more or less
                      let finalObj = {};
-                     final.forEach(function requireFinalLoop(i){
+                     things.forEach(function requireFinalLoop(i){
                          console.assert(i in globalEnv, i);
                          finalObj[i] = globalEnv[i];
                      });
                      return finalObj;
-
-                     switch(thing){
-                         case 'controller':
-                             return controller;
-                         case 'model':
-                             return controller.model;
-                         case 'views' :
-                             return controller.views;
-                         case 'iView':
-                             return iView;
-                         default:
-                             console.assert(false);
-                     }
                  }
                  let sourceMap = "\n//# sourceURL=" + iView.name + "\n";
                  return new Function(
@@ -2871,9 +2904,19 @@ window.MyTemplates = {};
 
                      templates.forEach((t)=>{
                          console.log("    forEach template ", t);
+                         const customName = t.dataset.custom;
+                         if(customName){
+                             t.remove();
+                             const script = extractScript(t);
+                             console.log("before eval");
+                             const customClass = scopedEval2(script, customName, {}, t);
+                     console.log("after eval");
+                             customElements.define(customName, customClass);
+                             return;
+                         }
                          let templateName = t.dataset.name;
                          // save reference to template, by name
-                         assert(t.dataset.name, `missing dataset name`, t);
+                         assert(t.dataset.name, `template w/o data-name`, t);
                          assert(
                              window.MyTemplates[templateName] == null,
                              `duplicate template name ${templateName}`);
