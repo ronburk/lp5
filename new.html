@@ -19,7 +19,6 @@
              }
          };
 
-
          window.lp5 = {};
          function parseTag(str, startPos){
              const result = {
@@ -190,7 +189,102 @@
     <body>
         <template data-custom="lp5-treeview">
             <!-- Hierarchical Treeview -->
-            <ul id="treeview" class="treeview" data-drag="true" data-id="treeView">
+            <style>
+             /* Base font size for scaling */
+             html {
+                 font-size: 16px; /* Default size, easily scalable */
+             }
+
+             /* Remove default padding and inline-start indentation on ul to prevent first-level items from being indented */
+             ul.treeview {
+                 list-style-type: none;
+                 padding-left: 0; /* Remove the default padding */
+                 padding-inline-start: 0; /* Remove the default inline-start padding */
+                 margin: 0;
+             }
+
+             /* Indentation for nested <ul> elements using em to scale */
+             ul.treeview ul {
+                 padding-left: 1.00em; /* Indent nested lists based on font size */
+                 list-style-type: none; /* Remove list bullet points */
+             }
+
+             /* Indentation for <li> elements */
+             li {
+                 cursor: pointer;
+                 display: block;
+                 position: relative;
+                 font-size: 1rem; /* Use rem to scale font size proportionally */
+                 user-select: none; /* Disable text selection on list items */
+             }
+
+             /* For all li elements, apply the triangle (default state) */
+             li::before {
+                 content: "\25B6 "; /* Right-pointing triangle */
+                 margin-right: 0;
+                 cursor: pointer;
+                 display: inline-block;
+                 width: 1em; /* Triangle width */
+                 height: 1em; /* Ensure consistent height */
+                 text-align: center;
+                 font-size: 0.75em; /* Triangle size */
+                 line-height: 1em;
+             }
+
+             /* Hide the triangle for li elements that do not have a <ul> as a direct child */
+             li:not(:has(> ul))::before {
+                 visibility: hidden; /* Hide the triangle */
+             }
+
+             /* Horizontal line indicating where the dragged item will go */
+             li.drop-target-before {
+                 box-shadow: inset 0 2px 0 0 rgba(0, 123, 255, 0.5); /* Shadow on the top of the element */
+             }
+
+             /* Horizontal line indicating the "after" drop location */
+             li.drop-target-after {
+                 box-shadow: inset 0 -2px 0 0 rgba(0, 123, 255, 0.5); /* Shadow on the bottom of the element */
+             }
+
+             /* Highlight the target area while dragging */
+             li.over {
+                 border: 2px dashed #007bff; /* Adds a dashed border to indicate a valid drop area */
+                 background-color: #f0f8ff;  /* Light background to highlight the target */
+             }
+
+             /* When an item is being dragged, reduce its opacity */
+             li.dragging {
+                 opacity: 0.1;  /* Makes the dragged item semi-transparent */
+             }
+
+             /* When the container item is expanded, use the down-pointing triangle */
+             li.expanded::before {
+                 content: "\25BC "; /* Downward-pointing triangle */
+             }
+
+             /* Ensure nested <ul> elements are collapsed by default */
+             ul.nested {
+                 display: none;
+             }
+
+             /* When active, display nested <ul> */
+             ul.nested.active {
+                 display: block;
+             }
+
+             /* Style for the selected item */
+             .selected {
+                 background-color: lightblue;
+                 font-weight: bold;
+             }
+
+             span {
+                 font-size: 1rem; /* Use rem for text size */
+             }
+
+            </style>
+
+            <ul data-id="lp5-treeview" data-drag="true">
                 <li><span>Fruits</span>
                     <ul class="nested">
                         <li><span>Orange</span></li>
@@ -217,18 +311,52 @@
             <p><strong>Selected Item:</strong> <span id="selected-item">None</span></p>
 
             <script>
-.....
+             function makeAllLiDraggable(ancestor, ){
+                 const items = ancestor.querySelectorAll('li');
+                 items.forEach(item => {
+                     item.setAttribute('draggable', 'true');
+                 });
+                 console.log("makeAllLiDraggable returns");
+             }
+             // Add an event listener on the UL element (capture phase)
+             //             treeView.addEventListener('click', function(event) {
+             function clickHandler(event){
+                 console.log("clickHandler!!!!!");
+                 const target = event.target;
+                 const li = target.closest('li');
+                 
+                 if (li) {
+                     const span = li.querySelector(':scope > span');
+                     const nestedUl = li.querySelector('ul');
+                     
+                     // Only show triangle if li contains nested ul (container item)
+                     if (nestedUl) {
+                         if (target === span) {
+                             selectItem(span);
+                         } else {
+                             toggleList(li);
+                         }
+                     } else if (target === span) {
+                         // For non-container items, just select the item
+                         selectItem(span);
+                     }
+                 }
+             }
+
              class TreeView extends LP5Element {
                  constructor(){
                      super(require('template'));
                  }
+                 #treeView = null;
+                 connectedCallback(){
+                     super.connectedCallback();
+                     this.#treeView = this.elements["lp5-treeview"];
+                     console.assert(this.#treeView, "Missing <ul data-id='lp5-treeview'>");
+                     makeAllLiDraggable(this.#treeView);
+                     this.#treeView.addEventListener('click', clickHandler, true);
+                 }
              }
-//             document.define('lp5-treeview', TreeView);
-             
-             const {treeView} = require('dataID');
-             // Select the outermost UL element
-             //             const treeView = document.getElementById('treeView');
-             if(treeView.dataset.drag){
+       if(false) if(treeView.dataset.drag){
                  console.log("Draggable!");
                  const items = treeView.querySelectorAll('li');
                  items.forEach(item => {
@@ -244,13 +372,16 @@
              // drag-and-drop code
              let previousTarget     = null;  // Store the last hovered element
              let currentTarget      = null;
-             (function (move){
+
+             function dragAndDrop(){
                  let currentDragSource  = null;
                  let currentDropTarget  = null;
                  let undo               = () => null;
                  let relPos             = null;
+                 const api              = {}
 
-                 treeView.addEventListener('dragstart', function(event) {
+//                 treeView.addEventListener('dragstart', function(event) {
+                 api.dragstart = function dragstart(event) {
                      const li = event.target.closest('li');
                      console.log("dragstart", li);
                      if(li){
@@ -259,12 +390,13 @@
                          event.dataTransfer.dropEffect    = "move";
                          event.dataTransfer.effectAllowed = "move";
                      }
-                 });
+                 }
 
-                 treeView.addEventListener('dragenter', function(event) {
+//                 treeView.addEventListener('dragenter', function(event) {
+                 api.dragenter = function dragenter(event){
                      event.preventDefault();  // Allow the drop
-                 });
-                 treeView.addEventListener('dragover', function(event) {
+                 }
+                 api.dragover = function dragover(event){
                      event.preventDefault();  // Allow the drop
                      const li = event.target.closest('li');
 
@@ -281,19 +413,19 @@
                              undo = () => null;
                          currentDropTarget = li;
                      }
-                 });
+                 }
 
                  // Event listener for dragend (cleanup after the drag is done)
-                 treeView.addEventListener('dragend', function(event) {
+                 api.dragend = function dragend(event){
                      const draggedItem = event.target;
                      if (draggedItem.tagName === 'LI')
                          draggedItem.classList.remove('dragging');
                      undo();
-                 });
+                 }
 
 
                  // Event listener for drop events on the parent UL element
-                 treeView.addEventListener('drop', function(event) {
+                 api.drop = function drop(event){
                      event.preventDefault();
                      const target = event.target.closest('li');
                      console.log("drop", target);
@@ -301,36 +433,12 @@
                      target.classList.remove('over');
                      currentTarget = null;
 
-                     move(currentDragSource, currentDropTarget, relPos);
-                 });
-
-             })(move);
-             let selected = null;
-
-             // Add an event listener on the UL element (capture phase)
-             treeView.addEventListener('click', function(event) {
-                 const target = event.target;
-                 const li = target.closest('li');
-                 
-                 if (li) {
-                     const span = li.querySelector(':scope > span'); // Corrected querySelector
-                     const nestedUl = li.querySelector('ul'); // Check if the li contains a nested ul
-                     
-                     // Only show the triangle if the li contains a nested ul (container item)
-                     if (nestedUl) {
-                         if (target === span) {
-                             // If the clicked target is the span, select the item
-                             selectItem(span);
-                         } else {
-                             // Otherwise, toggle the expand/collapse for container items
-                             toggleList(li);
-                         }
-                     } else if (target === span) {
-                         // For non-container items, just select the item
-                         selectItem(span);
-                     }
+                     api.move(currentDragSource, currentDropTarget, relPos);
                  }
-             }, true); // Use capture phase to catch clicks early
+                 return  api;
+             }
+             const dragApi = dragAndDrop();
+             let selected = null;
 
              // Toggle expand/collapse for nested lists
              function toggleList(li) {
@@ -353,6 +461,7 @@
                  //             const nestedLists = document.querySelectorAll('.nested');
                  //             nestedLists.forEach(nested => nested.classList.remove('active')); // Ensures all nested lists are collapsed initially
              }
+             return TreeView;
              function init(){}
              function render(){}
              return {init, render };
@@ -506,7 +615,7 @@
                     <label><input data-id="unref" type="checkbox" data-tooltip="Search for unreferenced items"> Unreferenced</label>
                     <label><input data-id="undef" type="checkbox" data-tooltip="Search for undefined items"> Undefined</label>
                     <button data-id="save" type="submit">Save</button>
-                    <button data-id="cancel" type="button" onclick="document.getElementById('myDialog').close();">Cancel</button>
+                    <button data-id="cancel" type="button" onclick="this.closest('dialog').close();">Cancel</button>
                 </form>
             </dialog>
             <script>
@@ -542,7 +651,7 @@
                  match.value   = model.viewSettings.match;
              }
              function respond(iView, event){
-                 console.log("EditSection responds to event ", event.composedPath());
+                 console.log("ViewSettings responds to event ", event.composedPath());
                  if(event.target == cancel){
                      console.log("Got cancel!");
                  } else if(event.target == save){
@@ -1289,9 +1398,9 @@
                                  for(const article of model.docOrder(model.rootTOC)){
                                      let visible = true;
                                      if(undef || unref){
-                                         if(undef && article.isUnreferenced())
+                                         if(unref && article.isUnreferenced())
                                              ;
-                                         else if(unref && article.hasUndefinedReferences())
+                                         else if(undef && article.hasUndefinedReferences())
                                              ;
                                          else
                                              visible = false;
@@ -1819,6 +1928,9 @@
                          let titleNode        = createFreeElement('h2');
                          titleNode.innerHTML = '<h2>New_Empty_Article</h2>';
                      }
+                     isUnreferenced(){
+                         return false; // ???
+                     }
                      hasUndefinedReferences(){
                          let result = false;
                          for(const codeName in this.refersTo)
@@ -2196,6 +2308,7 @@ ${codeText}
              function controller(event){
                  const { model, views, asyncSchedule } = controller;
                  if(controller.crashed){
+                     console.log("Got event, but controller is crashed.", event);
 //                     event.preventDefault();
                      return;
                  }
@@ -2227,8 +2340,8 @@ ${codeText}
                      const error = event.error;
                      let   detail   = "";
                      if(error instanceof SyntaxError){
-                         console.log("    and it's a SyntaxError");
-                         const {lineno,colno} = event;
+                             console.log("    and it's a SyntaxError");
+                             const {lineno,colno} = event;
 
                          // if it's text we are eval'ing
                          if(controller.script){
@@ -2253,10 +2366,13 @@ ${codeText}
                      } else {
                          detail = error.stack.toString();
                          console.log("else: ", detail);
-                         detail = detail.replace(/(^|\n)\s+at console\.assert[^\n]*\n/, '$1'); 
+                         let match = /^([\s\S]*)\n\s*at\s+(?:console\.)?assert.*/;
+                         detail = detail.replace(match, '$1');
+                         detail = detail.replace(match, '$1');
+                         console.log("details: ", detail);
                      }
                      event.preventDefault();
-                     console.log("calling crash");
+                     console.log("calling crash", detail);
                      controller.crash(detail);
                      return;
                      //                     controller.deferEvent('Crash', detail);
@@ -2306,6 +2422,7 @@ ${codeText}
                              asyncSchedule(selectParentDir, model, target.id);
                              controller.state = 'SelectingParent';
                          } else if(event.type == 'click') {
+                             console.log("SelectParent got clicks");
                              // let the view handle clicks
                          } else if(event.type == 'close') {
                              console.log("'close' event came in");
@@ -2541,8 +2658,8 @@ ${codeText}
                          } else if(event.type == 'saveArticle'){
                              views.respond(event);
                          } else {
-                             console.log("controller calls respond!");
-                             views.respond(event);
+                             console.log("controller EditingView calls respond!");
+//                             views.respond(event);
                          }
                          break;
 
@@ -2600,7 +2717,7 @@ ${codeText}
              controller.crashed = false;
              controller.crash = function(message){
                  controller.crashed = true;
-                 const overlay = document.createElement("div");
+                 const overlay = document.createElement("dialog");
                  // Style the overlay to cover the entire viewport and block user interaction.
                  Object.assign(overlay.style, {
                      position: "fixed",
@@ -2611,7 +2728,7 @@ ${codeText}
                      backgroundColor: "rgba(100,0,0,0.9)",
                      color: "white",
                      fontSize: "1.2em",
-                     zIndex: "999999",
+                     zIndex: "999999999",
                      display: "flex",
                      flexDirection: "column",
                      justifyContent: "center",
@@ -2622,8 +2739,11 @@ ${codeText}
                  overlay.innerText = message;
                  
                  document.body.appendChild(overlay);
+                 overlay.showModal();
                  // Disable user interactions on the rest of the page.
 //                 document.body.style.pointerEvents = "none";
+                 debugger;
+//                 throw new Error("foo");
              }
 
              controller.deferEvent = function(target, eventName, eventDetail) {
@@ -2706,14 +2826,20 @@ ${codeText}
 
              class LP5Element extends HTMLElement {
                  constructor(template){
+                     assert(template);
                      super();
                      this.template = template;
                      const content = template.content;
                      const shadow = this.attachShadow({mode:'open',delegatesFocus:true});
                      shadow.appendChild(document.importNode(content, true));
+                 }
+                 connectedCallback(){
                      this.elements = {};
-                     content.querySelectAll('[id]').forEach(element =>
-                         elements[element.id] = element);
+//                     this.template.content.querySelectorAll('[data-id]').
+                     this.shadowRoot.querySelectorAll('[data-id]').
+                          forEach(element =>
+                              this.elements[element.dataset.id] = element);
+                     console.log(">>>>found ", this.elements);
                  }
              }
              customElements.define('lp5-element', LP5Element);
@@ -2727,7 +2853,8 @@ ${codeText}
                          if(thing in globalEnv)
                              return globalEnv[thing];
                          else
-                             console.assert(false);
+                             assert(false,
+                             `'${thing}': undefined name for require`);
                      }
                      // else we are turning a set of sets, more or less
                      let finalObj = {};
@@ -2740,10 +2867,13 @@ ${codeText}
 
                  let sourceMap = "\n//# sourceURL=" + scriptName + "\n";
 console.log("before scopedEval2 return");
-                 return new Function(
-                     "require", '"use strict";' + script + sourceMap).call(
-                         scriptThis, require);
-                 
+                 controller.script = script;
+                 controller.scriptName = scriptName;
+                 const result = new Function(
+                     "require", "LP5Element", '"use strict";' + script + sourceMap).call(
+                         scriptThis, require, LP5Element);
+                 controller.script = null;
+                 return result;
              }
              function scopedEval(script, iView){
                  console.log("scopedEval ", iView ); //, script);
@@ -2906,10 +3036,14 @@ window.MyTemplates = {};
                          console.log("    forEach template ", t);
                          const customName = t.dataset.custom;
                          if(customName){
+                             const globalEnv = {
+                                 template: t,
+                                 LP5Element: LP5Element,
+                             };
                              t.remove();
                              const script = extractScript(t);
                              console.log("before eval");
-                             const customClass = scopedEval2(script, customName, {}, t);
+                             const customClass = scopedEval2(script.textContent, customName, globalEnv, t);
                      console.log("after eval");
                              customElements.define(customName, customClass);
                              return;
@@ -2958,7 +3092,7 @@ window.MyTemplates = {};
                              let script = scriptNode.innerHTML;
                              controller.script = script;
                              controller.scriptName = iView.name;
-                             iView.notify  = scopedEval(scriptNode.innerHTML, iView);
+                             iView.notify  = scopedEval(scriptNode.textContent, iView);
                              controller.script = null;
                              console.assert(
                                  typeof iView.notify === 'object',
@@ -3113,9 +3247,7 @@ window.MyTemplates = {};
                          body.prepend(iView.rootNode);
                          iView.dialogNode.showModal();
                      } else {
-                         console.log("before problem ", iView.rootNode);
                          document.body.replaceChildren(iView.rootNode);
-                         console.log("after problem");
                          /* if not showing dialog, autofocus only valid on page load,
                           * so fix that manually.
                           * https://html.spec.whatwg.org/multipage/interaction.html#the-autofocus-attribute
