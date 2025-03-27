@@ -121,21 +121,21 @@
     <p></p>
     <p>
         An lp5 program consists of a series of
-        <q>sections,</q>
-        where each section contains documentation
-        or code fragments or both
-        (the section you are currently reading
+        <q>articles,</q>
+        where each article contains documentation
+        or code sections or both
+        (the article you are currently reading
         happens to contain only
         documentation, no code).
     </p>
     <p>
-        The order of the sections is the order the
+        The order of the articles is the order the
         author deems most conducive to explaining
         the code,
         and is independent of the order of the code
         in the final HTML output
         (which is produced by asking lp5 to <q>compile</q>).
-        Most lp5 sections are quite short
+        Most lp5 articles are quite short
         and often contain not much more than a dozen
         lines of code.
         Simple parts, simply related:

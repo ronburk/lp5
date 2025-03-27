@@ -95,12 +95,10 @@
                      posNext     = length;
                  else
                      posNext = match.index;
-                 console.warn("pattern match was ", match);
                  if(posStart < posNext)
                      result.push(scriptText.substring(posStart, posNext));
                  if(match){
                      const tagDescriptor = parseTag(scriptText, match.index);
-                     console.warn("parseTag() returns ", tagDescriptor);
                      if(tagDescriptor){
                          let typename = classifyTag(tagDescriptor);
                          // console.assert(false, typename);
@@ -118,7 +116,6 @@
                      }
                  }
              }
-             console.warn("<<<<<<<<<<parseCode() returns ", result);
              return result;
          }
          function showFatalError(message) {
@@ -612,8 +609,8 @@
                     <label for="searchText" data-tooltip="Enter the text to search">Search:
                         <input data-id="match" type="text" id="searchText" placeholder="Search">
                     </label>
-                    <label><input data-id="unref" type="checkbox" data-tooltip="Search for unreferenced items"> Unreferenced</label>
-                    <label><input data-id="undef" type="checkbox" data-tooltip="Search for undefined items"> Undefined</label>
+                    <label><input data-id="unref" type="checkbox" data-tooltip="Search for unreferenced items">Is Orphan</label>
+                    <label><input data-id="undef" type="checkbox" data-tooltip="Search for undefined items">Has Dangling</label>
                     <button data-id="save" type="submit">Save</button>
                     <button data-id="cancel" type="button" onclick="this.closest('dialog').close();">Cancel</button>
                 </form>
@@ -732,7 +729,7 @@
                  save.addEventListener('click', clickSave);
              }
              function renderEditSectionDialog(iView, article){
-                 console.log("EditSection Dialog render!!!!!!", article);
+                 console.log("renderEditSectionDialog render!!!!!!", article);
                  thisArticle = article; // remember for future use
                  let title = sectionGetTitle(article);
                  console.log("Title is ", title);
@@ -1229,6 +1226,11 @@
                              font-family: "Verdana", "Arial", Gadget, sans-serif;
                              white-space: normal;
                          }
+                         .LP5-Code-Undef{
+                             background-color: #FFc0c0;
+                             font-family: "Verdana", "Arial", Gadget, sans-serif;
+                             white-space: normal;
+                         }
                          .LP5-CodeName {
                              font-family: "Arial", Gadget, sans-serif;
                              background-color: #F9FFF0;
@@ -1276,7 +1278,7 @@
                          function clickHandler(event){
                              console.log(":::::: source pane clickHandler ", event);
                              const articleNode = articleNodeFromClick(event);
-                             console.assert(articleNode); // ??? really does happen.
+                             console.assert(articleNode, "??? missing article node"); // ??? really does happen.
                              articleNode.focus();
                              console.log(" clicked article ", articleNode, iView);
                              iView.eventPublish("SelectArticle", articleNode);
@@ -1332,7 +1334,10 @@
                                          if(nameCount > 1 )
                                              equals = "+\u2261";
                                          const codeHeader = document.createElement('DIV');
-                                         codeHeader.classList.add('LP5-Code-Def');
+                                         if(article.isOrphan)
+                                             codeHeader.classList.add('LP5-Code-Undef');
+                                         else
+                                             codeHeader.classList.add('LP5-Code-Def');
                                          codeHeader.appendChild(
                                              document.createTextNode(
                                                  "\u3008"+codeName+"\u3009"+equals));
@@ -1354,14 +1359,14 @@
                                                  refText = item.value;
                                                  span.style.backgroundColor = 'red';
                                              }
-                                             console.warn("refText = ", refText);
+                                             console.warn(`refText = '${refText}' `);
                                              span.appendChild(document.createTextNode(refText));
                                              article.codeTextNode.appendChild(span);
                                          }
                                          else if(item.type == 'endscript')
                                              article.codeTextNode.appendChild(document.createTextNode("<" + "/script>"));
                                          else
-                                             console.warn(false, item);
+                                             console.warn(`unknown code parse item ${item}`);
                                      }
                                      
                                  }
@@ -1398,7 +1403,7 @@
                                  for(const article of model.docOrder(model.rootTOC)){
                                      let visible = true;
                                      if(undef || unref){
-                                         if(unref && article.isUnreferenced())
+                                         if(unref && article.isOrphan())
                                              ;
                                          else if(undef && article.hasUndefinedReferences())
                                              ;
@@ -1853,6 +1858,7 @@
                          console.assert(template.parentNode.nodeName == 'HEAD');
                          console.assert(template.parentNode.childElementCount == 1);
 
+                         result.articleNode.append(URL);
                          result.articleNode.tabIndex = 0;
                          const childElements = template.content.children;
                          let nChild = childElements.length;
@@ -1928,8 +1934,12 @@
                          let titleNode        = createFreeElement('h2');
                          titleNode.innerHTML = '<h2>New_Empty_Article</h2>';
                      }
-                     isUnreferenced(){
-                         return false; // ???
+                     isOrphan(){
+                         let   result   = false;
+                         const codeName = this.getCodeName();
+                         if(codeName && !model.codeNameToReferringArticles[codeName])
+                             result = true;
+                         return result;
                      }
                      hasUndefinedReferences(){
                          let result = false;
@@ -2536,21 +2546,8 @@ ${codeText}
                              console.log("deep =  ", getDeepActiveElement());
                          }else if(event.type == 'click'){
                              console.log(" it's a click", event.srcElement);
-                             {
-                                 let body = document.getElementsByClassName('lp5-body')[0];
-                                 if(false){
-                                     console.log("drag body ", body);
-                                     let style = getComputedStyle(body);
-                                     let columns = style.gridTemplateColumns;
-                                     console.log("drag style ", style);
-                                     console.log("columns ", columns);
-                                     console.log("type of columns ", typeof columns);
-                                     body.style.gridTemplateColumns = "438px 400px 203.664px";
-                                 }
-                             }
                              let path   = event.composedPath();
                              console.log("path = ", path);
-                             console.log(path);
                              let paneNode = path.find((node, index)=>{
                                  return node.id && node.id.substring(0,4) == 'LP5-';
                              });
@@ -2612,16 +2609,19 @@ ${codeText}
                                              inline  : 'nearest',
                                          };
                                          console.log(options);
-                                         console.log(href);
+                                         console.log("href =", href);
                                          console.log(href.substring(1));
                                          const article = model.articles.fromURL(href.substring(1));
-                                         //                                         let destination = model.anchorNameToNode.get(href);
-                                         let destination = document.getElementById(href.substring(1));
-                                         //                                     let destination = document.querySelector(`a[name="${href}"]`);
-                                         if(destination)
+                                         let destination = article.articleNode;
+                                         console.log("article = ", article);
+                                         console.log("destination = ", destination);
+                                         if(destination){
                                              destination.scrollIntoView(true);
-                                         else{
-                                             console.assert(`${href.substring(1)} not found`);
+                                             console.log("scrollIntoView ", destination);
+                                         }else{
+                                             console.log("Gonna assert!", href);
+                                             console.assert(false, `${href.substring(1)} not found`);
+                                             console.log("Can't believe I'm back from assert!");
                                          }
                                          //                                         console.assert(false);
                                      } else {
@@ -2644,6 +2644,7 @@ ${codeText}
                              asyncSchedule(model.storeResource.bind(model),
                                            controller.currentArticle, event.detail);
                              model.updateDerivedState();
+                             views.render();
                          } else {
                              console.log("controller calls respond!");
                              views.respond(event);
@@ -3302,14 +3303,12 @@ window.MyTemplates = {};
                  const codeNameToReferringArticles = {};
                  const articlesFromName = {};
                  for(const article of model.tocOrder){
-                     console.log("checking article: ", article);
                      if(article.getCodeSerial()){
-                         console.log("pushing code article ", article);
                          (articlesFromName[article.getCodeName()] ??= []).
                            push(article);
                          const name = article.getCodeName();
                          for(const item of article.codeParsed){
-                             console.log("YYY", name, item);
+//                             console.log(`'${name}' '${item}'`, name, item);
                              if(name && item?.type === 'ref'){
                                  pushArticle(codeNameToReferringArticles, name, article);
                              }
@@ -3326,6 +3325,7 @@ window.MyTemplates = {};
                      if(name && name !== ''){
                      }
                  }
+                 console.log("Updated model", model);
              }
              model.articlesMatchingName = function (name){
                  const matches = model.articlesFromName[name];

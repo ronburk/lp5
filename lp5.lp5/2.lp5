@@ -1,239 +1,281 @@
-<template>
-    <section>
-        <h2><a name="#2.lp5"> Appendix I: Literate Programming</a></h2>
-        <div class="epigraph">
-            <div>
-            Nothing about WEB is really new; I have simply combined a
-            bunch of ideas that have been in the air for a long time.
-            </div>
-            <hr>
-            <div>
-            &ndash;Donald Knuth, p. 130, "Literate Programming"
-            </div>
-        </div>
-        <div>
-            <p>
-                This appendix is for people familiar with Knuth's
-                Literate Programming who want to know how it is
-                related to lp5.
-                In writing lp5, I adapted concepts from Literate Programming
-                I found crucial and rejected others I deemed downright
-                unhelpful, as enumerated here.
-            </p>
-            <p>
-                When I say <q>Literate Programming</q> I am referring
-                specifically to the concepts documented and implemented
-                by Knuth.
-                It is necessary to point this out because the
-                generic-sounding nature of the name leads
-                an amazing percentage of programmers who hear
-                it to believe that it refers to nothing very specific at all.
-                A survey of <q>Literate Programming</q> videos on YouTube
-                reveals people who believe it refers to nearly any
-                code which contains any documentation whatsoever!
-                I believe if you polled all the programmers who have
-                heard of Literate Programming,
-                the overwhelming majority would not know,
-                for example,
-                that there is a directed graph at the heart of
-                the techique, or what that is for.
-                If Knuth jokingly took his <q>revenge</q> on
-                <q>structured programming</q> by using similar
-                language to name his new tools,
-                language has had the last laugh,
-                and helped prevent <q>Literate Programming</q>
-                from being understood,
-                let alone taken up,
-                by a significant percentage of programmers.
-            </p>
-            <p>
-                Although lp5 is different than Literate Programming,
-                they share the core structural concepts I see as most important.
-                My attempt to characterize the relevant nature of these
-                tools led me to replace <q>literate</q> with two
-                words: decomposition and explanation.
-            </p>
-            <h3>What Does LP5 Take From Literate Programming?</h3>
-            <p>
-                Broadly speaking, there are two key concepts that I
-                took away from Literate Programming.
-                First, lp5 takes the decomposition
-                tools of Literate Programming.
-                It is astonishing how often this is belittled or
-                completely ignored in discussions of Literate Programming.
-                Kibitzers will even claim that this was merely a
-                crutch for ancient programming language restrictions
-                on the ordering of code and has no use in
-                modern languages.
-            </p>
-            <p>
-                Literate Programming and lp5 allow nearly arbitrary degrees
-                of ordering and decomposition of code.
-                Programmers may <q>break a function down</q> into
-                subfunctions merely because it becomes physically long
-                rather than because it lacks cohesion or is not understandable.
-                With all Literate Programming tools for any languages they target,
-                this is completely unnecessary&mdash;one breaks functions
-                down textually, and only breaks them down structurally
-                when that actually makes sense for the structure of the code.
-            </p>
-            <p>
-                Likewise, the always annoying problem of too many levels of indentation
-                (or unreadably small indentation to make up for too many levels)
-                pretty much disappears.
-                Long before indentation levels become ungainly,
-                one has generally textually decomposed the code into
-                smaller sections.
-            </p>
-            <p>
-                In 1984, long before any World Wide Web,
-                Knuth was saying:
-                <blockquote>
-                    [A]fter gaining experience with WEB,
-                    I have come to realize that there is no need to
-                    choose once and for all between top-down and
-                    bottom-up, because a program is best thought
-                    of as a web instead of as a tree.
-                </blockquote>
-                
-            </p>
-            <p>
-                Programming inventions like structured programming,
-                object-oriented programming, etc., gave programmers
-                no new computational power (it's Turing machines all the way down,
-                after all), but provided new forms of expressing computation.
-                These new forms of expression required experience to
-                get used to and to evolve idioms that proved beneficial.
-                The decompositional tools that Literate Programming
-                and lp5 provide likewise make possible new forms of
-                expressing computation.
-                There's really not much point in talking about it
-                until you've tried it and glimpsed the possibilities for
-                new forms and styles.
-            </p>
-            <p>
-                The second key concept lp5 takes from Literate Programming is,
-                of course, the primacy of text explanations.
-                Here again, I think most of writing about Literate Programming
-                misses the mark.
-                What all professional writers know that apparently
-                most programmers don't know is this:
-                writing is a form of thinking.
-                Professional writers don't just write down
-                what they're thinking
-                (a whole lot more people would be writers if it was that simple),
-                their writing is a part of their process of thinking.
-                What this means for programmers is essentially this:
-                <b>if you focus on explaining your code,
-                    you will write different code.</b>
-            </p>
-            <p>
-                The typical programmer seems to think writing explanations
-                of code represents a failure to write clear code,
-                or a mindless chore with little value,
-                or a duplication of code that will need to be
-                <q>maintained.</q>
-                They don't understand that writing can be an intimate
-                part of the process of thinking,
-                giving you the ability to see things you would
-                otherwise ignore.
-            </p>
-            <p>
-                Quite apart from the specific techniques of Literate Programming,
-                I can't count the number of times writing documentation
-                for my code has altered the code.
-                Often, this simply takes the form of realizing
-                how overcomplicated things have become.
-                Many times, as I read documentation for some
-                API function that droned on with a seemingly endless
-                list of cautions and special cases,
-                I mightily wished the programmer who invented the API
-                had tried to write an explanation for it first.
-                They might have had the experience that they instead
-                inflicted on all the users of their code:
-                the experience of <q>My God, there has to be a simpler way!</q>
-            </p>
-            <h3>What Does LP5 Reject From Literate Programming?</h3>
-            <p>
-                Most importantly, lp5 rejects the core Knuth notion
-                of programs as literature.
-                I remember how excited I was when I
-                read Knuth's paper <i>Literate Programming</i>
-                in 1984.
-                And how much less excited I was when I actually
-                read his
-                <i>T<span style="position:relative; top:.2em">E</span>X: The Program</i>.
-                Where were the pictures?
-                Where were the overviews, the architectural
-                rationales, and so on?
-                Much like reading a novel,
-                if you wanted pictures and overviews and
-                other non-linear slices of understanding,
-                you were responsible for creating them yourself
-                after reading the book.
-            </p>
-            <p>
-                Do I want to read code <q>like a book?</q>
-                No, I do not,
-                no more than I want to traverse Harry Potter like
-                a hyptertext pile of source code.
-                Knuth said:
-                <blockquote>
-                    My experiences have led me to believe that a person
-                    reading a program is, likewise, ready to comprehend it
-                    by learning its various parts in approximately the
-                    order in which it was written.
-                </blockquote>
-                But I do not want to learn the various parts of
-                a good-sized program&mdash;I want to learn just
-                the bits I need to know to do my work,
-                be it finding/fixing a bug, adding a new feature,
-                or whatever.
-                And in the order that saves me the most time&mdash;hypertext
-                order, in other words, jumping around to get
-                to the information I need at that instant in time.
-            </p>
-            <p>
-                However, do not reject all novels just because you
-                did not care for one author's book.
-                As Knuth says,
-                <q>
-                    I imagine that different programmers will converge
-                    to quite different styles.
-                </q>
-                When Martin Ruckert published
-                <a href="https://www.google.com/books/edition/Understanding_MP3/MN34-91z6qAC?hl=en&gbpv=1&pg=PT7&printsec=frontcover">Understanding MP3</a>,
-                a Literate Program that explains the ubiquitous
-                audio coding format,
-                there were wonderful pictures, expositions, rationales,
-                etc.
-                Ruckert explicitly wrote in a style designed to serve
-                different needs,
-                making it easy to dive into exactly the area of
-                the topic you were interested in at the moment.
-                Knuth's Literate Programming provides tools&mdash;what
-                authors can produce with those tools is as varied
-                as the authors themselves.
-            </p>
-            <p>
-                This mostly boils down to differing goals.
-                Knuth is concerned with creating finished, polished works,
-                with the finality of committing ink to paper and paper
-                to book publisher.
-                I live a world where <q>finished</q> software is a mirage.
-                Few programs are ever finished, they're always being maintained,
-                extended, rethought.
-            </p>
-            <p>
-                Of course, an unavoidable handicap of Knuth's
-                consistent (relentless?) push to analogize with
-                literature was that he was trying to create
-                hypertext with ink and paper.
-            </p>
-            <p>
-                blah
-            </p>
 
-        </div>
+<template>
+    
+    <section>
+        <h2>Appendix I: Literate Programming</h2>
+<div class="epigraph">
+    <div>
+        Nothing about WEB is really new; I have simply combined a
+        bunch of ideas that have been in the air for a long time.
+    </div>
+    <hr>
+    <div>
+        –Donald Knuth, p. 130, "Literate Programming"
+    </div>
+</div>
+<div>
+    <p>
+        This appendix is for people familiar with Knuth's
+        Literate Programming who want to know how it is
+        related to lp5.
+        lp5 is obviously related to Literate Programming,
+        yet not the same.
+        Some differences are structurally driven by the
+        desire to reimagine the "web" of Literate Programming
+        as the web that HTML5 natively supplies.
+    </p>
+    <p>
+        When I say <q>Literate Programming</q> I am referring
+        specifically to the concepts documented and implemented
+        by Knuth.
+        It is necessary to point this out because the
+        generic-sounding nature of the name leads
+        an amazing percentage of programmers who hear
+        it to believe that it refers to nothing very specific at all.
+        A survey of <q>Literate Programming</q> videos on YouTube
+        reveals people who believe it refers to nearly any
+        code which contains any documentation whatsoever!
+    </p>
+    <p>
+        I believe if you polled all the programmers who have
+        heard of Literate Programming,
+        the overwhelming majority would not know,
+        for example,
+        that there is a directed graph at the heart of
+        the techique, or what that is for.
+        If Knuth jokingly took his <q>revenge</q> on
+        <q>structured programming</q> by using similar
+        language to name his new tools,
+        language has had the last laugh,
+        and helped prevent <q>Literate Programming</q>
+        from being understood,
+        let alone taken up,
+        by a significant percentage of programmers.
+    </p>
+    <h3>What Does LP5 Take From Literate Programming?</h3>
+    <p>
+        Broadly speaking, there are two key concepts that lp5
+        takes from Literate Programming.
+        The first is the primacy of explanation,
+        and the second is generalized decomposition.
+    </p>
+    <h4>The Primacy of Explanation.</h4>
+    <p>
+        The primacy of explanation in Literate Programming can
+        be seen even in its basic structure.
+        Perhaps the most "documentation" that the average
+        modern programmer ever writes is in the form of
+        comments embedded in the code.
+        Tools are available to extract specifically structured
+        comments from the code and create a separate document.
+        Thus, the "documentation" is embedded in and subordinate to the
+        code.
+        In Literate Programming, the code is embedded in the documentation,
+        or as I prefer to call it, explanation.
+    </p>
+    <p>
+        Of course, these structures cannot <emph>enforce</emph>
+        behavior.
+        You are free to just plop your existing explanation-free
+        code into a Literate Programming tool and refuse to
+        explain it at all!
+    </p>
+    <p>
+        Here lies one of the forces preventing the
+        adoption of Literate Programming:
+        a revulsion for writing.
+        Alas, this revulsion also prevents ever experiencing
+        the benefits of Literate Programming.
+    </p>
+
+    <p>
+        took away from Literate Programming.
+        First, lp5 takes the decomposition
+        tools of Literate Programming.
+        It is astonishing how often this is belittled or
+        completely ignored in discussions of Literate Programming.
+        Kibitzers will even claim that this was merely a
+        crutch for ancient programming language restrictions
+        on the ordering of code and has no use in
+        modern languages.
+    </p>
+    <p>
+        Literate Programming and lp5 allow nearly arbitrary degrees
+        of ordering and decomposition of code.
+        Programmers may <q>break a function down</q> into
+        subfunctions merely because it becomes physically long
+        rather than because it lacks cohesion or is not understandable.
+        With all Literate Programming tools for any languages they target,
+        this is completely unnecessary—one breaks functions
+        down textually, and only breaks them down structurally
+        when that actually makes sense for the structure of the code.
+    </p>
+    <p>
+        Likewise, the always annoying problem of too many levels of indentation
+        (or unreadably small indentation to make up for too many levels)
+        pretty much disappears.
+        Long before indentation levels become ungainly,
+        one has generally textually decomposed the code into
+        smaller sections.
+    </p>
+    <p>
+        In 1984, long before any World Wide Web,
+        Knuth was saying:
+    </p><blockquote>
+        [A]fter gaining experience with WEB,
+        I have come to realize that there is no need to
+        choose once and for all between top-down and
+        bottom-up, because a program is best thought
+        of as a web instead of as a tree.
+    </blockquote>
+    
+    <p></p>
+    <p>
+        Programming inventions like structured programming,
+        object-oriented programming, etc., gave programmers
+        no new computational power (it's Turing machines all the way down,
+        after all), but provided new forms of expressing computation.
+        These new forms of expression required experience to
+        get used to and to evolve idioms that proved beneficial.
+        The decompositional tools that Literate Programming
+        and lp5 provide likewise make possible new forms of
+        expressing computation.
+        There's really not much point in talking about it
+        until you've tried it and glimpsed the possibilities for
+        new forms and styles.
+    </p>
+    <p>
+        The second key concept lp5 takes from Literate Programming is,
+        of course, the primacy of text explanations.
+        Here again, I think most of writing about Literate Programming
+        misses the mark.
+        What all professional writers know that apparently
+        most programmers don't know is this:
+        writing is a form of thinking.
+        Professional writers don't just write down
+        what they're thinking
+        (a whole lot more people would be writers if it was that simple),
+        their writing is a part of their process of thinking.
+        What this means for programmers is essentially this:
+        <b>if you focus on explaining your code,
+            you will write different code.</b>
+    </p>
+    <p>
+        The typical programmer seems to think writing explanations
+        of code represents a failure to write clear code,
+        or a mindless chore with little value,
+        or a duplication of code that will need to be
+        <q>maintained.</q>
+        They don't understand that writing can be an intimate
+        part of the process of thinking,
+        giving you the ability to see things you would
+        otherwise ignore.
+    </p>
+    <p>
+        Quite apart from the specific techniques of Literate Programming,
+        I can't count the number of times writing documentation
+        for my code has altered the code.
+        Often, this simply takes the form of realizing
+        how overcomplicated things have become.
+        Many times, as I read documentation for some
+        API function that droned on with a seemingly endless
+        list of cautions and special cases,
+        I mightily wished the programmer who invented the API
+        had tried to write an explanation for it first.
+        They might have had the experience that they instead
+        inflicted on all the users of their code:
+        the experience of <q>My God, there has to be a simpler way!</q>
+    </p>
+    <h3>What Does LP5 Reject From Literate Programming?</h3>
+    <p>
+        Most importantly, lp5 rejects the core Knuth notion
+        of programs as literature.
+        I remember how excited I was when I
+        read Knuth's paper <i>Literate Programming</i>
+        in 1984.
+        And how much less excited I was when I actually
+        read his
+        <i>T<span style="position:relative; top:.2em">E</span>X: The Program</i>.
+        Where were the pictures?
+        Where were the overviews, the architectural
+        rationales, and so on?
+        Much like reading a novel,
+        if you wanted pictures and overviews and
+        other non-linear slices of understanding,
+        you were responsible for creating them yourself
+        after reading the book.
+    </p>
+    <p>
+        Do I want to read code <q>like a book?</q>
+        No, I do not,
+        no more than I want to traverse Harry Potter like
+        a hyptertext pile of source code.
+        Knuth said:
+    </p><blockquote>
+        My experiences have led me to believe that a person
+        reading a program is, likewise, ready to comprehend it
+        by learning its various parts in approximately the
+        order in which it was written.
+    </blockquote>
+    But I do not want to learn the various parts of
+    a good-sized program—I want to learn just
+    the bits I need to know to do my work,
+    be it finding/fixing a bug, adding a new feature,
+    or whatever.
+    And in the order that saves me the most time—hypertext
+    order, in other words, jumping around to get
+    to the information I need at that instant in time.
+    <p></p>
+    <p>
+        However, do not reject all novels just because you
+        did not care for one author's book.
+        As Knuth says,
+        <q>
+            I imagine that different programmers will converge
+            to quite different styles.
+        </q>
+        When Martin Ruckert published
+        <a href="https://www.google.com/books/edition/Understanding_MP3/MN34-91z6qAC?hl=en&amp;gbpv=1&amp;pg=PT7&amp;printsec=frontcover">Understanding MP3</a>,
+        a Literate Program that explains the ubiquitous
+        audio coding format,
+        there were wonderful pictures, expositions, rationales,
+        etc.
+        Ruckert explicitly wrote in a style designed to serve
+        different needs,
+        making it easy to dive into exactly the area of
+        the topic you were interested in at the moment.
+        Knuth's Literate Programming provides tools—what
+        authors can produce with those tools is as varied
+        as the authors themselves.
+    </p>
+    <p>
+        This mostly boils down to differing goals.
+        Knuth is concerned with creating finished, polished works,
+        with the finality of committing ink to paper and paper
+        to book publisher.
+        I live a world where <q>finished</q> software is a mirage.
+        Few programs are ever finished, they're always being maintained,
+        extended, rethought.
+    </p>
+    <p>
+        Of course, an unavoidable handicap of Knuth's
+        consistent (relentless?) push to analogize with
+        literature was that he was trying to create
+        hypertext with ink and paper.
+    </p>
+    <p>
+        blah
+    </p>
+
+</div>
+
+    </section>
+    <section>
+        <h2></h2>
+        <script type="text/plain">
+
+
+        </script>
     </section>
 </template>
+                             

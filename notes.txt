@@ -1,5 +1,6 @@
 BUGS
 ====
+[ ] Not re-rendered after editing article (e.g. orphan/dangler state).
 [ ] is parseCode() getting called after edit?
 [ ] if listing x.lp5 from DOS box then save of edit will silently fail!
 [X] Output render algorithm is wrong. When encountering a reference to
