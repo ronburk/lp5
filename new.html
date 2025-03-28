@@ -11,6 +11,7 @@
         <meta charset="utf-8" >
         <title>lp5</title>
         <script>
+         
          const originalAssert = console.assert;
          console.assert = function(condition, message, ...optionalParams) {
              if (!condition) {
@@ -18,6 +19,7 @@
                  throw new Error(message);
              }
          };
+         assert = console.assert;
 
          window.lp5 = {};
          function parseTag(str, startPos){
@@ -664,7 +666,7 @@
             </script>
         </template>
 
-        <template data-name="EditSection">
+        <template data-custom="lp5-editarticle">
             <style>
              .table { display: table; }
              p      { display: table-row; }
@@ -675,7 +677,7 @@
              .col1 { display: table-column; }
              .col2 { display: table-column; }
             </style>
-            <dialog data-id="EditSection">
+            <dialog data-id="dialog">
                 <div class="table">
                     <div class="col1"></div>
                     <div class="col2"></div>
@@ -702,15 +704,59 @@
                 </div>
             </dialog>
             <script>
+             function sectionGetTitle(article){
+                 console.log("sectionGetTitle ", article);
+                 return article.titleNode.innerText;
+             }
+
+             function renderDialog(article, namedNodes){
+                 const {articleTitle, docText, codeText, codeName } = namedNodes;
+                 console.log("renderDialog !!!!!!", article);
+                 let title = sectionGetTitle(article);
+                 console.log("Title is ", title);
+                 articleTitle.value = title;
+                 let value = "";
+                 if(article.docSectionNode){
+                     value = article.docSectionNode.innerHTML;
+                     value = value.replace(/^\s*<h2[^<]+[^>]+>/,'');
+                     docText.value = article.unindentCode(value);
+                 }
+                 if(article.codeSectionNode){
+                     value = article.scriptNode.childNodes[0].textContent;
+                     codeText.value = article.unindentCode(value);
+                     codeName.value = article.codeNameNode.innerHTML;
+                 }
+             }
+
+             class EditArticle extends LP5Element {
+                 constructor(){
+                     console.log("EditArticle constructor");
+                     super(require('template'));
+                 }
+                 #article = null;
+                 setArticle(article){
+                     console.log("EditArticle setArticle");
+                     assert(!this.isConnected, "can't set after connected");
+                     this.#article = article;
+                 }
+                 connectedCallback(){
+                     console.log("EditArticle connected", super.elements);
+                     super.connectedCallback();
+                     renderDialog(this.#article, this.namedNodes);
+                     this.namedNodes.dialog.showModal();
+                 }
+                 disconnectedCallback(){
+                     console.log("EditArticle disconnected");
+                     this.#article = null;
+                 }
+             }
+             return EditArticle;
+
              const {model, dataID, Article} = require('model,dataID,Article');
              const {EditSection, save, cancel, articleTitle, docText, codeName, codeText} = dataID;
 
              let   thisArticle = null;
 
-             function sectionGetTitle(article){
-                 console.log("sectionGetTitle ", article);
-                 return article.titleNode.innerText;
-             }
              function clickSave(event){
                  console.log("clickSave!!!");
                  // serialize contents of editing dialog
@@ -2061,7 +2107,7 @@ ${codeText}
                              return serial;
                          }
                      }
-                     static unindentCode(text){
+                     unindentCode(text){
                          text = text.replace(/^\s*[\r\n]+/,'');
                          text = text.replace(/\s*$/,'') + '\n';
                          let result = text;
@@ -2583,8 +2629,11 @@ ${codeText}
                              console.log(target, articleNode);
                              if(articleNode && event.ctrlKey && event.shiftKey){
                                  console.log("views.push Edit Section ", articleNode);
-                                 views.push('EditSection',
-                                            model.articles.fromArticleNode(articleNode));
+                                 dialog = document.createElement("lp5-editarticle");
+                                 dialog.setArticle(model.articles.fromArticleNode(articleNode));
+                                 document.body.appendChild(dialog);
+//                                 views.push('EditSection',
+//                                            model.articles.fromArticleNode(articleNode));
                                  controller.state = 'EditingSection';
                              }else if(target.id == 'LP5-Menu-Reload'){
                                  controller.state = 'openProject';
@@ -2637,7 +2686,7 @@ ${codeText}
                              controller.state = 'home';
                              controller.state = 'openProject';
                              asyncSchedule(model.openProject.bind(model), model.rootTOC.URL);
-                             views.pop();
+//                             views.pop();
                              views.render();
                          } else if(event.type == 'saveArticle'){
                              views.respond(event);
@@ -2825,7 +2874,9 @@ ${codeText}
              controller.inSync = false;
              controller.state  = 'load';
 
+
              class LP5Element extends HTMLElement {
+                 #namedNodes = {}
                  constructor(template){
                      assert(template);
                      super();
@@ -2833,14 +2884,12 @@ ${codeText}
                      const content = template.content;
                      const shadow = this.attachShadow({mode:'open',delegatesFocus:true});
                      shadow.appendChild(document.importNode(content, true));
-                 }
-                 connectedCallback(){
-                     this.elements = {};
-//                     this.template.content.querySelectorAll('[data-id]').
                      this.shadowRoot.querySelectorAll('[data-id]').
-                          forEach(element =>
-                              this.elements[element.dataset.id] = element);
-                     console.log(">>>>found ", this.elements);
+                     forEach(namedNode =>
+                         this.#namedNodes[namedNode.dataset.id] = namedNode);
+                 }
+                 get namedNodes() { return this.#namedNodes }
+                 connectedCallback(){
                  }
              }
              customElements.define('lp5-element', LP5Element);
