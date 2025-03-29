@@ -704,6 +704,7 @@
                 </div>
             </dialog>
             <script>
+             const {deferEvent} = require('controller');
              function sectionGetTitle(article){
                  console.log("sectionGetTitle ", article);
                  return article.titleNode.innerText;
@@ -711,7 +712,6 @@
 
              function renderDialog(article, namedNodes){
                  const {articleTitle, docText, codeText, codeName } = namedNodes;
-                 console.log("renderDialog !!!!!!", article);
                  let title = sectionGetTitle(article);
                  console.log("Title is ", title);
                  articleTitle.value = title;
@@ -732,12 +732,7 @@
                  constructor(){
                      console.log("EditArticle constructor");
                      super(require('template'));
-                 }
-                 #article = null;
-                 setArticle(article){
-                     console.log("EditArticle setArticle");
-                     assert(!this.isConnected, "can't set after connected");
-                     this.#article = article;
+                     this.addListeners();
                  }
                  connectedCallback(){
                      console.log("EditArticle connected", super.elements);
@@ -748,6 +743,33 @@
                  disconnectedCallback(){
                      console.log("EditArticle disconnected");
                      this.#article = null;
+                 }
+                 addListeners(){
+                     const {save, cancel} = this.namedNodes;
+                     save.addEventListener('click', ()=>this.saveClick());
+                     cancel.addEventListener('click', ()=>this.cancelClick());
+                 }
+                 saveClick(){
+                     console.log("saveClick()");
+                     deferEvent(document, "lp5DialogSave");
+                 }
+                 cancelClick(){
+                     console.log("cancelClick()");
+                     deferEvent(document, "lp5DialogCancel");
+                 }
+                 #article = null;
+                 setArticle(article){
+                     console.log("EditArticle setArticle");
+                     assert(!this.isConnected, "can't set after connected");
+                     assert(!this.#article, "article already set!");
+                     this.#article = article;
+                 }
+                 getArticleSerial(){
+                     const {articleTitle, docText, codeName, codeText} = this.namedNodes;
+                     return this.#article.createSerial(
+                         this.#article.ulNode,
+                         articleTitle.value, docText.value,
+                         codeName.value, codeText.value);
                  }
              }
              return EditArticle;
@@ -1980,6 +2002,10 @@
                          let titleNode        = createFreeElement('h2');
                          titleNode.innerHTML = '<h2>New_Empty_Article</h2>';
                      }
+                     clone(){
+                         const result = new Article(secret);
+                         return result;
+                     }
                      isOrphan(){
                          let   result   = false;
                          const codeName = this.getCodeName();
@@ -2066,14 +2092,14 @@
                                  result = node.innerHTML;
                              return result;
                          }
-                         return Article.createSerial(
+                         return this.createSerial(
                              this.ulNode,
                              val(this.titleNode), val(this.docText),
                              val(this.codeNameNode), val(this.codeTextNode)
                          );
                      }
 
-                     static createSerial(ulNode=null, docTitle="", docText="", codeTitle="", codeText=""){
+                     createSerial(ulNode=null, docTitle="", docText="", codeTitle="", codeText=""){
                          // I'm terrible!
                          if(ulNode && URL in ulNode){
                              let a=ulNode;
@@ -2681,6 +2707,10 @@ ${codeText}
                          }
                          break;
                      case 'EditingSection' :
+                         if(event.type == 'lp5DialogSave'){
+                             asyncSchedule(model.storeResource2.bind(model),
+                                           dialog.getArticleSerial());
+                         }
                          if(event.type == 'close') {
                              console.log("'close' event came in");
                              controller.state = 'home';
@@ -2732,13 +2762,16 @@ ${codeText}
 
              [
                  'asyncComplete',
+                 'cancel',
                  'change',
                  'click',
-                 'close',
+//                 'close',
                  'closeDialog',
                  'contextmenu',
                  'command',
                  'DataCloneError',
+                 'lp5DialogSave',
+                 'lp5DialogCancel',
                  'error',
                  'hashchange',
                  'input',
@@ -3089,12 +3122,16 @@ window.MyTemplates = {};
                              const globalEnv = {
                                  template: t,
                                  LP5Element: LP5Element,
+                                 controller: controller,
                              };
                              t.remove();
                              const script = extractScript(t);
                              console.log("before eval");
-                             const customClass = scopedEval2(script.textContent, customName, globalEnv, t);
-                     console.log("after eval");
+                             const customClass = scopedEval2(
+                                 script.textContent, customName, globalEnv, t);
+                             console.assert(customClass.prototype instanceof LP5Element,
+                                `return of ${customName} must be type LP5Element`,
+                                customClass);
                              customElements.define(customName, customClass);
                              return;
                          }
@@ -3484,6 +3521,14 @@ window.MyTemplates = {};
                  await this.storage.write(article.URL, serial);
                  return true;
              }
+             model.storeResource2 = async function(serial){
+                 console.log("storeResource2 ", serial);
+                 debugger;
+                 let article = this.articles.fromArticleNode(articleNode);
+                 await this.storage.write(article.URL, serial);
+                 return true;
+             }
+
              model.loadResource = async function(url){
                  let result = { loaded : true, url : url }
                  try {
