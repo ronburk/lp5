@@ -1,13 +1,13 @@
 <!doctype html>
 <html lang="en">
-    <style>
-     body, html { display: flex; flex-direction: column; margin: 0; }
-     body > .lp5-root {
-         display: flex;
-         height: 100vh;
-     }
-    </style>
     <head>
+        <style>
+         body, html { display: flex; flex-direction: column; margin: 0; }
+         body > .lp5-root {
+             display: flex;
+             height: 100vh;
+         }
+        </style>
         <meta charset="utf-8" >
         <title>lp5</title>
         <script>
@@ -149,7 +149,6 @@
              // 3) Throw an error so that no further code in this call stack runs
              throw new Error("FATAL: " + message);
          }
-         console.error("We end first script!");
         </script>
         <style>
          div.epigraph  {
@@ -355,7 +354,7 @@
                      this.#treeView.addEventListener('click', clickHandler, true);
                  }
              }
-       if(false) if(treeView.dataset.drag){
+             if(false) if(treeView.dataset.drag){
                  console.log("Draggable!");
                  const items = treeView.querySelectorAll('li');
                  items.forEach(item => {
@@ -379,7 +378,7 @@
                  let relPos             = null;
                  const api              = {}
 
-//                 treeView.addEventListener('dragstart', function(event) {
+                 //                 treeView.addEventListener('dragstart', function(event) {
                  api.dragstart = function dragstart(event) {
                      const li = event.target.closest('li');
                      console.log("dragstart", li);
@@ -391,7 +390,7 @@
                      }
                  }
 
-//                 treeView.addEventListener('dragenter', function(event) {
+                 //                 treeView.addEventListener('dragenter', function(event) {
                  api.dragenter = function dragenter(event){
                      event.preventDefault();  // Allow the drop
                  }
@@ -528,7 +527,7 @@
              .lp5-context ul li:last-child {
                  border-bottom: none;
              }
-            :host { all: initial !important; }
+             :host { all: initial !important; }
             </style>
             <div>
                 <dialog id="ArticleContextMenu" class="lp5-context">
@@ -620,7 +619,7 @@
             <script>
              const {model, dataID, Article} = require('model,dataID,Article');
              const {save, cancel, unref, undef, match} = dataID;
-//             const {EditSection, save, cancel, articleTitle, docText, codeName, codeText} = dataID;
+             //             const {EditSection, save, cancel, articleTitle, docText, codeName, codeText} = dataID;
 
              let   thisArticle = null;
              model.viewSettings = {
@@ -687,7 +686,7 @@
                     </p>
                     <p>
                         <label>title:</label>
-                        <input data-id="articleTitle" type="text"/>
+                        <input data-id="articleTitle" type="text">
                     </p>
                     <p>
                         <label>documentation:</label>
@@ -695,7 +694,7 @@
                     </p>
                     <p>
                         <label>name:</label>
-                        <input data-id="codeName" type="text"/>
+                        <input data-id="codeName" type="text">
                     </p>
                     <p>
                         <label>code:</label>
@@ -840,7 +839,7 @@
                     <p>
                         Select <em>parent</em> directory of existing
                         or new lp5 project.
-                        <span style="background-color:#ffffa0; border-radius:50%; cursor:help;" title="I need access to the parent directory to place generated files there.&#10;A user click is required by Chrome for me to ask for this permission.">&#9432</span>
+                        <span style="background-color:#ffffa0; border-radius:50%; cursor:help;" title="I need access to the parent directory to place generated files there.&#10;A user click is required by Chrome for me to ask for this permission.">&#9432;a</span>
                     </p>
                     <input id="SelectParentDirButton"
                            autofocus type="button" value="Select"
@@ -880,9 +879,9 @@
             <div>
                 <dialog id="PickOrCreateProject">
                     <center>
-                        Project name: <input type="text" data-id="textProject" />
+                        Project name: <input type="text" data-id="textProject" >
                         <input type="button" value="Create" data-id="createButton">
-                        <br/>
+                        <br>
                         <div data-id="div">
                             <select data-id="select"></select>
                             <input type="button" value="Select" data-id="selectButton">
@@ -1088,7 +1087,7 @@
                  outline-offset: 4px;
                  display: inline-block;
              }
-/*             .pushable svg { display: block; } */
+             /*             .pushable svg { display: block; } */
              .front {
                  display: inline-block;
                  /*                 padding: 12px 42px;*/
@@ -1103,10 +1102,8 @@
                  transform: translateY(-2px);
              }
             </style>
-
             <div class="lp5-body">
                 <div id="LP5-Menu">
-
                     <ul>
                         <li id="LP5-Menu-Reload" tabindex="0">Reload</li>
                         <li id="LP5-Menu-Export">Export</li>
@@ -1116,36 +1113,37 @@
                         <li>
                             <button class="pushable">
                                 <span class="front"><svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <!-- Define the marker for the arrowhead -->
-                                <defs>
-                                    <marker id="dotarrowhead" viewBox="0 0 10 10" refX="3" refY="5" markerWidth="4" markerHeight="4" orient="auto">
-                                        <polygon points="0,0 6,5 0,10" fill="none" stroke="black" stroke-width="2" stroke-dasharray="2,4" opacity="0.4" />
-                                    </marker>
+                                    <!-- Define the marker for the arrowhead -->
+                                    <defs>
+                                        <marker id="dotarrowhead" viewBox="0 0 10 10" refX="3" refY="5" markerWidth="4" markerHeight="4" orient="auto">
+                                            <polygon points="0,0 6,5 0,10" fill="none" stroke="black" stroke-width="2" stroke-dasharray="2,4" opacity="0.4" />
+                                        </marker>
 
-                                    <marker id="arrowhead" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-                                        <polygon points="0,0 10,5 0,10" fill="black" />
-                                    </marker>
-                                </defs>
+                                        <marker id="arrowhead" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+                                            <polygon points="0,0 10,5 0,10" fill="black" />
+                                        </marker>
+                                    </defs>
 
-                            </svg>
-                            <svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                                <g>
-                                    <!-- Dotted vertical line on the left -->
-                                    <line x1="4" y1="4" x2="4" y2="20" stroke="black" stroke-width="2" stroke-dasharray="1.5,1.5" />
-                                    
-                                    <!-- Dotted arrow pointing right -->
-                                    <line x1="4" y1="12" x2="12" y2="12" stroke="black" stroke-width="2" stroke-dasharray="1.5,1.5" marker-end="url(#dotarrowhead)" />
-                                    <polygon points="12,12 14,10 14,14" fill="black" />
+                                </svg>
+                                <svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                                    <g>
+                                        <!-- Dotted vertical line on the left -->
+                                        <line x1="4" y1="4" x2="4" y2="20" stroke="black" stroke-width="2" stroke-dasharray="1.5,1.5" />
+                                        
+                                        <!-- Dotted arrow pointing right -->
+                                        <line x1="4" y1="12" x2="12" y2="12" stroke="black" stroke-width="2" stroke-dasharray="1.5,1.5" marker-end="url(#dotarrowhead)" />
+                                        <polygon points="12,12 14,10 14,14" fill="black" />
 
-                                    <!-- Solid vertical line on the right -->
-                                    <line x1="20" y1="4" x2="20" y2="20" stroke="black" stroke-width="2" />
-                                </g>
-                            </svg></span>
+                                        <!-- Solid vertical line on the right -->
+                                        <line x1="20" y1="4" x2="20" y2="20" stroke="black" stroke-width="2" />
+                                    </g>
+                                </svg></span>
                             </button>
                         </li>
                     </ul>
 
-                </div>
+                </div> <!-- id="LP5-Menu" -->
+
                 <div id="LP5-Middle">
                     <template data-name="tableOfContents" id="LP5-Toc">
                         <style>
@@ -1187,7 +1185,6 @@
                          const model = require('model');
                          const {command}         = require('controller');
 
-                         //                     const createFreeElement = require('createFreeElement');
                          function clickHandler(event){
                              event.preventDefault();
                              let path = event.composedPath();
@@ -1383,10 +1380,48 @@
                          }
                          let codeNameToArticle = {};
                          let codeReferrers     = {};
+                         function renderHeading(article){
+                             let result  = ""
+                             let heading = article.sections.heading;
+                             if(heading){
+                                 result = `<h2>${heading.innerHTML}</h2>`;
+                             }
+                             return result;
+                         }
+                         function renderExplanation(article){
+                             let result = "";
+                             let explanation = article.sections.explanation;
+                             if(explanation){
+                             }
+                             return result;
+                         }
+                         function renderName(article){
+                             let result = "";
+                             let name = article.sections.name;
+                             if(name){
+                             }
+                             return result;
+                         }
+                         function renderScript(article){
+                             let result = "";
+                             let script = article.sections.script;
+                             if(script){
+                             }
+                             return result;
+                         }
+
                          function renderArticle(article){
                              console.log("source pane renderArticle ", article);
-                             let {docSectionNode, ulNode} = article;
-                             if(docSectionNode){
+                             let articleNode = document.createElement('ARTICLE');
+                             articleNode.innerHTML =
+                                 renderHeading(article) +
+                                 renderExplanation(article) +
+                                 renderName(article) +
+                                 renderScript(article)
+                             ;
+                             outerDiv.appendChild(articleNode);
+                             return;
+                             if(article.sections){
                                  console.log("Appending article node");
                                  outerDiv.appendChild(article.articleNode);
                                  
@@ -1455,7 +1490,7 @@
                          function renderSource(){
                              console.log("render source: ", model.rootTOC);
                              codeNameToArticle = {};
-                             for(const article of model.docOrder(model.rootTOC)){
+                             if(false)for(const article of model.docOrder(model.rootTOC)){
                                  article.unref = false;
                                  article.undef = false;
                                  const name = article.getCodeName();
@@ -1480,7 +1515,7 @@
                                      }
                                      if(visible && match){
                                          //???
-//                                         visible = false;
+                                         //                                         visible = false;
                                      }
                                      if(visible)
                                          renderArticle(article);
@@ -1746,10 +1781,9 @@
                         </script>
                     </template>
                 </div>
+            </div>
         </template>
         <script>
-         console.error("We start again!");
-
          "use strict";
          void function(){
              // defense against malformed HTML leading to insane behavior
@@ -1769,8 +1803,6 @@
                      });
              }
              
-             //             findBadTemplate(document);
-
              class RelativeCodeRanges {
                  #ranges;    // array of {relPos, length}
                  constructor(codeText){
@@ -1849,7 +1881,7 @@
                      let   name      = "";
                      console.assert(this.dirHandle);
                      for(let i = 0; i < MAX_TRIES; ++i){
-                         ++number;
+            ++number;
                          name   = pattern.replace(/%d/, number);
                          try {
                              console.log(`getFileHandle(${name})`);
@@ -1882,19 +1914,40 @@
                  let secret = Symbol("new Article()");
                  Articles = class {
                      #array;
+                     byName = {};
+                     root = null;
                      constructor(){
                          this.#array = new Array();
                      }
                      *[Symbol.iterator](){ yield* this.#array }
+                     create(url, parent, text){
+                         let newArticle =  new Article2(url, parent, text);
+                         if(newArticle){
+                             this.#array.push(newArticle);
+                             if(this.#array.length === 0)
+                                 this.root = newArticle;
+                         }
+                         return newArticle;
+                     }
                      newArticle(parent=null, URL){
                          console.assert(URL);
-                         let newArticle = new Article(secret, parent, URL);
+                         let newArticle = new Article2(/*secret, */ parent, URL);
                          if(newArticle){
-                             //                             newArticle.articleNode.id = `article-${this.length}`;
                              newArticle.articleNode.id = URL;
                              this.#array.push(newArticle);
                          }
                          return newArticle;
+                     }
+                     #updateByName(){
+                         let result = this.byName = {}
+                         for(const article of this.#array){
+                             const name = article.getCodeName();
+                             if(name != null)
+                                 (result[name] ??= []).push(article);
+                         }
+                     }
+                     update(){
+                         this.#updateByName();
                      }
                      reset(){
                          this.#array.length = 0;
@@ -1917,6 +1970,7 @@
                      }
                      // create article from serial string
                      fromSerial(parent, URL, text){
+                         return new Article2(URL, parent, text);
                          let result = this.newArticle(parent, URL);
                          let html   = new DOMParser().parseFromString(text, 'text/html');
                          console.assert(html);
@@ -1982,6 +2036,50 @@
                          return result;
                      }
                  }
+                 Article2 = class {
+                     static articles = Articles;
+                     #fromString(articleString){
+                         let html = new DOMParser().parseFromString(articleString, 'text/html');
+                         assert(html);
+                         this.template = html.querySelector('template');
+                         assert(this.template, html);
+                         assert(this.template.parentNode.nodeName == 'HEAD', html);
+                         assert(this.template.parentNode.childElementCount == 1, html);
+                         let content = this.template.content;
+                         Array.from(content.children).forEach(child => {
+                             this.sections[child.nodeName.toLowerCase()] = child;
+                         });
+                     }
+                     constructor(URL, parent=null, articleString=null){
+                         this.parent       = parent;
+                         this.URL          = URL;
+                         this.sections     = {};
+                         this.template     = null;
+                         if(articleString)
+                             this.#fromString(articleString);
+                         else {
+                             debugger; //???
+                         }
+                         this.code = this.sections.script?.innerText.trim() || null;
+                         this.name = this.sections.name?.innerText.trim() || null;
+                         this.freeze();
+                     }
+                     clone(){
+                         const result = window.structuredClone(this);
+                         return result
+                     }
+                     freeze(){
+                         return Object.freeze(this);
+                     }
+                     // null if no code, else empty string means "unnamed"
+                     getCodeName(){
+                         let result = null;
+                         if(this.sections.script)
+                             result = this.sections?.name.innerText.trim() || '';
+                         return result;
+                     }
+
+                 };
                  Article = class {
                      constructor(sym, parent=null, URL=""){
                          console.assert(
@@ -2116,19 +2214,19 @@
                                  ulSerial = ulNode.outerHTML;
                              }
                              let serial = `
-<template>
-    ${ulSerial}
-    <section>
-        <h2>${docTitle}</h2>
-${docText}
-    </section>
-    <section>
-        <h2>${codeTitle}</h2>
-        ${startScript}
-${codeText}
-        ${endScript}
-    </section>
-</template>
+            <template>
+                ${ulSerial}
+                <section>
+                    <h2>${docTitle}</h2>
+                    ${docText}
+                </section>
+                <section>
+                    <h2>${codeTitle}</h2>
+                    ${startScript}
+                    ${codeText}
+                    ${endScript}
+                </section>
+            </template>
                              `;
                              return serial;
                          }
@@ -2312,7 +2410,7 @@ ${codeText}
                              console.log("looks like a project: ", handle);
                              model.projects[name] = { dirHandle: handle };
                              model.projectName = name;
-                         ++projectCount;
+            ++projectCount;
                          }
                      }
                  } catch(error) {
@@ -2391,7 +2489,7 @@ ${codeText}
                  const { model, views, asyncSchedule } = controller;
                  if(controller.crashed){
                      console.log("Got event, but controller is crashed.", event);
-//                     event.preventDefault();
+                     //                     event.preventDefault();
                      return;
                  }
                  if(event.type == 'asyncComplete' && event.detail instanceof Error){
@@ -2422,8 +2520,8 @@ ${codeText}
                      const error = event.error;
                      let   detail   = "";
                      if(error instanceof SyntaxError){
-                             console.log("    and it's a SyntaxError");
-                             const {lineno,colno} = event;
+                         console.log("    and it's a SyntaxError");
+                         const {lineno,colno} = event;
 
                          // if it's text we are eval'ing
                          if(controller.script){
@@ -2500,7 +2598,7 @@ ${codeText}
                          let target = path[0];
                          if(target.id == 'SelectParentDirButton'
                             || target.id == 'SelectParentDirPreviousButton'){
-//                             console.assert(event.type == 'click');
+                             //                             console.assert(event.type == 'click');
                              asyncSchedule(selectParentDir, model, target.id);
                              controller.state = 'SelectingParent';
                          } else if(event.type == 'click') {
@@ -2658,8 +2756,8 @@ ${codeText}
                                  dialog = document.createElement("lp5-editarticle");
                                  dialog.setArticle(model.articles.fromArticleNode(articleNode));
                                  document.body.appendChild(dialog);
-//                                 views.push('EditSection',
-//                                            model.articles.fromArticleNode(articleNode));
+                                 //                                 views.push('EditSection',
+                                 //                                            model.articles.fromArticleNode(articleNode));
                                  controller.state = 'EditingSection';
                              }else if(target.id == 'LP5-Menu-Reload'){
                                  controller.state = 'openProject';
@@ -2716,7 +2814,7 @@ ${codeText}
                              controller.state = 'home';
                              controller.state = 'openProject';
                              asyncSchedule(model.openProject.bind(model), model.rootTOC.URL);
-//                             views.pop();
+                             //                             views.pop();
                              views.render();
                          } else if(event.type == 'saveArticle'){
                              views.respond(event);
@@ -2739,7 +2837,7 @@ ${codeText}
                              views.respond(event);
                          } else {
                              console.log("controller EditingView calls respond!");
-//                             views.respond(event);
+                             //                             views.respond(event);
                          }
                          break;
 
@@ -2765,7 +2863,7 @@ ${codeText}
                  'cancel',
                  'change',
                  'click',
-//                 'close',
+                 //                 'close',
                  'closeDialog',
                  'contextmenu',
                  'command',
@@ -2793,7 +2891,7 @@ ${codeText}
                  var error_ = encodeURI("msg:"+ message + "\n\tfile:"+file+"\n\tln:"+lineNumber);
                  var user_ = encodeURI("");
 
-//                 console.warn("window.onerror: ", error_);
+                 //                 console.warn("window.onerror: ", error_);
                  return false;
              }
 
@@ -2824,9 +2922,9 @@ ${codeText}
                  document.body.appendChild(overlay);
                  overlay.showModal();
                  // Disable user interactions on the rest of the page.
-//                 document.body.style.pointerEvents = "none";
+                 //                 document.body.style.pointerEvents = "none";
                  debugger;
-//                 throw new Error("foo");
+                 //                 throw new Error("foo");
              }
 
              controller.deferEvent = function(target, eventName, eventDetail) {
@@ -2918,8 +3016,8 @@ ${codeText}
                      const shadow = this.attachShadow({mode:'open',delegatesFocus:true});
                      shadow.appendChild(document.importNode(content, true));
                      this.shadowRoot.querySelectorAll('[data-id]').
-                     forEach(namedNode =>
-                         this.#namedNodes[namedNode.dataset.id] = namedNode);
+                          forEach(namedNode =>
+                              this.#namedNodes[namedNode.dataset.id] = namedNode);
                  }
                  get namedNodes() { return this.#namedNodes }
                  connectedCallback(){
@@ -2937,7 +3035,7 @@ ${codeText}
                              return globalEnv[thing];
                          else
                              assert(false,
-                             `'${thing}': undefined name for require`);
+                                    `'${thing}': undefined name for require`);
                      }
                      // else we are turning a set of sets, more or less
                      let finalObj = {};
@@ -2949,7 +3047,7 @@ ${codeText}
                  }
 
                  let sourceMap = "\n//# sourceURL=" + scriptName + "\n";
-console.log("before scopedEval2 return");
+                 console.log("before scopedEval2 return");
                  controller.script = script;
                  controller.scriptName = scriptName;
                  const result = new Function(
@@ -3113,7 +3211,7 @@ console.log("before scopedEval2 return");
 
                      let templates = rootElement.querySelectorAll('template, link[rel="template"]');
                      console.log(`${templates.length} templates in document`);
-window.MyTemplates = {};
+                     window.MyTemplates = {};
 
                      templates.forEach((t)=>{
                          console.log("    forEach template ", t);
@@ -3130,8 +3228,8 @@ window.MyTemplates = {};
                              const customClass = scopedEval2(
                                  script.textContent, customName, globalEnv, t);
                              console.assert(customClass.prototype instanceof LP5Element,
-                                `return of ${customName} must be type LP5Element`,
-                                customClass);
+                                            `return of ${customName} must be type LP5Element`,
+                                            customClass);
                              customElements.define(customName, customClass);
                              return;
                          }
@@ -3264,7 +3362,7 @@ window.MyTemplates = {};
                  },
                  push(dialogName, ...args) {
                      console.log("views.push ", dialogName);
-                     ++this.inProgress;
+                             ++this.inProgress;
                      //                     console.assert(this.currentView);
                      this.stack.push(this.currentView);
                      const iView = this.views[dialogName];
@@ -3277,7 +3375,7 @@ window.MyTemplates = {};
                      --this.inProgress;
                  },
                  pop() {
-                     ++this.inProgress;
+                             ++this.inProgress;
                      const currentView = this.currentView;
                      console.assert(currentView.dialogNode);
                      console.assert(currentView);
@@ -3366,6 +3464,7 @@ window.MyTemplates = {};
              model.anchorNameToNode = new Map();
              model.updateDerivedState = function(){
                  console.log("updateDerivedState!!!!!!");
+                 return;
                  function pushArticle(object, name, article){
                      const articles = object[name] ?? [];
                      articles.push(article);
@@ -3389,12 +3488,12 @@ window.MyTemplates = {};
                  const codeNameToReferringArticles = {};
                  const articlesFromName = {};
                  for(const article of model.tocOrder){
-                     if(article.getCodeSerial()){
+                     if(article.code){
                          (articlesFromName[article.getCodeName()] ??= []).
-                           push(article);
+                              push(article);
                          const name = article.getCodeName();
                          for(const item of article.codeParsed){
-//                             console.log(`'${name}' '${item}'`, name, item);
+                             //                             console.log(`'${name}' '${item}'`, name, item);
                              if(name && item?.type === 'ref'){
                                  pushArticle(codeNameToReferringArticles, name, article);
                              }
@@ -3405,10 +3504,12 @@ window.MyTemplates = {};
                  }
                  model.codeNameToDefiningArticles  = codeNameToDefiningArticles;
                  model.codeNameToReferringArticles = codeNameToReferringArticles;
-                 model.articlesFromName            = articlesFromName;
+                 //                 model.articlesFromName            = articlesFromName;
+                 Articles.update();
+                 model.articlesFromName = Articles.byName;
                  for(const article of model.tocOrder){
-                     const name = article.getCodeName();
-                     if(name && name !== ''){
+                     const name = article.name;
+                     if(name && name !== ''){//??? wth
                      }
                  }
                  console.log("Updated model", model);
@@ -3563,7 +3664,9 @@ window.MyTemplates = {};
                      text = text.replace(/ERROR/, articleText.error.name);
                      text = text.replace(/MSG/, articleText.error.message);
                  }
-                 return this.articles.fromSerial(parent, filename, text);
+                 //                 let result = this.articles.fromSerial(parent, filename, text);
+                 let result = this.articles.create(filename, parent, text);
+                 return result;
              }
              model.loadTOC = async function(dirHandle, name, parent=null){
                  console.log("loadTOC ", name);
