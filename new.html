@@ -11,6 +11,7 @@
         <meta charset="utf-8" >
         <title>lp5</title>
         <script>
+         "use strict";
          
          const originalAssert = console.assert;
          console.assert = function(condition, message, ...optionalParams) {
@@ -19,7 +20,7 @@
                  throw new Error(message);
              }
          };
-         assert = console.assert;
+         window.assert = console.assert;
 
          window.lp5 = {};
          function parseTag(str, startPos){
@@ -80,6 +81,8 @@
           * of literal text or an lp5 tag descriptor.
           */
          function parseCode(scriptNode){
+             if(!scriptNode)
+                 return null;
              const result = [];
              let scriptText = scriptNode.childNodes[0].textContent;
              scriptText = scriptText.replace(/^[ \t\n]*/, '');
@@ -309,6 +312,8 @@
             <p><strong>Selected Item:</strong> <span id="selected-item">None</span></p>
 
             <script>
+             "use strict";
+
              function makeAllLiDraggable(ancestor, ){
                  const items = ancestor.querySelectorAll('li');
                  items.forEach(item => {
@@ -1392,6 +1397,7 @@
                              let result = "";
                              let explanation = article.sections.explanation;
                              if(explanation){
+                                 result = `<section>${explanation.innerHTML}</section>`;
                              }
                              return result;
                          }
@@ -1453,7 +1459,8 @@
                                          else if(item.type == 'ref'){
                                              const span = document.createElement("SPAN");
                                              span.classList.add('LP5-CodeRef');
-                                             const target = model.articles.fromURL(item.value);
+//                                             const target = model.articles.fromURL(item.value);
+                                             const target = Articles.fromURL(item.value);
                                              let refText = null;
                                              if(target)
                                                  refText = target.getCodeName();
@@ -1686,7 +1693,8 @@
                                      if(item.attributes.length == 1){
                                          const ref = item.attributes[0];
                                          if(ref.name == 'ref'){
-                                             const target = model.articles.fromURL(ref.value);
+//                                             const target = model.articles.fromURL(ref.value);
+                                             const target = Articles.fromURL(ref.value);
                                              if(target){
                                                  result = renderArticles(target.getCodeName(), indent + item.indent);
                                              } else{
@@ -1908,59 +1916,58 @@
                      return result;
                  }
              }
-             let Articles = null;
+             window.Articles = null;
              let Article  = null;
+             let Article2  = null;
              void function() {
                  let secret = Symbol("new Article()");
                  Articles = class {
-                     #array;
-                     byName = {};
-                     root = null;
-                     constructor(){
-                         this.#array = new Array();
-                     }
-                     *[Symbol.iterator](){ yield* this.#array }
-                     create(url, parent, text){
+                     static #array = [];
+                     static byName = {};
+                     static root   = null;
+                     static *[Symbol.iterator](){ yield* Articles.#array }
+                     static create(url, parent, text){
                          let newArticle =  new Article2(url, parent, text);
                          if(newArticle){
-                             this.#array.push(newArticle);
-                             if(this.#array.length === 0)
-                                 this.root = newArticle;
+                             Articles.#array.push(newArticle);
+                             if(Articles.#array.length === 0)
+                                 Articles.root = newArticle;
                          }
                          return newArticle;
                      }
-                     newArticle(parent=null, URL){
+                     static newArticle(parent=null, URL){
                          console.assert(URL);
                          let newArticle = new Article2(/*secret, */ parent, URL);
                          if(newArticle){
                              newArticle.articleNode.id = URL;
-                             this.#array.push(newArticle);
+                             Articles.#array.push(newArticle);
                          }
                          return newArticle;
                      }
-                     #updateByName(){
+                     static #updateByName(){
                          let result = this.byName = {}
-                         for(const article of this.#array){
+                         for(const article of Articles.#array){
                              const name = article.getCodeName();
                              if(name != null)
                                  (result[name] ??= []).push(article);
                          }
                      }
-                     update(){
-                         this.#updateByName();
+                     static update(){
+                         Articles.#updateByName();
+                         console.log("Articles updated.");
                      }
-                     reset(){
-                         this.#array.length = 0;
+                     static reset(){
+                         Articles.#array.length = 0;
                      }
-                     get length(){
-                         return this.#array.length;
+                     static get length(){
+                         return Articles.#array.length;
                      }
                      // locate article from its DOM node
-                     fromArticleNode(node){
+                     static fromArticleNode(node){
                          return this.#array.find(article => article.URL === node.id);
                      }
                      // locate article from its URL
-                     fromURL(url){
+                     static fromURL(url){
                          return this.#array.find(article => article.URL === url);
                      }
                      fromError(parent, url, error){
@@ -2062,8 +2069,19 @@
                          }
                          this.code = this.sections.script?.innerText.trim() || null;
                          this.name = this.sections.name?.innerText.trim() || null;
-                         this.freeze();
-                     }
+                         this.childrenIDs = [];
+                         let children = this.sections.children;
+                         if(children){
+                             console.log(`in constructor, article "${name}" has a ul`);
+                             const entries    = children.querySelectorAll('li');
+                             for(const li of entries){
+                                 let ID = li.getAttribute('id');
+                                 this.childrenIDs.push(ID);
+                             }
+                         }
+                         this.codeParsed = parseCode(this.sections.script);
+                     this.freeze();
+                 }
                      clone(){
                          const result = window.structuredClone(this);
                          return result
@@ -2075,7 +2093,7 @@
                      getCodeName(){
                          let result = null;
                          if(this.sections.script)
-                             result = this.sections?.name.innerText.trim() || '';
+                             result = this.sections?.name?.innerText.trim() || '';
                          return result;
                      }
 
@@ -3464,6 +3482,7 @@
              model.anchorNameToNode = new Map();
              model.updateDerivedState = function(){
                  console.log("updateDerivedState!!!!!!");
+                 Articles.update();
                  return;
                  function pushArticle(object, name, article){
                      const articles = object[name] ?? [];
@@ -3490,7 +3509,7 @@
                  for(const article of model.tocOrder){
                      if(article.code){
                          (articlesFromName[article.getCodeName()] ??= []).
-                              push(article);
+                                           push(article);
                          const name = article.getCodeName();
                          for(const item of article.codeParsed){
                              //                             console.log(`'${name}' '${item}'`, name, item);
@@ -3505,7 +3524,6 @@
                  model.codeNameToDefiningArticles  = codeNameToDefiningArticles;
                  model.codeNameToReferringArticles = codeNameToReferringArticles;
                  //                 model.articlesFromName            = articlesFromName;
-                 Articles.update();
                  model.articlesFromName = Articles.byName;
                  for(const article of model.tocOrder){
                      const name = article.name;
@@ -3515,7 +3533,7 @@
                  console.log("Updated model", model);
              }
              model.articlesMatchingName = function (name){
-                 const matches = model.articlesFromName[name];
+                 const matches = Articles.byName[name];
                  if(matches)
                      return matches;
                  else
@@ -3596,8 +3614,13 @@
                  model.updateDerivedState();
              };
              model.docOrder = function*(article){
-                 console.assert(this.articles); // detect bogus 'this'
+                 console.log("docOrder ", article);
+//                 console.assert(this.articles); // detect bogus 'this'
                  yield article;
+                 for(const childID of article.childrenIDs){
+                     yield* this.docOrder(Articles.fromURL(childID));
+                 }
+                 return;
                  let ulNode = article.ulNode;
                  if(ulNode)
                      for(const entry of ulNode.querySelectorAll(':scope > li')){
@@ -3665,29 +3688,34 @@
                      text = text.replace(/MSG/, articleText.error.message);
                  }
                  //                 let result = this.articles.fromSerial(parent, filename, text);
-                 let result = this.articles.create(filename, parent, text);
+                 let result = Articles.create(filename, parent, text);
                  return result;
              }
              model.loadTOC = async function(dirHandle, name, parent=null){
                  console.log("loadTOC ", name);
                  if(parent == null)
-                     this.articles.reset();
+                     Articles.reset();
                  let article = await this.loadArticle(dirHandle, name, parent);
                  console.log("loadTOC back from await of loadArticle ", name, article);
                  let match = name.match(/^[0-9]+/);
                  if(match && match[0] > model.nextArticleID)
                      model.nextArticleID = Number(match[0]);
                  // if article contains a <ul>, it is parent of other articles
-                 if(article.ulNode){
-                     console.log(`in loadTOC, article "${name}" has a ul`);
-                     const entries = article.ulNode.querySelectorAll('li');
-                     for(const li of entries){
-                         let ID = li.getAttribute('id');
-                         let child = await this.loadTOC(dirHandle, ID, article);
-                         article.children.push(child);
-                     }
-                 } else
-                     console.log(`in loadTOC, article "${name}" has NO ul`);
+                 let children = article.childrenIDs;
+                 for(const id of children){
+                     let child = await this.loadTOC(dirHandle, id, article);
+                     console.log("loaded child", child);
+                 }
+//                 if(children.length){
+                     //                     console.log(`in loadTOC, article "${name}" has a ul`);
+                     //                     const entries = children.querySelectorAll('li');
+                     //                     for(const li of entries){
+                     //                         let ID = li.getAttribute('id');
+                     //                         let child = await this.loadTOC(dirHandle, ID, article);
+                     //                         article.children.push(child);
+//                 }
+//                 } else
+//                     console.log(`in loadTOC, article "${name}" has NO ul`);
                  console.log(`loadTOC(${name}) returns `, article);
                  return article;
              }

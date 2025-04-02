@@ -1,20 +1,21 @@
 
 <template>
     <children>
-        <li id="1.lp5">
-        </li><li id="3.lp5">
-        </li><li id="4.lp5">
-        </li><li id="14.lp5"></li><li id="15.lp5"></li><li id="18.lp5"></li><li id="2.lp5">
-    </li>
+        <li id="1.lp5"></li>
+        <li id="3.lp5"></li>
+        <li id="4.lp5"></li>
+        <li id="14.lp5"></li>
+        <li id="15.lp5"></li>
+        <li id="18.lp5"></li>
+        <li id="2.lp5"></li>
     </children>
     <heading>lp5 - Explain, Decompose, Connect</heading>
     <explanation>
-    Explanation
+        Explanation
     </explanation>
     <name>Code Name</name>
     <script type="text/plain">
-    x = 5;
-    y = 6;
+     x = 5;
+     y = 6;
     </script>
 </template>
-                             

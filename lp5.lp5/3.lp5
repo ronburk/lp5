@@ -1,17 +1,12 @@
-
 <template>
-    <ul style="display: none;"><li id="10.lp5"></li></ul>
-    <section>
-        <h2>lp5: The Program</h2>
-The bulk of the lp5 source can be divided into two main pieces: templates (modular HTML/CSS/JavaScript for UI) and the main code (JavaScript).
-
-    </section>
-    <section>
-        <h2></h2>
-        <script type="text/plain">
-
-
-        </script>
-    </section>
+    <children>
+        <li id="10.lp5"></li>
+    </children
+    <heading>lp5: The Program</heading>
+    <explanation>
+        The bulk of the lp5 source can be divided
+        into two main pieces:
+        templates (modular HTML/CSS/JavaScript for UI)
+        and the main code (JavaScript).
+    </explanation>
 </template>
-                             
