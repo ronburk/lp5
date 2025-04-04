@@ -711,25 +711,25 @@
              const {deferEvent} = require('controller');
              function sectionGetTitle(article){
                  console.log("sectionGetTitle ", article);
-                 return article.titleNode.innerText;
+                 let result = article.sections?.heading?.innerText;
+                 if(!result)
+                     result = "";
+                 return result;
              }
 
              function renderDialog(article, namedNodes){
                  const {articleTitle, docText, codeText, codeName } = namedNodes;
                  let title = sectionGetTitle(article);
                  console.log("Title is ", title);
-                 articleTitle.value = title;
+                 articleTitle.value = title ;
+                 docText.value = article.unindentCode(
+                     article.sections?.explanation.innerHTML);
+                 console.log(article.sections.explanation, docText.value);
+
                  let value = "";
-                 if(article.docSectionNode){
-                     value = article.docSectionNode.innerHTML;
-                     value = value.replace(/^\s*<h2[^<]+[^>]+>/,'');
-                     docText.value = article.unindentCode(value);
-                 }
-                 if(article.codeSectionNode){
-                     value = article.scriptNode.childNodes[0].textContent;
-                     codeText.value = article.unindentCode(value);
-                     codeName.value = article.codeNameNode.innerHTML;
-                 }
+                 codeName.value = article.getCodeName();
+                 codeText.value = article.unindentCode(
+                     article.sections?.script.innerHTML);
              }
 
              class EditArticle extends LP5Element {
@@ -769,9 +769,8 @@
                      this.#article = article;
                  }
                  getArticleSerial(){
-                     const {articleTitle, docText, codeName, codeText} = this.namedNodes;
+                     const {articleTitle, docText, codeName, codeText}=this.namedNodes;
                      return this.#article.createSerial(
-                         this.#article.ulNode,
                          articleTitle.value, docText.value,
                          codeName.value, codeText.value);
                  }
@@ -807,11 +806,14 @@
                  console.log("Title is ", title);
                  articleTitle.value = title;
                  let value = "";
-                 if(article.docSectionNode){
-                     value = article.docSectionNode.innerHTML;
-                     value = value.replace(/^\s*<h2[^<]+[^>]+>/,'');
-                     docText.value = Article.unindentCode(value);
-                 }
+                 docText.value = article.sections?.explanation.innerHTML;
+                 console.log(article.sections.explanation, docText.value);
+                 
+                 //                 if(article.sections.explanation){
+                 //                     value = article.sections.explanation.innerHTML;
+                 //                     value = value.replace(/^\s*<h2[^<]+[^>]+>/,'');
+                 //                     docText.value = Article.unindentCode(value);
+                 //                 }
                  if(article.codeSectionNode){
                      value = article.scriptNode.childNodes[0].textContent;
                      codeText.value = Article.unindentCode(value);
@@ -1348,10 +1350,13 @@
                          function clickHandler(event){
                              console.log(":::::: source pane clickHandler ", event);
                              const articleNode = articleNodeFromClick(event);
-                             console.assert(articleNode, "??? missing article node"); // ??? really does happen.
-                             articleNode.focus();
-                             console.log(" clicked article ", articleNode, iView);
-                             iView.eventPublish("SelectArticle", articleNode);
+                             if(articleNode){
+                                 articleNode.focus();
+                                 console.log(" clicked article ", articleNode, iView);
+                                 iView.eventPublish("SelectArticle", articleNode);
+                             }
+                             else
+                                 console.log(articleNode, "??? missing article node"); // ??? really does happen.
                          }
                          function init(){
                              console.log("***** adding click handler in source");
@@ -1405,26 +1410,55 @@
                              let result = "";
                              let name = article.sections.name;
                              if(name){
+                                 // + 1 if shared name
+                                 result = `<h2>\u2261${name.innerHTML}</h2>`;
                              }
                              return result;
                          }
+                         function reduceCode(acc, item){
+                             if(typeof item === 'string')
+                                 acc += item
+                             else if(item.type == 'ref'){
+                                 acc += "<span class='LP5-CodeRef'"
+                                 const targetArticle = Articles.fromURL(item.value);
+                                 let   targetName    = null;
+                                 if(targetArticle)
+                                     targetName = target.getCodeName();
+                                 if(targetName == null){
+                                     targetName = item.value;
+                                     acc += " style='background-color: red;";
+                                 }
+                                 acc += ">";
+                                 acc += targetName;
+                                 acc += "</span>"
+                             }
+                             else if(item.type == 'endscript')
+                                 acc += "<" + "/script>";
+                             else
+                                 console.warn(`unknown code parse item ${item}`);
+                             return acc;
+                         }
+
                          function renderScript(article){
                              let result = "";
-                             let script = article.sections.script;
-                             if(script){
-                             }
-                             return result;
+                             if(article.codeParsed)
+                                 result = article.codeParsed.reduce(reduceCode, '');
+                             return `<section>${result}</section>`;
                          }
 
                          function renderArticle(article){
                              console.log("source pane renderArticle ", article);
                              let articleNode = document.createElement('ARTICLE');
+                             articleNode.setAttribute('tabIndex', 0);
                              articleNode.innerHTML =
                                  renderHeading(article) +
                                  renderExplanation(article) +
                                  renderName(article) +
                                  renderScript(article)
                              ;
+                             articleNode.id = article.URL;
+                             articleNode.querySelectorAll('a').
+                                         forEach(link => link.tabIndex = -1);
                              outerDiv.appendChild(articleNode);
                              return;
                              if(article.sections){
@@ -1459,7 +1493,7 @@
                                          else if(item.type == 'ref'){
                                              const span = document.createElement("SPAN");
                                              span.classList.add('LP5-CodeRef');
-//                                             const target = model.articles.fromURL(item.value);
+                                             //                                             const target = model.articles.fromURL(item.value);
                                              const target = Articles.fromURL(item.value);
                                              let refText = null;
                                              if(target)
@@ -1693,7 +1727,7 @@
                                      if(item.attributes.length == 1){
                                          const ref = item.attributes[0];
                                          if(ref.name == 'ref'){
-//                                             const target = model.articles.fromURL(ref.value);
+                                             //                                             const target = model.articles.fromURL(ref.value);
                                              const target = Articles.fromURL(ref.value);
                                              if(target){
                                                  result = renderArticles(target.getCodeName(), indent + item.indent);
@@ -2080,8 +2114,8 @@
                              }
                          }
                          this.codeParsed = parseCode(this.sections.script);
-                     this.freeze();
-                 }
+                         this.freeze();
+                     }
                      clone(){
                          const result = window.structuredClone(this);
                          return result
@@ -2096,8 +2130,32 @@
                              result = this.sections?.name?.innerText.trim() || '';
                          return result;
                      }
-
-                 };
+                     unindentCode(text){
+                         let result = text;
+                         if(text){
+                             text = text.replace(/^\s*[\r\n]+/,'');
+                             text = text.replace(/\s*$/,'') + '\n';
+                             let lines = text.split(/\r?\n/);
+                             let indent = -1;
+                             for(let line of lines){
+                                 line = line.replace(/\s+$/,'');
+                                 if(line.length){
+                                     let thisIndent = line.search(/\S|$/);
+                                     if(indent == -1 || thisIndent < indent){
+                                         indent = thisIndent;
+                                     }
+                                 }
+                             }
+                             if(indent > 0){
+                                 let space = " ".repeat(indent);
+                                 let regex = new RegExp("^" + space, 'gm');
+                                 result = text.replace(regex, '');
+                                 console.assert(result != text);
+                             }
+                         }
+                         return result;
+                     }
+                 }
                  Article = class {
                      constructor(sym, parent=null, URL=""){
                          console.assert(
@@ -2159,6 +2217,31 @@
                          let result = null;
                          if(this.codeTextNode){
                              result = this.codeTextNode.innerText;
+                         }
+                         return result;
+                     }
+                     unindentCode(text){
+                         if(text){
+                             text = text.replace(/^\s*[\r\n]+/,'');
+                             text = text.replace(/\s*$/,'') + '\n';
+                             let result = text;
+                             let lines = text.split(/\r?\n/);
+                             let indent = -1;
+                             for(let line of lines){
+                                 line = line.replace(/\s+$/,'');
+                                 if(line.length){
+                                     let thisIndent = line.search(/\S|$/);
+                                     if(indent == -1 || thisIndent < indent){
+                                         indent = thisIndent;
+                                     }
+                                 }
+                             }
+                             if(indent > 0){
+                                 let space = " ".repeat(indent);
+                                 let regex = new RegExp("^" + space, 'gm');
+                                 result = text.replace(regex, '');
+                                 console.assert(result != text);
+                             }
                          }
                          return result;
                      }
@@ -2504,6 +2587,13 @@
              }
 
              function controller(event){
+                 function getDeepFocus() {
+                     let focusedElement = document.activeElement;
+                     while (focusedElement.shadowRoot)
+                         focusedElement = focusedElement.shadowRoot.activeElement;
+                     return focusedElement;
+                 }
+
                  const { model, views, asyncSchedule } = controller;
                  if(controller.crashed){
                      console.log("Got event, but controller is crashed.", event);
@@ -2532,7 +2622,8 @@
                                        ? views.currentView.name : "";
                  console.log(`>>>>>>>>>>>>>>>>>>enter controller {${currentViewName}}`,
                              controller.state, model.articles.length, arguments.length);
-                 console.log(event);
+                 console.log("focus ", getDeepFocus());
+                 console.log("event ", event);
                  if(event.type == 'error'){
                      console.log("Alright, we got an error event");
                      const error = event.error;
@@ -2586,6 +2677,7 @@
                  } else
                      console.assert(!controller.inSync);
                  controller.inSync = true;
+
 
                  switch(controller.state){
                      case 'Crash' :
@@ -2748,12 +2840,12 @@
                                      && path[index+1].id == 'LP5-Source'
                                  ;
                              });
+                             console.log("articleNode is ", articleNode);
                              if(articleNode){
                                  controller.currentArticle = articleNode;
-                                 //                                 event.preventDefault();
-                                 //                                 articleNode.focus();
                                  if(event.shiftKey){
-                                     const article    = model.articles.fromArticleNode(articleNode);
+                                     console.log(" humm ", articleNode);
+                                     const article    = Articles.fromURL(articleNode.id);
                                      console.log("article.URL = ", article.URL);
                                      const outputSpan = document.querySelector(
                                          '#LP5-Output [data-ref="' + article.URL + '"]'
@@ -2771,11 +2863,9 @@
                              console.log(target, articleNode);
                              if(articleNode && event.ctrlKey && event.shiftKey){
                                  console.log("views.push Edit Section ", articleNode);
-                                 dialog = document.createElement("lp5-editarticle");
-                                 dialog.setArticle(model.articles.fromArticleNode(articleNode));
-                                 document.body.appendChild(dialog);
-                                 //                                 views.push('EditSection',
-                                 //                                            model.articles.fromArticleNode(articleNode));
+                                 this.dialog = document.createElement("lp5-editarticle");
+                                 this.dialog.setArticle(Articles.fromURL(articleNode.id));
+                                 document.body.appendChild(this.dialog);
                                  controller.state = 'EditingSection';
                              }else if(target.id == 'LP5-Menu-Reload'){
                                  controller.state = 'openProject';
@@ -2825,9 +2915,9 @@
                      case 'EditingSection' :
                          if(event.type == 'lp5DialogSave'){
                              asyncSchedule(model.storeResource2.bind(model),
-                                           dialog.getArticleSerial());
+                                           this.dialog.getArticleSerial());
                          }
-                         if(event.type == 'close') {
+                         if(event.type == 'close' || event.type == 'keydown' && event.key == 'Escape') {
                              console.log("'close' event came in");
                              controller.state = 'home';
                              controller.state = 'openProject';
@@ -3509,7 +3599,7 @@
                  for(const article of model.tocOrder){
                      if(article.code){
                          (articlesFromName[article.getCodeName()] ??= []).
-                                           push(article);
+                                       push(article);
                          const name = article.getCodeName();
                          for(const item of article.codeParsed){
                              //                             console.log(`'${name}' '${item}'`, name, item);
@@ -3615,7 +3705,7 @@
              };
              model.docOrder = function*(article){
                  console.log("docOrder ", article);
-//                 console.assert(this.articles); // detect bogus 'this'
+                 //                 console.assert(this.articles); // detect bogus 'this'
                  yield article;
                  for(const childID of article.childrenIDs){
                      yield* this.docOrder(Articles.fromURL(childID));
@@ -3706,16 +3796,16 @@
                      let child = await this.loadTOC(dirHandle, id, article);
                      console.log("loaded child", child);
                  }
-//                 if(children.length){
-                     //                     console.log(`in loadTOC, article "${name}" has a ul`);
-                     //                     const entries = children.querySelectorAll('li');
-                     //                     for(const li of entries){
-                     //                         let ID = li.getAttribute('id');
-                     //                         let child = await this.loadTOC(dirHandle, ID, article);
-                     //                         article.children.push(child);
-//                 }
-//                 } else
-//                     console.log(`in loadTOC, article "${name}" has NO ul`);
+                 //                 if(children.length){
+                 //                     console.log(`in loadTOC, article "${name}" has a ul`);
+                 //                     const entries = children.querySelectorAll('li');
+                 //                     for(const li of entries){
+                 //                         let ID = li.getAttribute('id');
+                 //                         let child = await this.loadTOC(dirHandle, ID, article);
+                 //                         article.children.push(child);
+                 //                 }
+                 //                 } else
+                 //                     console.log(`in loadTOC, article "${name}" has NO ul`);
                  console.log(`loadTOC(${name}) returns `, article);
                  return article;
              }
