@@ -1,47 +1,43 @@
-<template>
-    <heading>Outermost Code</heading>
-    <explanation>
-        <p>
-            Note that this code section has no name,
-            and recall the lp5 code generation algorithm:
-            it first gathers, in order, all the unnamed
-            code sections,
-            then starts recursively expanding the code
-            references they contain.
-            But because HTML is a (nearly) rigorously nested syntax,
-            that means that when you're using lp5 to write
-            an HTML5 program (i.e., a single HTML file),
-            there will be one and only one unnamed code section
-            (unless you want to give <code>doctype</code>
-            its very own lonely little code section).
-        </p>
-        <p>
-            Note also that the code here (and this paragraph!)
-            contain the dreaded <code>&lt;/script&gt;</code>—the
-            one character sequence that must not appear inside of
-            a <code>&lt;script&gt;</code> element,
-            and lp5 keeps code inside a <code>&lt;script&gt;</code> element
-            when it's not being displayed.
-            In both situations (as you can see if you edit this article),
-            the solution is to write <code>&amp;lt;/script&gt;</code>.
-        </p>
-
-    </explanation>
-    <script type="text/plain">
-     <!doctype html>
-     <!-- lp5.html   -->
-     <html lang="en">
-     <head>
-         <meta charset="utf-8" >
-         <title>lp5</title>
-         <style>
-             <lp5- ref="Global CSS declarations"/>
-         </style>
-     </head>
-     <body>
-         <script>
-         <lp5-endscript/>
-     </body>
-     </html>
-    </script>
+<template>    <heading>Outermost Code</heading>
+    <explanation><p>
+    Note that this code section has no name,
+    and recall the lp5 code generation algorithm:
+    it first gathers, in order, all the unnamed
+    code sections,
+    then starts recursively expanding the code
+    references they contain.
+    But because HTML is a (nearly) rigorously nested syntax,
+    that means that when you're using lp5 to write
+    an HTML5 program (i.e., a single HTML file),
+    there will be one and only one unnamed code section
+    (unless you want to give <code>doctype</code>
+    its very own lonely little code section).
+</p>
+<p>
+    Note also that the code here (and this paragraph!)
+    contain the dreaded <code>&lt;/script&gt;</code>—the
+    one character sequence that must not appear inside of
+    a <code>&lt;script&gt;</code> element,
+    and lp5 keeps code inside a <code>&lt;script&gt;</code> element
+    when it's not being displayed.
+    In both situations (as you can see if you edit this article),
+    the solution is to write <code>&amp;lt;/script&gt;</code>.
+</p>
+</explanation>
+    <script><!doctype html>
+<!-- lp5.html <>  -->
+<html lang="en">
+<head>
+    <meta charset="utf-8" >
+    <title>lp5</title>
+    <style>
+        <lp5- ref="Global CSS declarations"/>
+    </style>
+</head>
+<body>
+    <script>
+    <lp5-endscript/>
+</body>
+</html>
+</script>
 </template>
