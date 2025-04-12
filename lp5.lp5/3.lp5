@@ -1,7 +1,7 @@
 <template>
     <children>
         <li id="10.lp5"></li>
-    </children
+    </children>
     <heading>lp5: The Program</heading>
     <explanation>
         The bulk of the lp5 source can be divided

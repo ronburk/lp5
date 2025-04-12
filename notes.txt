@@ -1,5 +1,7 @@
 BUGS
 ====
+[ ] failed load article should be treated special, can't edit it.
+[ ] Can't put HTML markup in codeName
 [ ] Not re-rendered after editing article (e.g. orphan/dangler state).
 [ ] is parseCode() getting called after edit?
 [ ] if listing x.lp5 from DOS box then save of edit will silently fail!
@@ -22,6 +24,9 @@ NITS
 [ ] dialog close not handled uniformly
 [ ] do dialogs have to hide the home window?
 [ ] code name header is indented by one space looks like
+
+2025/04/11
+
 
 2025/03/10
 fromSerial() is the only place that should initialize article.refersTo.

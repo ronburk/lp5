@@ -91,8 +91,6 @@
              const result = [];
              if(!escapedScript)
                  return result;
-             //             escapedScript = escapedScript.replace(/^[ \t\n]*/, '');
-             console.log(`escapedScript = '${escapedScript}'`);
              const tagPattern = /&lt;(\/)?\s*lp5-/g;  // lp5 start or end tag
              let   posStart     = 0;
              let   posNext      = 0;
@@ -318,8 +316,6 @@
             <p><strong>Selected Item:</strong> <span id="selected-item">None</span></p>
 
             <script>
-             "use strict";
-
              function makeAllLiDraggable(ancestor, ){
                  const items = ancestor.querySelectorAll('li');
                  items.forEach(item => {
@@ -359,10 +355,13 @@
                  #treeView = null;
                  connectedCallback(){
                      super.connectedCallback();
-                     this.#treeView = this.elements["lp5-treeview"];
+                     this.#treeView = this.namedNodes["lp5-treeview"];
                      console.assert(this.#treeView, "Missing <ul data-id='lp5-treeview'>");
-                     makeAllLiDraggable(this.#treeView);
                      this.#treeView.addEventListener('click', clickHandler, true);
+                     this.render();
+                 }
+                 render(){
+                     makeAllLiDraggable(this.#treeView);
                  }
              }
              if(false) if(treeView.dataset.drag){
@@ -734,7 +733,7 @@
                  let value = "";
                  codeName.value = article.getCodeName();
                  codeText.value = article.unindentCode(
-                     article.sections?.script.innerHTML);
+                     article.sections?.script?.innerHTML);
              }
 
              class EditArticle extends LP5Element {
@@ -1217,7 +1216,7 @@
                                      && index +2 < path.length
                                      && path[index+1].tagName == 'LI'
                                      && path[index+2].tagName == 'UL'
-                                     && path[index+3].tagName == 'NAV'
+//                                     && path[index+3].tagName == 'NAV'
                                  ;
                              });
                              console.log('toc click', a);
@@ -1342,6 +1341,14 @@
                              background-color: lightyellow;
                          }
 
+                         .lp5CodeName::before {
+                             content: "\27E8";  /* Unicode for left angle bracket */
+                         }
+
+                         .lp5CodeName::after {
+                             content: "\27E9";  /* Unicode for right angle bracket */
+                         }
+
                         </style>
                         <div id="LP5-Source" data-id="outerDiv">
                         </div>
@@ -1379,6 +1386,7 @@
                                  articleNode.focus();
                                  console.log(" clicked article ", articleNode, iView);
                                  iView.eventPublish("SelectArticle", articleNode);
+                                 deferEvent(document, 'lp5SelectArticle', articleNode.id);
                              }
                              else
                                  console.log(articleNode, "??? missing article node"); // ??? really does happen.
@@ -1434,10 +1442,13 @@
                          }
                          function renderName(article){
                              let result = "";
-                             let name = article.sections.name;
+                             let name = article.getCodeName();
+                             let style = "class='lp5CodeName'";
+                             if(!Articles.referencedBy[article])
+                                 style += " style='background-color: red;'";
                              if(name){
                                  // + 1 if shared name
-                                 result = `<h2>\u2261${name.innerHTML}</h2>`;
+                                 result = `<h2 ${style}>${name}</h2>`;
                              }
                              return result;
                          }
@@ -1446,7 +1457,7 @@
                                  acc += item
                              else if(item.type == 'ref'){
                                  acc += "<span class='LP5-CodeRef'"
-                                 console.error(Articles.byName[item.value]);
+//                                 console.error(Articles.byName[item.value]);
                                  if(!Articles.byName[item.value])
                                      acc += " style='background-color: red;'";
                                  /*
@@ -1464,7 +1475,7 @@
                                  acc += "&lt;/script&gt;";
                              else
                                  console.warn(`unknown code parse item ${item}`);
-                             console.log(`reduceCode(${item}) = '${acc}'`);
+//                             console.log(`reduceCode(${item}) = '${acc}'`);
                              return acc;
                          }
 
@@ -1473,7 +1484,9 @@
                              if(article.codeParsed)
                                  result = article.codeParsed.reduce(reduceCode, '');
                              result = article.unindentCode(result);
-                             return `<section class='LP5-Code'>${result}</section>`;
+                             if(result && result.trim())
+                                 result = `<section class='LP5-Code'>${result}</section>`;
+                             return result;
                          }
 
                          function renderArticle(article){
@@ -1752,7 +1765,6 @@
                          // renderArticle() - create 'code' output from an article.
                          function renderArticle(article, indent){
                              console.log("renderArticle ", article, indent);
-                             debugger;
                              let result = []; // always return (possibly empty) array
                              let span   = createFreeElement('SPAN');
                              let emit   = spanEmitter(span);
@@ -1806,40 +1818,58 @@
                     </template>
                 </div> <!-- LP5-Middle -->
                 
-                <div id="LP5-Footer">
-                    <template data-name="footerDiv" >
+                <lp5-footer id="LP5-Footer"></lp5-footer>
+                    <template data-custom="lp5-footer" >
                         <style>
+                         div{
+                             background:#d0d0d0;
+                             height: 30px;
+                             width: 100%;
+                         }
                          span { background-color: #f88; }
                         </style>
-                        <div>
+                        <div data-id="footerDiv">
                             <span data-id="span"></span>
                             <span data-id="ref"></span>
                         </div>
                         <script>
-                         const model          = require('model');
-                         const iView          = require('iView');
-                         const {span, ref}    = iView.dataID;
-                         let   selectionCount = 0;
-
-                         function init(){
-                             if(navigator.webdriver)
-                                 span.innerText = "webdriver";
-                             iView.eventListen("SelectArticle", selectArticle);
-                         };
-                         function render(){
-                             let message = model.articles.length + " articles.";
-                             message += " " + selectionCount + " selected.";
-                             span.innerText = message;
-                         };
-                         function selectArticle(event){
-                             console.error("footer selectArticle()", event);
-                             selectionCount = 1;
-                             render();
+                         class Footer extends LP5Element {
+                             #selectedArticle = null;
+                             constructor(){
+                                 super(require('template'));
+                                 document.addEventListener
+                                 ('lp5NavSelect',
+                                  (event)=>this.lp5NavSelect(event));
+                                 document.addEventListener
+                                 ('SelectArticle',
+                                  (event)=>this.lp5NavSelect(event));
+                                 document.addEventListener
+                                 ('lp5Render',
+                                  (event)=>this.lp5Render(event));
+                             }
+                             connectedCallback(){
+                                 this.render();
+                             }
+                             lp5NavSelect(event){
+                                 console.log("Footer.lp5NavSelect()", event);
+                                 this.#selectedArticle = Articles.fromURL(event.detail);
+                                 this.render();
+                             }
+                             lp5Render(event){
+                                 this.render();
+                             }
+                             render(){
+                                 let message = Articles.length + " articles.";
+//                                 message += " " + selectionCount + " selected.";
+                                 if(this.#selectedArticle){
+                                     message += ` [${this.#selectedArticle.URL}]`;
+                                 }
+                                 this.namedNodes.span.innerText = message;
+                             }
                          }
-                         return {init:init, render:render};
+                         return Footer;
                         </script>
                     </template>
-                </div>
             </div>
         </template>
         <script>
@@ -1973,8 +2003,9 @@
              void function() {
                  let secret = Symbol("new Article()");
                  Articles = class {
-                     static #array = [];
-                     static byName = {};  // map from codeName to articles
+                     static #array       = [];
+                     static byName       = {};  // map from codeName to articles
+                     static referencedBy = {};  // map from article to all articles that reference us
                      static root   = null;
                      static *[Symbol.iterator](){ yield* Articles.#array }
                      static create(url, parent, text){
@@ -1995,8 +2026,24 @@
                          }
                          return newArticle;
                      }
+                     static #updateReferencedBy(){
+                         let result = this.referencedBy = {};
+                         for(const article of Articles.#array){
+                             for(const item of article.codeParsed){
+                                 if(item.type == 'ref'){
+                                     const codeName = item.value;
+                                     const targets  = Articles.byName[codeName];
+                                     if(targets)
+                                         for(const target of targets){
+                                             (this.referencedBy[target] ??= []).
+                                          push(article);
+                                         }
+                                 }
+                             }
+                         }
+                     }
                      static #updateByName(){
-                         let result = this.byName = {}
+                         let result = this.byName = {};
                          for(const article of Articles.#array){
                              const name = article.getCodeName();
                              if(name != null)
@@ -2005,6 +2052,7 @@
                      }
                      static update(){
                          Articles.#updateByName();
+                         Articles.#updateReferencedBy();
                          console.log("Articles updated.");
                      }
                      static reset(){
@@ -2047,14 +2095,25 @@
                                                  filter(key => !(key in expected));
                          console.assert(surprise.length = 0, surprise, this);
                      }
+                     #hasNoNonWhitespaceTextChildren(node) {
+                         for (let child of node.childNodes) 
+                             // Check if the child is a text node and not just whitespace
+                             if (child.nodeType === Node.TEXT_NODE && child.textContent.trim() !== '') 
+                                 return false;  // Found a non-whitespace text node
+                         return true;  // No non-whitespace text nodes found
+                     }
+
                      #fromString(articleString){
                          let html = new DOMParser().parseFromString(articleString, 'text/html');
+                         console.log(this, html);
                          assert(html);
                          this.template = html.querySelector('template');
                          assert(this.template, html);
                          assert(this.template.parentNode.nodeName == 'HEAD', html);
                          assert(this.template.parentNode.childElementCount == 1, html);
                          let content = this.template.content;
+                         console.assert(this.#hasNoNonWhitespaceTextChildren(content));
+
                          Array.from(content.children).forEach(child => {
                              this.sections[child.nodeName.toLowerCase()] = child;
                          });
@@ -2085,7 +2144,7 @@
                          }
                          //this.codeParsed = parseCode(this.escapedScript);
                          this.codeParsed = parseCode(this.unindentCode(this.escapedScript));
-                         this.code = this.sections.script?.innerText.trim() || null;
+//                         this.code = this.sections.script?.innerText.trim() || null;
                          this.name = this.sections.name?.innerText.trim() || null;
                          this.childrenIDs = [];
                          this.childCount  = 0;
@@ -2130,8 +2189,10 @@
                      // null if no code, else empty string means "unnamed"
                      getCodeName(){
                          let result = null;
-                         if(this.sections.script)
+                         if(this.sections.script){
                              result = this.sections?.name?.innerText.trim() || '';
+                             result = result.replace(/\s+/g, ' ').trim();
+                         }
                          return result;
                      }
                      unindentCode(text){
@@ -3187,7 +3248,7 @@
                              assert(false,
                                     `'${thing}': undefined name for require`);
                      }
-                     // else we are turning a set of sets, more or less
+                     // else we are returning a set of sets, more or less
                      let finalObj = {};
                      things.forEach(function requireFinalLoop(i){
                          console.assert(i in globalEnv, i);
@@ -3746,7 +3807,6 @@
                  model.updateDerivedState();
              };
              model.docOrder = function*(article){
-                 console.log("docOrder ", article);
                  //                 console.assert(this.articles); // detect bogus 'this'
                  yield article;
                  for(const childID of article.childrenIDs){
@@ -3756,7 +3816,6 @@
                  let ulNode = article.ulNode;
                  if(ulNode)
                      for(const entry of ulNode.querySelectorAll(':scope > li')){
-                         console.log(entry);
                          let id     = entry.getAttribute('id');
                          yield* this.docOrder(this.articles.fromURL(id));
                      }
@@ -3799,21 +3858,25 @@
              }
              model.loadArticle = async function(dirHandle, filename, parent){
                  const articleText = await this.loadResource(filename);
+                 console.error("model.loadArticle()", articleText);
                  let text = articleText.text;
                  if(!articleText.loaded){
                      text = `
 <template>
-    <section>
-    <h2>FAILED LOAD OF "URL": ERROR</h2>
-<div style="background-color: #ffcccc; border: 2px solid #ffcc00; padding: 10px; margin: 10px 0; font-family: sans-serif;">
+    <heading>"URL": FAILED LOAD: ERROR</heading>
+    <explanation>
+        <div style="background-color: #ffcccc; border: 2px solid #ffcc00; padding: 10px; margin: 10px 0; font-family: sans-serif;">
            <p>
 <span style="font-size: 24px;">&#9888;</span>MSG
            </p>
+        <p>
+            The parent that linked to 'URL' was 'PARENTURL'.
+        </p>
        </div>
-
-    </section>
+    </explanation>
 </template>`;
                      text = text.replace(/URL/, articleText.url);
+                     text = text.replace(/PARENTURL/, parent.URL);
                      text = text.replace(/ERROR/, articleText.error.name);
                      text = text.replace(/MSG/, articleText.error.message);
                  }
@@ -3846,6 +3909,7 @@
                  //                 }
                  //                 } else
                  //                     console.log(`in loadTOC, article "${name}" has NO ul`);
+                 controller.deferEvent(document, "lp5Render");
                  console.log(`loadTOC(${name}) returns `, article);
                  return article;
              }
