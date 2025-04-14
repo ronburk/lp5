@@ -319,6 +319,13 @@
                  #slot        = null;
                  #selectEvent = "lp5-treeview:select";
 
+                 #toggleList(li) {
+                     const nestedList = li.querySelector('ul');
+                     if (nestedList) {
+                         nestedList.classList.toggle('active');
+                         li.classList.toggle('expanded');
+                     }
+                 }
                  #clickHandler(event){
                      console.log("treeview  clickHandler!!!!!");
                      event.preventDefault();
@@ -331,19 +338,12 @@
                          const nestedUl = li.querySelector('ul');
                          
                          console.log("target, span, nestedUl", target, span, nestedUl);
-                         // Only show triangle if li contains nested ul (container item)
-                         if (nestedUl) {
-                             if (target.closest('span') === span) {
-                                 this.selectItem(span);
-                                 console.log("    selectItem()");
-                             } else {
-                                 console.log("    toggleList()");
-                                 toggleList(li);
-                             }
-                         } else if (target === span) {
-                             // For non-container items, just select the item
-                             this.selectItem(span);
-                         }
+                         if(target.closest('span') === span)// click in span is always selection
+                             this.#selectItem(li);
+                         else if(nestedUl) // not in span, but there is triangle
+                             this.#toggleList(li);
+                         else // not in span, but no triangle, so select anyway.
+                             this.#selectItem(li);
                      }
                  }
 
@@ -351,8 +351,9 @@
                      selected?.classList.remove('selected');
                      span.classList.add('selected');
                      selected = span;
-                     console.log("selectItem", span);
-                     deferEvent(this, this.#selectEvent, "fooooober!");
+                     console.log("selectItem", span, deferEvent);
+                     deferEvent(window, this.#selectEvent, "fooooober!");
+                     console.log("back from deferEvent()");
                  }
                  #handleSlotChange() {
                      this.render();
@@ -375,7 +376,7 @@
                      super.connectedCallback();
                      this.#treeView = this.namedNodes["lp5-treeview"];
                      console.assert(this.#treeView, "Missing <ul data-id='lp5-treeview'>");
-                     this.#treeView.addEventListener('click', event=>this.#clickHandler, true);
+                     this.#treeView.addEventListener('click', event=>this.#clickHandler(event), true);
                      //??? must put directly on slot node!
                      this.#treeView.addEventListener('slotchange', event=>this.#handleSlotChange(event), true);
                      this.render();
@@ -473,13 +474,6 @@
              let selected  = null;
 
              // Toggle expand/collapse for nested lists
-             function toggleList(li) {
-                 const nestedList = li.querySelector('ul');
-                 if (nestedList) {
-                     nestedList.classList.toggle('active');
-                     li.classList.toggle('expanded');
-                 }
-             }
 
              // Function to select an item and highlight it
 
@@ -778,11 +772,11 @@
                  }
                  saveClick(){
                      console.log("saveClick()");
-                     deferEvent(document, "lp5DialogSave");
+                     deferEvent(window, "lp5DialogSave");
                  }
                  cancelClick(){
                      console.log("cancelClick()");
-                     deferEvent(document, "lp5DialogCancel");
+                     deferEvent(window, "lp5DialogCancel");
                  }
                  #article = null;
                  setArticle(article){
@@ -1226,8 +1220,10 @@
                          const {command}         = require('controller');
                          const {deferEvent} = require('controller');
 
-                         function clickHandler(event){
-//                             event.preventDefault();
+                         function selectHandler(event){
+                             console.error("nav selectHandler!!!!", event);
+                             return;
+
                              let path = event.composedPath();
                              // was click inside TOC element?
                              let a = path.find((node,index)=>{
@@ -3007,6 +3003,7 @@
                                  controller.state = 'EditingView';
                              }else if(target.tagName == 'A'){
                                  const href=target.getAttribute('href');
+                                 console.error("href= ", href);
                                  //if(href){
                                  if(false){
                                      if(href.startsWith("#")){
@@ -3105,6 +3102,7 @@
                  'contextmenu',
                  'command',
                  'DataCloneError',
+                 'lp5-treeview:select',
                  'lp5DialogSave',
                  'lp5DialogCancel',
                  'lp5NavSelect',
@@ -3167,8 +3165,14 @@
 
              controller.deferEvent = function(target, eventName, eventDetail) {
                  console.assert(target);
+                 console.log("deferEvent", target, eventName);
                  const event = new CustomEvent(eventName, { detail: eventDetail });
-                 queueMicrotask(()=> target.dispatchEvent(event));
+                 function deferred(){
+                     console.log("deferred dispatch of ", event);
+                     const result = target.dispatchEvent(event);
+                     console.log("deferred dispatch returns ", result);
+                 }
+                 queueMicrotask(deferred);
              }
 
              controller.asyncSchedule = function(func, ...args){
