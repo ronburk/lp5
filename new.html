@@ -24,6 +24,10 @@
 
          window.lp5 = {};
 
+         const elementFoundry = new Proxy({}, {
+             get(target, prop) {return document.createElement(prop);}
+         });
+
          function trimLines(text) {
              return text
                  .replace(/^\s*[\r\n]+/, '')  // Remove leading blank lines
@@ -195,21 +199,17 @@
         <template data-custom="lp5-treeview">
             <!-- Hierarchical Treeview -->
             <style>
-             /* Base font size for scaling */
-             html {
-                 font-size: 16px; /* Default size, easily scalable */
-             }
 
              /* Remove default padding and inline-start indentation on ul to prevent first-level items from being indented */
-             ul.treeview {
-                 list-style-type: none;
-                 padding-left: 0; /* Remove the default padding */
-                 padding-inline-start: 0; /* Remove the default inline-start padding */
-                 margin: 0;
-             }
+             ul {
+                     list-style-type: none;
+                     padding-left: 0; /* Remove the default padding */
+                     padding-inline-start: 0; /* Remove the default inline-start padding */
+                     margin: 0;
+                 }
 
              /* Indentation for nested <ul> elements using em to scale */
-             ul.treeview ul {
+             /*ul.treeview */ ul ul {
                  padding-left: 1.00em; /* Indent nested lists based on font size */
                  list-style-type: none; /* Remove list bullet points */
              }
@@ -223,7 +223,8 @@
                  user-select: none; /* Disable text selection on list items */
              }
 
-             /* For all li elements, apply the triangle (default state) */
+             /* For all li elements, apply the hidden triangle  */
+/*             ul[data-id="lp5-treeview"] > ul >li::before { */
              li::before {
                  content: "\25B6 "; /* Right-pointing triangle */
                  margin-right: 0;
@@ -234,9 +235,10 @@
                  text-align: center;
                  font-size: 0.75em; /* Triangle size */
                  line-height: 1em;
+                 visibility: visible;
              }
 
-             /* Hide the triangle for li elements that do not have a <ul> as a direct child */
+             /* Show the triangle for li elements that do not have a <ul> as a direct child */
              li:not(:has(> ul))::before {
                  visibility: hidden; /* Hide the triangle */
              }
@@ -268,12 +270,12 @@
              }
 
              /* Ensure nested <ul> elements are collapsed by default */
-             ul.nested {
+             ul ul /*.nested */ {
                  display: none;
              }
 
              /* When active, display nested <ul> */
-             ul.nested.active {
+             ul ul.active {
                  display: block;
              }
 
@@ -286,36 +288,18 @@
              span {
                  font-size: 1rem; /* Use rem for text size */
              }
-
+             slot { display: none; }
             </style>
 
             <ul data-id="lp5-treeview" data-drag="true">
-                <li><span>Fruits</span>
-                    <ul class="nested">
-                        <li><span>Orange</span></li>
-                        <li><span>Lemon</span></li>
-                        <li><span>Melons</span>
-                            <ul class="nested">
-                                <li><span>Watermelon</span></li>
-                                <li><span>Cantaloupe</span></li>
-                            </ul>
-                        </li>
-                    </ul>
-                </li>
-                <li><span>Apple</span></li>
-                <li><span>Vegetables</span>
-                    <ul class="nested">
-                        <li><span>Carrot</span></li>
-                        <li><span>Spinach</span></li>
-                        <li><span>Broccoli</span></li>
-                    </ul>
-                </li>
-                <li><span>Potato</span></li>
             </ul>
+            <slot data-id="slot"></slot>
 
             <p><strong>Selected Item:</strong> <span id="selected-item">None</span></p>
 
             <script>
+             const {deferEvent} = require('controller');
+
              function makeAllLiDraggable(ancestor, ){
                  const items = ancestor.querySelectorAll('li');
                  items.forEach(item => {
@@ -325,43 +309,83 @@
              }
              // Add an event listener on the UL element (capture phase)
              //             treeView.addEventListener('click', function(event) {
-             function clickHandler(event){
-                 console.log("clickHandler!!!!!");
-                 const target = event.target;
-                 const li = target.closest('li');
-                 
-                 if (li) {
-                     const span = li.querySelector(':scope > span');
-                     const nestedUl = li.querySelector('ul');
-                     
-                     // Only show triangle if li contains nested ul (container item)
-                     if (nestedUl) {
-                         if (target === span) {
-                             selectItem(span);
-                         } else {
-                             toggleList(li);
-                         }
-                     } else if (target === span) {
-                         // For non-container items, just select the item
-                         selectItem(span);
-                     }
-                 }
-             }
 
              class TreeView extends LP5Element {
                  constructor(){
                      super(require('template'));
                  }
-                 #treeView = null;
+                 #treeView    = null;
+                 #dirty       = true;
+                 #slot        = null;
+                 #selectEvent = "lp5-treeview:select";
+
+                 #clickHandler(event){
+                     console.log("treeview  clickHandler!!!!!");
+                     event.preventDefault();
+                     const target = event.target;
+                     const li     = target.closest('li');
+                     
+                     console.log("===li", li);
+                     if (li) { // if click was inside <li>
+                         const span     = li.querySelector(':scope > span');
+                         const nestedUl = li.querySelector('ul');
+                         
+                         console.log("target, span, nestedUl", target, span, nestedUl);
+                         // Only show triangle if li contains nested ul (container item)
+                         if (nestedUl) {
+                             if (target.closest('span') === span) {
+                                 this.selectItem(span);
+                                 console.log("    selectItem()");
+                             } else {
+                                 console.log("    toggleList()");
+                                 toggleList(li);
+                             }
+                         } else if (target === span) {
+                             // For non-container items, just select the item
+                             this.selectItem(span);
+                         }
+                     }
+                 }
+
+                 #selectItem(span) {
+                     selected?.classList.remove('selected');
+                     span.classList.add('selected');
+                     selected = span;
+                     console.log("selectItem", span);
+                     deferEvent(this, this.#selectEvent, "fooooober!");
+                 }
+                 #handleSlotChange() {
+                     this.render();
+                     this.#dirty = false;
+                 }
+                 #wrapSlotContent() {
+                     const container = this.namedNodes["lp5-treeview"];
+                     console.error(container);
+                     this.#slot.assignedNodes().forEach(node => {
+                         console.error("append!");
+                         container.append(node.cloneNode(true));
+                     });
+                     console.error(this.template.content);
+
+                     return;
+                 }
+
                  connectedCallback(){
+                     this.#slot = this.namedNodes.slot;
                      super.connectedCallback();
                      this.#treeView = this.namedNodes["lp5-treeview"];
                      console.assert(this.#treeView, "Missing <ul data-id='lp5-treeview'>");
-                     this.#treeView.addEventListener('click', clickHandler, true);
+                     this.#treeView.addEventListener('click', event=>this.#clickHandler, true);
+                     //??? must put directly on slot node!
+                     this.#treeView.addEventListener('slotchange', event=>this.#handleSlotChange(event), true);
                      this.render();
                  }
                  render(){
-                     makeAllLiDraggable(this.#treeView);
+                     if(this.#dirty){
+                         this.#wrapSlotContent();
+                         makeAllLiDraggable(this.#treeView);
+                     }
+                     this.#dirty = false;
                  }
              }
              if(false) if(treeView.dataset.drag){
@@ -446,11 +470,11 @@
                  return  api;
              }
              const dragApi = dragAndDrop();
-             let selected = null;
+             let selected  = null;
 
              // Toggle expand/collapse for nested lists
              function toggleList(li) {
-                 const nestedList = li.querySelector('.nested');
+                 const nestedList = li.querySelector('ul');
                  if (nestedList) {
                      nestedList.classList.toggle('active');
                      li.classList.toggle('expanded');
@@ -458,11 +482,6 @@
              }
 
              // Function to select an item and highlight it
-             function selectItem(span) {
-                 selected?.classList.remove('selected');
-                 span.classList.add('selected');
-                 selected = span;
-             }
 
              // On page load, ensure no nested lists are visible initially
              window.onload = function() {
@@ -1091,7 +1110,7 @@
              }
              function init(thisView){
                  iView.routeEvent = routeEvent;
-                 console.warn(thisView, thisView.views);
+//                 console.warn(thisView, thisView.views);
              }
              function render(iView, message){
                  console.log(message);
@@ -1208,7 +1227,7 @@
                          const {deferEvent} = require('controller');
 
                          function clickHandler(event){
-                             event.preventDefault();
+//                             event.preventDefault();
                              let path = event.composedPath();
                              // was click inside TOC element?
                              let a = path.find((node,index)=>{
@@ -1226,21 +1245,23 @@
                          }
                          function init(){
                              const {pane} = require('dataID');
-                             pane.addEventListener('click', clickHandler);
+//                             pane.addEventListener('click', clickHandler);
                          };
                          function getTitle(li){
                              let ID = li.getAttribute('id');
                          }
-                         function renderChildTOC(article){
+                         function renderChildTOC(article, ul=null){
                              console.log(`renderChildTOC`, article);
                              let children = article.sections.children;
-
-                             let ul    = document.createElement('ul');
+                             if(!ul)
+                                 ({ul} = elementFoundry);
                              children.querySelectorAll('li').forEach((entry)=>{
-                                 let li           = document.createElement('li');
-                                 let id           = entry.getAttribute('id');
-                                 let a            = document.createElement('a');
-                                 li.appendChild(a);
+                                 const {li,span,a} = elementFoundry;
+                                 li.classList.add('lp5-treeview');
+                                 let id            = entry.getAttribute('id');
+
+                                 span.appendChild(a);
+                                 li.appendChild(span);
                                  let childArticle = Articles.fromURL(id);
                                  console.log("childArticle, id", childArticle, id);
                                  a.setAttribute('href', childArticle.URL);
@@ -1250,8 +1271,11 @@
                                  else
                                      a.innerText = "< no title >";
                                  ul.appendChild(li);
-                                 if(childArticle.childCount)
-                                     ul.appendChild(renderChildTOC(childArticle));
+                                 if(childArticle.childCount){
+                                     const {ul} = elementFoundry;
+                                     li.appendChild(renderChildTOC(childArticle, ul));
+                                 }
+//                                 ul.appendChild(renderChildTOC(childArticle));
                              });
                              return ul;
                          }
@@ -1259,10 +1283,13 @@
                              console.log("render toc: ", model.rootTOC);
                              let article = model.rootTOC;
                              if(article && article.childCount){
-                                 let ul = renderChildTOC(article);
+                                 let tv = document.createElement('lp5-treeview');
+                                 let ul = renderChildTOC(article, tv);
                                  let tocRootNode = iView.rootNode.shadowRoot.querySelector('#LP5-Nav');
                                  console.assert(tocRootNode && tocRootNode.id == "LP5-Nav");
-                                 tocRootNode.replaceChildren(ul);
+//                                 tv.append(ul.cloneNode(true));
+                                 tocRootNode.replaceChildren(tv);
+//                                 tocRootNode.append(ul);
                              }
                              return;
                          };
@@ -1353,9 +1380,10 @@
                         <div id="LP5-Source" data-id="outerDiv">
                         </div>
                         <script>
-                         const {outerDiv} = require('dataID');
+                         const {outerDiv}       = require('dataID');
                          const {model, Article} = require('model, Article');
-                         const iView          = this;
+                         const {deferEvent}     = require('controller');
+                         const iView            = this;
 
                          function articleNodeFromClick(event){
                              let result = null;
@@ -2696,7 +2724,6 @@
                  const { model, views, asyncSchedule } = controller;
                  if(controller.crashed){
                      console.log("Got event, but controller is crashed.", event);
-                     //                     event.preventDefault();
                      return;
                  }
                  if(event.type == 'asyncComplete' && event.detail instanceof Error){
@@ -3140,7 +3167,6 @@
 
              controller.deferEvent = function(target, eventName, eventDetail) {
                  console.assert(target);
-                 console.warn("deferEvent " + eventName, eventDetail);
                  const event = new CustomEvent(eventName, { detail: eventDetail });
                  queueMicrotask(()=> target.dispatchEvent(event));
              }
@@ -3858,7 +3884,6 @@
              }
              model.loadArticle = async function(dirHandle, filename, parent){
                  const articleText = await this.loadResource(filename);
-                 console.error("model.loadArticle()", articleText);
                  let text = articleText.text;
                  if(!articleText.loaded){
                      text = `
