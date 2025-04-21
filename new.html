@@ -1,5 +1,18 @@
 <!doctype html>
 <html lang="en">
+<!-- 
+    <template id="lp5">
+        <lp5-treeview listen="click">
+            <shadowevent name='lp5-treeview:select'/>
+        </lp5-treeview>
+        <class name="lp5-treeview" listen="click">
+        </class>
+
+        <events>
+            <treeview>contextMenu</treeview>
+        </events>
+    </template>
+    - -->
     <head>
         <style>
          body, html { display: flex; flex-direction: column; margin: 0; }
@@ -114,7 +127,6 @@
                      const tagDescriptor = parseTag(escapedScript, match.index);
                      if(tagDescriptor){
                          let typename = classifyTag(tagDescriptor);
-                         // console.assert(false, typename);
                          if(tagDescriptor.type === 'ref'){
                              const lineStart = escapedScript.lastIndexOf('\n', match.index)+1;
                              const prefix = escapedScript.substring(lineStart, match.index);
@@ -200,13 +212,15 @@
             <!-- Hierarchical Treeview -->
             <style>
 
-             /* Remove default padding and inline-start indentation on ul to prevent first-level items from being indented */
+             /* Remove default padding and inline-start indentation on ul
+              * to prevent first-level items from being indented
+              */
              ul {
-                     list-style-type: none;
-                     padding-left: 0; /* Remove the default padding */
-                     padding-inline-start: 0; /* Remove the default inline-start padding */
-                     margin: 0;
-                 }
+                 list-style-type: none;
+                 padding-left: 0; /* Remove the default padding */
+                 padding-inline-start: 0; /* Remove the default inline-start padding */
+                 margin: 0;
+             }
 
              /* Indentation for nested <ul> elements using em to scale */
              /*ul.treeview */ ul ul {
@@ -298,14 +312,13 @@
             <p><strong>Selected Item:</strong> <span id="selected-item">None</span></p>
 
             <script>
-             const {deferEvent} = require('controller');
+             const {deferShadowEvent} = require('controller');
 
              function makeAllLiDraggable(ancestor, ){
                  const items = ancestor.querySelectorAll('li');
                  items.forEach(item => {
                      item.setAttribute('draggable', 'true');
                  });
-                 console.log("makeAllLiDraggable returns");
              }
              // Add an event listener on the UL element (capture phase)
              //             treeView.addEventListener('click', function(event) {
@@ -314,7 +327,7 @@
                  constructor(){
                      super(require('template'));
                  }
-                 #treeView    = null;
+                 #treeview    = null;
                  #dirty       = true;
                  #slot        = null;
                  #selectEvent = "lp5-treeview:select";
@@ -326,18 +339,18 @@
                          li.classList.toggle('expanded');
                      }
                  }
+                 #contextMenuHandler(event){
+                     console.error("contextMenuHandler!!!!!", event);
+                 }
                  #clickHandler(event){
-                     console.log("treeview  clickHandler!!!!!");
                      event.preventDefault();
                      const target = event.target;
                      const li     = target.closest('li');
                      
-                     console.log("===li", li);
                      if (li) { // if click was inside <li>
                          const span     = li.querySelector(':scope > span');
                          const nestedUl = li.querySelector('ul');
                          
-                         console.log("target, span, nestedUl", target, span, nestedUl);
                          if(target.closest('span') === span)// click in span is always selection
                              this.#selectItem(li);
                          else if(nestedUl) // not in span, but there is triangle
@@ -347,13 +360,11 @@
                      }
                  }
 
-                 #selectItem(span) {
+                 #selectItem(li) {
                      selected?.classList.remove('selected');
-                     span.classList.add('selected');
-                     selected = span;
-                     console.log("selectItem", span, deferEvent);
-                     deferEvent(window, this.#selectEvent, "fooooober!");
-                     console.log("back from deferEvent()");
+                     li.classList.add('selected');
+                     selected = li;
+                     deferShadowEvent(this, this.#selectEvent, li);
                  }
                  #handleSlotChange() {
                      this.render();
@@ -361,12 +372,9 @@
                  }
                  #wrapSlotContent() {
                      const container = this.namedNodes["lp5-treeview"];
-                     console.error(container);
                      this.#slot.assignedNodes().forEach(node => {
-                         console.error("append!");
                          container.append(node.cloneNode(true));
                      });
-                     console.error(this.template.content);
 
                      return;
                  }
@@ -374,23 +382,25 @@
                  connectedCallback(){
                      this.#slot = this.namedNodes.slot;
                      super.connectedCallback();
-                     this.#treeView = this.namedNodes["lp5-treeview"];
-                     console.assert(this.#treeView, "Missing <ul data-id='lp5-treeview'>");
-                     this.#treeView.addEventListener('click', event=>this.#clickHandler(event), true);
+                     this.#treeview = this.namedNodes["lp5-treeview"];
+                     console.assert(this.#treeview, "Missing <ul data-id='lp5-treeview'>");
+                     this.#treeview.addEventListener('click', event=>this.#clickHandler(event), true);
+                     this.#treeview.addEventListener('contextmenu', event=>this.#contextMenuHandler(event), true);
                      //??? must put directly on slot node!
-                     this.#treeView.addEventListener('slotchange', event=>this.#handleSlotChange(event), true);
+                     this.#treeview.addEventListener('slotchange', event=>this.#handleSlotChange(event), true);
                      this.render();
+                 }
+                 setContent(nodes){
                  }
                  render(){
                      if(this.#dirty){
                          this.#wrapSlotContent();
-                         makeAllLiDraggable(this.#treeView);
+                         makeAllLiDraggable(this.#treeview);
                      }
                      this.#dirty = false;
                  }
              }
              if(false) if(treeView.dataset.drag){
-                 console.log("Draggable!");
                  const items = treeView.querySelectorAll('li');
                  items.forEach(item => {
                      item.setAttribute('draggable', 'true');
@@ -518,7 +528,7 @@
              return { init:init, render:render };
             </script>
         </template>
-        <template data-name="ArticleContextMenu" >
+        <template data-custom="lp5-contextmenu" >
             <style>
              article:focus {
                  outline: 3px solid orange;
@@ -551,34 +561,46 @@
                  border-bottom: none;
              }
              :host { all: initial !important; }
+             slot { display: none; }
             </style>
-            <div>
-                <dialog id="ArticleContextMenu" class="lp5-context">
-                    <ul data-id="ul">
+            <dialog data-id="dialog">
+                <!--
+                <ul data-id="ul">
+                    <slot>
                         <li data-cmd="createArticle -1">Insert New Article Before</li>
                         <li data-cmd="createArticle  1">Append New Article After</li>
                         <li data-id="childOption" data-cmd="createArticle  0">Create First Child Article</li>
-                    </ul>
-                </dialog>
-            </div>
+                </ul>
+                -->
+            </dialog>
             <script>
-             const {ul, childOption} = require('dataID');
-             let articleTarget = null;
+//             const {ul, childOption} = require('dataID');
+//             let articleTarget = null;
 
-             function clickHandler(event){
-                 console.log("clickHandler ", event);
-                 const target = event.target;
-                 console.log("cmd ", target.dataset.cmd);
-                 if(target.dataset.cmd){
-                     let argv = target.dataset.cmd.split(/[ ]+/);
-                     argv.push(articleTarget);
-                     console.log("argv = ", argv);
-                     document.dispatchEvent(
-                         new CustomEvent('command', {
-                             detail : argv,
-                     }));
+             class LP5ContextMenu extends LP5Element {
+                 #dialog;
+                 constructor(){
+                     super(require('template'));
+                     this.#dialog = this.namedNodes.dialog;
+                 }
+                 connectedCallback(){
+                     this.#dialog.addEventListener('click', (event)=>this.#clickHandler);
+                 }
+                 showModal(){ this.#dialog.showModal() }
+                 #clickHandler(event){
+                     const target = event.target;
+                     if(target.dataset.cmd){
+                         let argv = target.dataset.cmd.split(/[ ]+/);
+                         argv.push(articleTarget);
+                         document.dispatchEvent(
+                             new CustomEvent('command', {
+                                 detail : argv,
+                         }));
+                     }
                  }
              }
+             return LP5ContextMenu;
+
              function init(iView, article){
                  articleTarget = article;
                  ul.addEventListener('click', clickHandler);
@@ -591,6 +613,22 @@
                  }
              }
              return {init:init, render:render};
+            </script>
+        </template>
+        <template data-custom="lp5-articlecontextmenu">
+            <ul data-id="ul">
+                <li data-cmd="createArticle -1">Insert New Article Before</li>
+                <li data-cmd="createArticle  1">Append New Article After</li>
+                <li data-id="childOption" data-cmd="createArticle  0">Create First Child Article</li>
+            </ul>
+            <script>
+             const LP5ContextMenu = customElements.get('lp5-contextmenu');
+             class LP5ArticleContextMenu extends LP5ContextMenu {
+                 constructor(){
+                     super(require('template'));
+                 }
+             }
+             return LP5ArticleContextMenu;
             </script>
         </template>
         <template data-name="EditView">
@@ -652,21 +690,17 @@
              };
 
              function sectionGetTitle(article){
-                 console.log("sectionGetTitle ", article);
                  return article.titleNode.innerText;
              }
              function clickSave(event){
-                 console.log("clickSave!!! >>>>>>>>>>>>>>>>>>>>>>>>>>>");
                  model.viewSettings.unref = unref.checked;
                  model.viewSettings.undef = undef.checked;
                  model.viewSettings.match = match.value;
              }
              function init(iView){
-                 console.log("View ");
                  save.addEventListener('click', clickSave);
              }
              function renderViewDialog(iView){
-                 console.log("View Dialog render!!!!!!");
                  unref.checked = model.viewSettings.unref;
                  undef.checked = model.viewSettings.undef;
                  match.value   = model.viewSettings.match;
@@ -728,7 +762,6 @@
             <script>
              const {deferEvent} = require('controller');
              function sectionGetTitle(article){
-                 console.log("sectionGetTitle ", article);
                  let result = article.sections?.heading?.innerText;
                  if(!result)
                      result = "";
@@ -738,7 +771,6 @@
              function renderDialog(article, namedNodes){
                  const {articleTitle, docText, codeText, codeName } = namedNodes;
                  let title = sectionGetTitle(article);
-                 console.log("Title is ", title);
                  articleTitle.value = title ;
                  let explain = article.sections?.explanation?.innerHTML;
                  if(explain)
@@ -751,18 +783,15 @@
 
              class EditArticle extends LP5Element {
                  constructor(){
-                     console.log("EditArticle constructor");
                      super(require('template'));
                      this.addListeners();
                  }
                  connectedCallback(){
-                     console.log("EditArticle connected", super.elements);
                      super.connectedCallback();
                      renderDialog(this.#article, this.namedNodes);
                      this.namedNodes.dialog.showModal();
                  }
                  disconnectedCallback(){
-                     console.log("EditArticle disconnected");
                      this.#article = null;
                  }
                  addListeners(){
@@ -771,16 +800,13 @@
                      cancel.addEventListener('click', ()=>this.cancelClick());
                  }
                  saveClick(){
-                     console.log("saveClick()");
-                     deferEvent(window, "lp5DialogSave");
+                     deferEvent(this, "lp5DialogSave");
                  }
                  cancelClick(){
-                     console.log("cancelClick()");
-                     deferEvent(window, "lp5DialogCancel");
+                     deferEvent(this, "lp5DialogCancel");
                  }
                  #article = null;
                  setArticle(article){
-                     console.log("EditArticle setArticle");
                      assert(!this.isConnected, "can't set after connected");
                      assert(!this.#article, "article already set!");
                      this.#article = article;
@@ -811,7 +837,6 @@
              let   thisArticle = null;
 
              function clickSave(event){
-                 console.log("clickSave!!!");
                  // serialize contents of editing dialog
                  let serial = Article.createSerial(
                      thisArticle.ulNode,
@@ -824,14 +849,13 @@
                  }));
              }
              function init(iView, node){
-                 console.log("EditSection ", node);
+
                  save.addEventListener('click', clickSave);
              }
              function renderEditSectionDialog(iView, article){
-                 console.log("renderEditSectionDialog render!!!!!!", article);
                  thisArticle = article; // remember for future use
                  let title = sectionGetTitle(article);
-                 console.log("Title is ", title);
+
                  articleTitle.value = title;
                  let value = "";
                  docText.value = article.sections?.explanation.innerHTML;
@@ -1215,33 +1239,23 @@
                         </nav>
                         <script>
                          //                     const iView = require('iView');
-                         const iView = this;
-                         const model = require('model');
-                         const {command}         = require('controller');
-                         const {deferEvent} = require('controller');
+                         const iView        = this;
+                         const model        = require('model');
+                         //                         const {command}    = require('controller');
+                         const {deferShadowEvent, command} = require('controller');
+                         const {publish, subscribe} = require('controller');
 
                          function selectHandler(event){
-                             console.error("nav selectHandler!!!!", event);
+                             console.error("selectHandler ", event);
+                             const li = event.detail; // the <li> selected
+                             const a  = li.querySelector('a');
+                             publish('lp5NavSelect', a.getAttribute('href'));
                              return;
-
-                             let path = event.composedPath();
-                             // was click inside TOC element?
-                             let a = path.find((node,index)=>{
-                                 return node.tagName == 'A'
-                                     && index +2 < path.length
-                                     && path[index+1].tagName == 'LI'
-                                     && path[index+2].tagName == 'UL'
-//                                     && path[index+3].tagName == 'NAV'
-                                 ;
-                             });
-                             console.log('toc click', a);
-                             if(a){
-                                 deferEvent(document, 'lp5NavSelect', a.getAttribute('href'));
-                             }
                          }
                          function init(){
                              const {pane} = require('dataID');
-//                             pane.addEventListener('click', clickHandler);
+//                             subscribe('lp5-treeview:select', selectHandler);
+                             pane.addEventListener('lp5-treeview:select', selectHandler, true);
                          };
                          function getTitle(li){
                              let ID = li.getAttribute('id');
@@ -1271,7 +1285,6 @@
                                      const {ul} = elementFoundry;
                                      li.appendChild(renderChildTOC(childArticle, ul));
                                  }
-//                                 ul.appendChild(renderChildTOC(childArticle));
                              });
                              return ul;
                          }
@@ -1283,9 +1296,7 @@
                                  let ul = renderChildTOC(article, tv);
                                  let tocRootNode = iView.rootNode.shadowRoot.querySelector('#LP5-Nav');
                                  console.assert(tocRootNode && tocRootNode.id == "LP5-Nav");
-//                                 tv.append(ul.cloneNode(true));
                                  tocRootNode.replaceChildren(tv);
-//                                 tocRootNode.append(ul);
                              }
                              return;
                          };
@@ -1378,7 +1389,7 @@
                         <script>
                          const {outerDiv}       = require('dataID');
                          const {model, Article} = require('model, Article');
-                         const {deferEvent}     = require('controller');
+                         const {deferEvent,publish,subscribe}     = require('controller');
                          const iView            = this;
 
                          function articleNodeFromClick(event){
@@ -1396,12 +1407,21 @@
                              return result;
                          }
                          function navSelectHandler(event){
-                             console.log(event, event.detail);
+                             console.log("source pane navSelectHandler",
+                                         event, event.detail);
                              let pattern = 'article#'+ CSS.escape(event.detail);
                              let match = outerDiv.querySelector(pattern);
                              console.log("match = ", match);
                              if(match)
                                  match.scrollIntoView(true);
+                         }
+                         function contextMenuHandler(event){
+                             const articleNode = articleNodeFromClick(event);
+                             console.log(":::::: source pane contextMenuHandler ", event, articleNode);
+                             if(articleNode){
+                                 publish('lp5ArticleContext', articleNode.id);
+                             }
+                             event.preventDefault();
                          }
                          function clickHandler(event){
                              console.log(":::::: source pane clickHandler ", event);
@@ -1419,7 +1439,9 @@
                              console.log("***** adding click handler in source");
                              outerDiv.addEventListener('click', clickHandler,
                                                        { composed: true, bubble: true });
-                             document.addEventListener('lp5NavSelect', navSelectHandler);
+                             outerDiv.addEventListener('contextmenu', contextMenuHandler,
+                                                       { composed: true, bubble: true });
+                             subscribe('lp5NavSelect', navSelectHandler);
                              iView.routeEvent = function(){
                                  console.warn("source pane routeEvent hit!");
                              };
@@ -1481,7 +1503,6 @@
                                  acc += item
                              else if(item.type == 'ref'){
                                  acc += "<span class='LP5-CodeRef'"
-//                                 console.error(Articles.byName[item.value]);
                                  if(!Articles.byName[item.value])
                                      acc += " style='background-color: red;'";
                                  /*
@@ -2562,10 +2583,8 @@
 
              // load any previously stored handle to our parent directory
              async function loadDirParentHandle(model){
-                 console.log("loadDirParentHandle()");
                  let db = await openDB();
                  let handle = await getDB(db, "handle");
-                 console.log(handle);
                  if(false){
                      let option = {mode:'readwrite'};
                      let perms = await handle.queryPermission(option);
@@ -2581,7 +2600,6 @@
                  }else{
                      model.dirParentHandle       = handle;
                  }
-                 console.log("loadDirParentHandle() obtains handle: ", handle);
                  return true;
              }
 
@@ -2745,7 +2763,7 @@
                  console.log(`>>>>>>>>>>>>>>>>>>enter controller {${currentViewName}}`,
                              controller.state, model.articles.length, arguments.length);
                  console.log("focus ", getDeepFocus());
-                 console.log("event ", event);
+                 console.log("event ", event, event.composedPath());
                  if(event.type == 'error'){
                      console.log("Alright, we got an error event");
                      const error = event.error;
@@ -2918,14 +2936,22 @@
                          }
                          break;
                      case 'home' :
-                         if(event.type == 'contextmenu'){
-                             let articleNode = articleNodeFromClick(event);
-                             if(articleNode){
-                                 views.push(
-                                     'ArticleContextMenu',
-                                     model.articles.fromArticleNode(articleNode));
+                         //if(event.type == 'contextmenu'){
+                         if(event.type == 'lp5ArticleContext'){
+                             console.error("lp5ArticleContext in 'home'");
+                             let article = Articles.fromURL(event.detail);
+                             console.error("   article is", article);
+                             if(article){
+                                 const dialog = document.createElement('lp5-articlecontextmenu');
+                                 document.body.append(dialog);
+                                 dialog.showModal();
+//                                 views.push(
+//                                     'ArticleContextMenu',
+//                                     model.articles.fromArticleNode(articleNode));
                                  event.preventDefault();
                                  controller.state = 'ContextMenu';
+                             } else {
+                                 console.error("right click not on article!");
                              }
                              break;
                          }else if(event.type == 'command'){
@@ -3004,37 +3030,9 @@
                              }else if(target.tagName == 'A'){
                                  const href=target.getAttribute('href');
                                  console.error("href= ", href);
-                                 //if(href){
-                                 if(false){
-                                     if(href.startsWith("#")){
-                                         event.preventDefault();
-                                         let options = {
-                                             behavior: 'auto',
-                                             block   : 'nearest',
-                                             inline  : 'nearest',
-                                         };
-                                         console.log(options);
-                                         console.log("href =", href);
-                                         console.log(href.substring(1));
-                                         const article = Articles.fromURL(href.substring(1));
-                                         let destination = article.articleNode;
-                                         console.log("article = ", article);
-                                         console.log("destination = ", destination);
-                                         if(destination){
-                                             destination.scrollIntoView(true);
-                                             console.log("scrollIntoView ", destination);
-                                         }else{
-                                             console.log("Gonna assert!", href);
-                                             console.assert(false, `${href.substring(1)} not found`);
-                                             console.log("Can't believe I'm back from assert!");
-                                         }
-                                         //                                         console.assert(false);
-                                     } else {
-                                         window.open(href, '_blank');
-                                     }
-                                 }
                              }
                          }
+                         console.error("home: ", event.type);
                          break;
                      case 'EditingSection' :
                          if(event.type == 'lp5DialogSave'){
@@ -3102,7 +3100,8 @@
                  'contextmenu',
                  'command',
                  'DataCloneError',
-                 'lp5-treeview:select',
+                 // 'lp5-treeview:select',
+                 'lp5ArticleContext',
                  'lp5DialogSave',
                  'lp5DialogCancel',
                  'lp5NavSelect',
@@ -3127,7 +3126,7 @@
                  var error_ = encodeURI("msg:"+ message + "\n\tfile:"+file+"\n\tln:"+lineNumber);
                  var user_ = encodeURI("");
 
-                 //                 console.warn("window.onerror: ", error_);
+                 console.warn("window.onerror: ", error_);
                  return false;
              }
 
@@ -3154,7 +3153,6 @@
                  });
                  
                  overlay.innerText = message;
-                 
                  document.body.appendChild(overlay);
                  overlay.showModal();
                  // Disable user interactions on the rest of the page.
@@ -3163,16 +3161,28 @@
                  //                 throw new Error("foo");
              }
 
-             controller.deferEvent = function(target, eventName, eventDetail) {
-                 console.assert(target);
-                 console.log("deferEvent", target, eventName);
-                 const event = new CustomEvent(eventName, { detail: eventDetail });
-                 function deferred(){
-                     console.log("deferred dispatch of ", event);
-                     const result = target.dispatchEvent(event);
-                     console.log("deferred dispatch returns ", result);
-                 }
-                 queueMicrotask(deferred);
+             controller.publish = function(eventName, detail){
+                 controller.deferEvent(document, eventName, {detail});
+             }
+             controller.subscribe = function(eventName, callback){
+                 document.addEventListener(eventName, callback, true);
+             }
+             controller.deferShadowEvent = function(target, eventName, detail){
+                 const initDict = {
+                     detail,
+                     composed : true,
+                     capture : true
+                 };
+                 controller.deferEvent(target, eventName, initDict);
+             }
+             controller.deferEvent = function(target, eventName, initDict) {
+                 console.assert(target instanceof EventTarget);
+                 console.assert(typeof eventName === 'string');
+                 if(typeof initDict != 'object')
+                     initDict = { detail: initDict };
+                 const event = new CustomEvent(eventName, initDict);
+                 console.log(".deferEvent", target, event, initDict);
+                 queueMicrotask(()=>target.dispatchEvent(event, initDict));
              }
 
              controller.asyncSchedule = function(func, ...args){
@@ -3245,6 +3255,7 @@
              
              controller.inSync = false;
              controller.state  = 'load';
+
 
 
              class LP5Element extends HTMLElement {
@@ -3465,7 +3476,7 @@
                              };
                              t.remove();
                              const script = extractScript(t);
-                             console.log("before eval");
+
                              const customClass = scopedEval2(
                                  script.textContent, customName, globalEnv, t);
                              console.assert(customClass.prototype instanceof LP5Element,
@@ -3490,10 +3501,8 @@
                              rootNode.className = t.className;
                          const shadow   = rootNode.attachShadow({mode:'open',delegatesFocus:true});
                          shadow.appendChild(document.importNode(t.content, true));
-                         console.log("rootNode is ", rootNode);
 
                          const iView = new View(t.dataset.name, parentView);
-                         console.log(`template named ${iView.name}, parent `, parentView);
                          // if this is a child template
                          if(parentView){
                              iView.rootNode = rootNode;
@@ -3530,7 +3539,6 @@
                                  iView.notify.hasOwnProperty('render'),
                                  `template '${iView.name}' didn't return .render()`);
                          } else {
-                             console.log("notify set to null!");
                              iView.notify = null;
                          }
                          // two templates with same name is a mistake

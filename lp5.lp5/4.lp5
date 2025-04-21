@@ -33,10 +33,13 @@
     <style>
         <lp5- ref="Global CSS declarations"/>
     </style>
+    <script>
+        (function () {
+            <lp5- ref="Outermost scope code"/>
+        )();
+    <lp5-endscript/>
 </head>
 <body>
-    <script>
-    <lp5-endscript/>
 </body>
 </html>
 </script>
