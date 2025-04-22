@@ -324,13 +324,16 @@
              //             treeView.addEventListener('click', function(event) {
 
              class TreeView extends LP5Element {
-                 constructor(){
-                     super(require('template'));
-                 }
                  #treeview    = null;
                  #dirty       = true;
                  #slot        = null;
                  #selectEvent = "lp5-treeview:select";
+                 #template;
+                 constructor(){
+                     super();
+                     this.#template = new LP5Element.TemplateInstance();
+                     this.#slot     = this.#template.namedNodes.slot;
+                 }
 
                  #toggleList(li) {
                      const nestedList = li.querySelector('ul');
@@ -371,7 +374,7 @@
                      this.#dirty = false;
                  }
                  #wrapSlotContent() {
-                     const container = this.namedNodes["lp5-treeview"];
+                     const container = this.#template.namedNodes["lp5-treeview"];
                      this.#slot.assignedNodes().forEach(node => {
                          container.append(node.cloneNode(true));
                      });
@@ -380,9 +383,9 @@
                  }
 
                  connectedCallback(){
-                     this.#slot = this.namedNodes.slot;
+
                      super.connectedCallback();
-                     this.#treeview = this.namedNodes["lp5-treeview"];
+                     this.#treeview = this.#template.namedNodes["lp5-treeview"];
                      console.assert(this.#treeview, "Missing <ul data-id='lp5-treeview'>");
                      this.#treeview.addEventListener('click', event=>this.#clickHandler(event), true);
                      this.#treeview.addEventListener('contextmenu', event=>this.#contextMenuHandler(event), true);
@@ -530,10 +533,6 @@
         </template>
         <template data-custom="lp5-contextmenu" >
             <style>
-             article:focus {
-                 outline: 3px solid orange;
-             }
-             article:focus { background-color: yellow; }
              dialog:has(> ul > li) { padding:0; }
              .lp5-context {
                  position:absolute;
@@ -564,24 +563,15 @@
              slot { display: none; }
             </style>
             <dialog data-id="dialog">
-                <!--
-                <ul data-id="ul">
-                    <slot>
-                        <li data-cmd="createArticle -1">Insert New Article Before</li>
-                        <li data-cmd="createArticle  1">Append New Article After</li>
-                        <li data-id="childOption" data-cmd="createArticle  0">Create First Child Article</li>
-                </ul>
-                -->
             </dialog>
             <script>
-//             const {ul, childOption} = require('dataID');
-//             let articleTarget = null;
-
              class LP5ContextMenu extends LP5Element {
                  #dialog;
+                 #template;
                  constructor(){
-                     super(require('template'));
-                     this.#dialog = this.namedNodes.dialog;
+                     super();
+                     this.#template = new LP5Element.TemplateInstance();
+                     this.#dialog   = this.#template.namedNodes.dialog;
                  }
                  connectedCallback(){
                      this.#dialog.addEventListener('click', (event)=>this.#clickHandler);
@@ -600,32 +590,32 @@
                  }
              }
              return LP5ContextMenu;
-
-             function init(iView, article){
-                 articleTarget = article;
-                 ul.addEventListener('click', clickHandler);
-             }
-             function render(iView, article){
-                 if(article.ulNode){
-                     childOption.style.display = 'none';
-                 } else {
-                     childOption.style.display = 'block';
-                 }
-             }
-             return {init:init, render:render};
             </script>
         </template>
-        <template data-custom="lp5-articlecontextmenu">
+        <template data-custom="lp5-articlecontextmenu" data-extends="lp5-contextmenu">
             <ul data-id="ul">
                 <li data-cmd="createArticle -1">Insert New Article Before</li>
                 <li data-cmd="createArticle  1">Append New Article After</li>
                 <li data-id="childOption" data-cmd="createArticle  0">Create First Child Article</li>
             </ul>
             <script>
-             const LP5ContextMenu = customElements.get('lp5-contextmenu');
-             class LP5ArticleContextMenu extends LP5ContextMenu {
+             class LP5ArticleContextMenu extends LP5Element {
+                 #template;
                  constructor(){
-                     super(require('template'));
+                     super();
+                     this.#template = new LP5Element.TemplateInstance();
+                 }
+                 connectedCallback(){
+                     console.error("getMenuItems = ", this.getMenuItems());
+                     // update any menu item nodes as needed
+                 }
+                 getMenuItems(){ // called by LP5ContextMenu.connectedCallback()
+                     return this.#template.namedNodes.ul;
+                 }
+                 selectEvent(menuItem){ // called by LP5ContextMenu on click
+                     let close = true;
+                     // any select-time decisions
+                     return close;
                  }
              }
              return LP5ArticleContextMenu;
@@ -784,6 +774,7 @@
              class EditArticle extends LP5Element {
                  constructor(){
                      super(require('template'));
+                     this.template = new LP5Element.TemplateInstance();
                      this.addListeners();
                  }
                  connectedCallback(){
@@ -795,7 +786,7 @@
                      this.#article = null;
                  }
                  addListeners(){
-                     const {save, cancel} = this.namedNodes;
+                     const {save, cancel} = this.template.namedNodes;
                      save.addEventListener('click', ()=>this.saveClick());
                      cancel.addEventListener('click', ()=>this.cancelClick());
                  }
@@ -1879,9 +1870,11 @@
                         </div>
                         <script>
                          class Footer extends LP5Element {
+                             #template;
                              #selectedArticle = null;
                              constructor(){
-                                 super(require('template'));
+                                 super();
+                                 this.#template = new LP5Element.TemplateInstance();
                                  document.addEventListener
                                  ('lp5NavSelect',
                                   (event)=>this.lp5NavSelect(event));
@@ -1909,7 +1902,7 @@
                                  if(this.#selectedArticle){
                                      message += ` [${this.#selectedArticle.URL}]`;
                                  }
-                                 this.namedNodes.span.innerText = message;
+                                 this.#template.namedNodes.span.innerText = message;
                              }
                          }
                          return Footer;
@@ -3256,26 +3249,52 @@
              controller.inSync = false;
              controller.state  = 'load';
 
-
-
-             class LP5Element extends HTMLElement {
-                 #namedNodes = {}
-                 constructor(template){
-                     assert(template);
-                     super();
-                     this.template = template;
-                     const content = template.content;
-                     const shadow = this.attachShadow({mode:'open',delegatesFocus:true});
-                     shadow.appendChild(document.importNode(content, true));
-                     this.shadowRoot.querySelectorAll('[data-id]').
-                          forEach(namedNode =>
-                              this.#namedNodes[namedNode.dataset.id] = namedNode);
+             function getBaseClass(template){
+                 let baseClass = HTMLElement;
+                 let baseName  = template.dataset.extends;
+                 if(baseName){
+                     baseClass = customElements.get(baseName);
+                     console.assert(
+                         baseClass,
+                         `${template.dataset.custom} attempts to derive from ${baseName}, which is not (yet?) defined.`);
                  }
-                 get namedNodes() { return this.#namedNodes }
-                 connectedCallback(){
+                 class TemplateInstance {
+                     #template;
+                     #namedNodes = {};
+                     #nodes;
+                     constructor(copy=true){
+                         this.#template = template;
+                         this.#nodes    = template.content;
+                         if(copy)
+                             this.#nodes = document.importNode(template.content, true);
+                         this.#nodes.querySelectorAll('[data-id]').
+                              forEach(namedNode =>
+                                  this.#namedNodes[namedNode.dataset.id]=namedNode);
+                     }
+                     get namedNodes(){ return this.#namedNodes; }
                  }
+                 const newClass = class LP5Element extends baseClass {
+                     #namedNodes = {};
+                     #content    = template.content;
+                     #nodes;
+                     constructor(){
+                         super();
+                         this.#nodes = document.importNode(template.content, true);
+                         if(baseClass === HTMLElement){
+                             const shadow  = this.attachShadow({mode:'open',delegatesFocus:true});
+                             shadow.appendChild(this.#nodes);
+                             this.shadowRoot.querySelectorAll('[data-id]').
+                                  forEach(namedNode =>
+                                      this.#namedNodes[namedNode.dataset.id]=namedNode);
+                         }
+                     }
+                     connectedCallback(){
+                     }
+                 }
+                 newClass.TemplateInstance = TemplateInstance;
+                 return newClass;
              }
-             customElements.define('lp5-element', LP5Element);
+//             customElements.define('lp5-element', LP5Element);
              
              function scopedEval2(script, scriptName, globalEnv, scriptThis){
                  function require(thing){
@@ -3304,8 +3323,9 @@
                  controller.scriptName = scriptName;
                  const result = new Function(
                      "require", "LP5Element", '"use strict";' + script + sourceMap).call(
-                         scriptThis, require, LP5Element);
+                         scriptThis, require, globalEnv["LP5Element"]);
                  controller.script = null;
+                 
                  return result;
              }
              function scopedEval(script, iView){
@@ -3471,7 +3491,7 @@
                          if(customName){
                              const globalEnv = {
                                  template: t,
-                                 LP5Element: LP5Element,
+                                 LP5Element: getBaseClass(t),
                                  controller: controller,
                              };
                              t.remove();
@@ -3479,10 +3499,19 @@
 
                              const customClass = scopedEval2(
                                  script.textContent, customName, globalEnv, t);
+                             console.assert(!Object.prototype.hasOwnProperty.call(customClass, 'template'),
+                                            `${customName}: static field 'template' should not be defined`);
+                             customClass.template = t;
+                             
+/*
                              console.assert(customClass.prototype instanceof LP5Element,
                                             `return of ${customName} must be type LP5Element`,
                                             customClass);
+                             */
                              customElements.define(customName, customClass);
+const element = document.createElement(customName);
+                             console.error(Object.getOwnPropertyDescriptor(element.__proto__, 'namedNodes'));
+
                              return;
                          }
                          let templateName = t.dataset.name;
