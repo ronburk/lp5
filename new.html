@@ -562,7 +562,7 @@
              :host { all: initial !important; }
              slot { display: none; }
             </style>
-            <dialog data-id="dialog">
+            <dialog data-id="dialog" class="lp5-context">
             </dialog>
             <script>
              class LP5ContextMenu extends LP5Element {
@@ -572,11 +572,25 @@
                      super();
                      this.#template = new LP5Element.TemplateInstance();
                      this.#dialog   = this.#template.namedNodes.dialog;
+                     const shadow = this.attachShadow({mode:'open',delegatesFocus:true});
+                     console.log("nodes =", this.#template.nodes);
+
+                     shadow.append(this.#template.nodes);
+                     console.log("shadowRoot is", this.shadowRoot);
+                     console.log("shadowRoot children:", this.shadowRoot?.childNodes);
+
                  }
                  connectedCallback(){
-                     this.#dialog.addEventListener('click', (event)=>this.#clickHandler);
+                     console.error("LP5ContextMenu connected: ", this.#dialog);
+                     this.#dialog.addEventListener('click',(event)=>this.#clickHandler);
+                     const items = this.getMenuItems();
+                     console.error("items = ", items);
+                     this.#dialog.replaceChildren(this.getMenuItems());
                  }
-                 showModal(){ this.#dialog.showModal() }
+                 showModal(){
+                     console.assert(this.#dialog.isConnected, this);
+                     this.#dialog.showModal()
+                 }
                  #clickHandler(event){
                      const target = event.target;
                      if(target.dataset.cmd){
@@ -605,10 +619,12 @@
                      super();
                      this.#template = new LP5Element.TemplateInstance();
                  }
+/*
                  connectedCallback(){
                      console.error("getMenuItems = ", this.getMenuItems());
                      // update any menu item nodes as needed
                  }
+*/
                  getMenuItems(){ // called by LP5ContextMenu.connectedCallback()
                      return this.#template.namedNodes.ul;
                  }
@@ -1408,14 +1424,12 @@
                          }
                          function contextMenuHandler(event){
                              const articleNode = articleNodeFromClick(event);
-                             console.log(":::::: source pane contextMenuHandler ", event, articleNode);
                              if(articleNode){
                                  publish('lp5ArticleContext', articleNode.id);
                              }
                              event.preventDefault();
                          }
                          function clickHandler(event){
-                             console.log(":::::: source pane clickHandler ", event);
                              const articleNode = articleNodeFromClick(event);
                              if(articleNode){
                                  articleNode.focus();
@@ -2797,8 +2811,6 @@
                      console.log("calling crash", detail);
                      controller.crash(detail);
                      return;
-                     //                     controller.deferEvent('Crash', detail);
-                     //                     document.dispatchEvent(new CustomEvent('crash', {detail:detail}));
                      controller.state = 'Crash';
                      event.preventDefault();
                      // we are likely already inside a controller call, so return
@@ -2810,6 +2822,8 @@
                  } else
                      console.assert(!controller.inSync);
                  controller.inSync = true;
+
+
 
 
                  switch(controller.state){
@@ -2935,12 +2949,13 @@
                              let article = Articles.fromURL(event.detail);
                              console.error("   article is", article);
                              if(article){
-                                 const dialog = document.createElement('lp5-articlecontextmenu');
+                                 const dialog=elementFoundry['lp5-articlecontextmenu'];
                                  document.body.append(dialog);
+                                 console.error("home dialog is: ", dialog);
                                  dialog.showModal();
-//                                 views.push(
-//                                     'ArticleContextMenu',
-//                                     model.articles.fromArticleNode(articleNode));
+                                 //                                 views.push(
+                                 //                                     'ArticleContextMenu',
+                                 //                                     model.articles.fromArticleNode(articleNode));
                                  event.preventDefault();
                                  controller.state = 'ContextMenu';
                              } else {
@@ -3174,7 +3189,6 @@
                  if(typeof initDict != 'object')
                      initDict = { detail: initDict };
                  const event = new CustomEvent(eventName, initDict);
-                 console.log(".deferEvent", target, event, initDict);
                  queueMicrotask(()=>target.dispatchEvent(event, initDict));
              }
 
@@ -3272,23 +3286,18 @@
                                   this.#namedNodes[namedNode.dataset.id]=namedNode);
                      }
                      get namedNodes(){ return this.#namedNodes; }
+                     get nodes() { return this.#nodes; }
                  }
                  const newClass = class LP5Element extends baseClass {
-                     #namedNodes = {};
-                     #content    = template.content;
-                     #nodes;
                      constructor(){
                          super();
-                         this.#nodes = document.importNode(template.content, true);
                          if(baseClass === HTMLElement){
-                             const shadow  = this.attachShadow({mode:'open',delegatesFocus:true});
-                             shadow.appendChild(this.#nodes);
-                             this.shadowRoot.querySelectorAll('[data-id]').
-                                  forEach(namedNode =>
-                                      this.#namedNodes[namedNode.dataset.id]=namedNode);
+                             console.error("baseClass is HTMLElement", template);
                          }
                      }
                      connectedCallback(){
+                         if(baseClass !== HTMLElement)
+                             super.connectedCallback();
                      }
                  }
                  newClass.TemplateInstance = TemplateInstance;
@@ -3509,9 +3518,6 @@
                                             customClass);
                              */
                              customElements.define(customName, customClass);
-const element = document.createElement(customName);
-                             console.error(Object.getOwnPropertyDescriptor(element.__proto__, 'namedNodes'));
-
                              return;
                          }
                          let templateName = t.dataset.name;
