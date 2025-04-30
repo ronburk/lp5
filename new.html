@@ -26,6 +26,9 @@
         <script>
          "use strict";
          
+         window.LP5       = window.LP5       || {};
+         window.LP5.popup = window.LP5.popup || {};
+
          const originalAssert = console.assert;
          console.assert = function(condition, message, ...optionalParams) {
              if (!condition) {
@@ -531,6 +534,7 @@
              return { init:init, render:render };
             </script>
         </template>
+
         <template data-custom="lp5-contextmenu" >
             <style>
              dialog:has(> ul > li) { padding:0; }
@@ -606,6 +610,103 @@
              return LP5ContextMenu;
             </script>
         </template>
+        <template data-custom2="lp5-dialog">
+            <style></style>
+            <script>
+             return class LP5Dialog extends HTMLElement {
+                 #dialog
+                 constructor(){
+                     super();
+                     this.#dialog = elementFoundry.dialog;
+                     this.#dialog.append("text stuff!");
+                     this.append(this.#dialog);
+                 }
+                 connectedCallback(){
+                 }
+                 show(){
+                     console.error("Show!!!", this.#dialog);
+                     this.#dialog.show();
+                 }
+             }
+            </script>
+        </template>
+        <!-- wrapper for popup/context menu data -->
+        <template data-custom2="lp5-popmenu" >
+            <style>
+             dialog:has(> ul > li) { padding:0; }
+             .lp5-context {
+                 position:absolute;
+                 border: 1px solid blue;
+                 cursor: pointer;
+             }
+             .lp5-context ul {
+                 list-style: none;
+                 margin: 0;
+                 padding: 0;
+             }
+             .lp5-context ul li {
+                 text-transform: uppercase;
+                 font-family: sans-serif;
+                 display: flex;
+                 justify-content: space-between;
+                 border-bottom: solid 1px #dfdfdf;
+                 padding: .1em;
+                 margin: 0;
+             }
+             .lp5-context ul li:hover {
+                 background-color: #eee;
+             }
+             .lp5-context ul li:last-child {
+                 border-bottom: none;
+             }
+             :host { all: initial !important; }
+             slot { display: none; }
+            </style>
+            <dialog data-id="dialog" class="lp5-context">
+            </dialog>
+            <script>
+             class LP5PopMenu extends LP5Base {
+                 #dialog;
+                 #template;
+                 constructor(){
+                     super();
+                     this.#template = new LP5Base.Instance();
+                     this.#dialog   = this.#template.namedNodes.dialog;
+                     const shadow = this.attachShadow({mode:'open',delegatesFocus:true});
+                     console.log("nodes =", this.#template.nodes);
+
+                     shadow.append(this.#template.nodes);
+                     console.log("shadowRoot is", this.shadowRoot);
+                     console.log("shadowRoot children:", this.shadowRoot?.childNodes);
+
+                 }
+                 connectedCallback(){
+                     console.error("LP5ContextMenu connected: ", this.#dialog);
+                     this.#dialog.addEventListener('click',(event)=>this.#clickHandler);
+                     const items = this.getMenuItems();
+                     console.error("items = ", items);
+                     this.#dialog.replaceChildren(this.getMenuItems());
+                 }
+                 showModal(){
+                     console.assert(this.#dialog.isConnected, this);
+                     this.#dialog.showModal()
+                 }
+                 #clickHandler(event){
+                     const target = event.target;
+                     if(target.dataset.cmd){
+                         let argv = target.dataset.cmd.split(/[ ]+/);
+                         argv.push(articleTarget);
+                         document.dispatchEvent(
+                             new CustomEvent('command', {
+                                 detail : argv,
+                         }));
+                     }
+                 }
+             }
+             return LP5PopMenu;
+            </script>
+        </template>
+
         <template data-custom="lp5-articlecontextmenu" data-extends="lp5-contextmenu">
             <ul data-id="ul">
                 <li data-cmd="createArticle -1">Insert New Article Before</li>
@@ -897,50 +998,76 @@
              return result;
             </script>
         </template>
-        <template data-name="SelectParent">
-            <style>
-            </style>
-            <dialog id="SelectParentDialog">
-                <center>
-                    <p>
-                        Select <em>parent</em> directory of existing
-                        or new lp5 project.
-                        <span style="background-color:#ffffa0; border-radius:50%; cursor:help;" title="I need access to the parent directory to place generated files there.&#10;A user click is required by Chrome for me to ask for this permission.">&#9432;a</span>
-                    </p>
-                    <input id="SelectParentDirButton"
-                           autofocus type="button" value="Select"
-                           data-id="selectButton" >
-                    <div data-id="auxDiv">
-                        <p>or select previous parent directory:</p>
-                        <input id="SelectParentDirPreviousButton"
-                               data-id="previousDir" type="button">
-                    </div>
-                </center>
-            </dialog>
-            <script>
-             const model = require('model');
-             const iView = require('iView');
-             const {auxDiv, selectButton, previousDir} = iView.dataID;
+        <lp5-dialog data-popup="lp5-selectparent">
+            <template>
+                <style>
+                </style>
+                <dialog data-id="dialog">
+                    <center>
+                        <p>
+                            Select <em>parent</em> directory of existing
+                            or new lp5 project.
+                            <span style="background-color:#ffffa0; border-radius:50%; cursor:help;" title="I need access to the parent directory to place generated files there.&#10;A user click is required by Chrome for me to ask for this permission.">&#9432;a</span>
+                        </p>
+                        <input id="SelectParentDirButton"
+                               autofocus type="button" value="Select"
+                               data-id="selectButton" >
+                        <div data-id="auxDiv">
+                            <p>or select previous parent directory:</p>
+                            <input id="SelectParentDirPreviousButton"
+                                   data-id="previousDir" type="button">
+                        </div>
+                    </center>
+                </dialog>
+                <script>
+                 const {dirParentHandle} = require('model')
+                 class LP5SelectParent extends LP5Element {
+                     #template;
+                     #namedNodes;
+                     constructor(){
+                         super();
+                         this.#template   = new LP5Element.TemplateInstance();
+                         this.#namedNodes = this.#template.namedNodes
+                     }
+                     connectedCallback(){
+                     }
+                     render(){
+                         console.log("SelectParentDialog render!!!!!!");
+                         if(model.dirParentHandle){
+                             console.log("Show button ", dirParentHandle.name);
+                             auxDiv.style.display = 'block';
+                             previousDir.value    = dirParentHandle.name;
+                         } else {
+                             auxDiv.style.display = 'none';
+                         }
+                     }
+                 };
+                 return LP5SelectParent;
 
-             function init(){
-                 console.log("SelectParentDialog page script init!!!!!!");
-                 auxDiv.style.display = 'none';
-             }
+                 const model = require('model');
+                 const iView = require('iView');
+                 const {auxDiv, selectButton, previousDir} = iView.dataID;
 
-             function renderSelectParentDialog(){
-                 console.log("SelectParentDialog render!!!!!!");
-                 if(model.dirParentHandle){
-                     console.log("Show button ", model.dirParentHandle.name);
-                     auxDiv.style.display = 'block';
-                     previousDir.value    = model.dirParentHandle.name;
-                 } else {
+                 function init(){
+                     console.log("SelectParentDialog page script init!!!!!!");
                      auxDiv.style.display = 'none';
                  }
-             }
-             let result = { init: init, render: renderSelectParentDialog };
-             return result;
-            </script>
-        </template>
+
+                 function renderSelectParentDialog(){
+                     console.log("SelectParentDialog render!!!!!!");
+                     if(model.dirParentHandle){
+                         console.log("Show button ", model.dirParentHandle.name);
+                         auxDiv.style.display = 'block';
+                         previousDir.value    = model.dirParentHandle.name;
+                     } else {
+                         auxDiv.style.display = 'none';
+                     }
+                 }
+                 let result = { init: init, render: renderSelectParentDialog };
+                 return result;
+                </script>
+            </template>
+        </lp5-dialog>
         <template data-name="PickOrCreateProject">
             <div>
                 <dialog id="PickOrCreateProject">
@@ -2823,26 +2950,59 @@
                      console.assert(!controller.inSync);
                  controller.inSync = true;
 
+                 const machine = {
+                     Crash(event){
+                         controller.crash(event.detail);
+                         console.log("crash.");
+                         return 'Crash';
+                     },
+                     ...(() => {
+                         let selectParentDialog;
+                         return {
+                             stateLoad(event){
+                                 console.assert(event.type == 'load', event);
+                                 asyncSchedule(loadDirParentHandle, model);
+                                 return 'stateAwaitDirHandleLoad';
+                             },
+                             stateAwaitDirHandleLoad(event){
+                                 if(event.type != 'asyncComplete')
+                                     console.error("event.type = ", event.type);
+                                 console.assert(event.type == 'asyncComplete');
+                                 views.loadTemplates();
+                                 views.change('home');
+                                 selectParentDialog = window.LP5.popup['lp5-selectparent']
+                                 document.body.append(selectParentDialog);
+                                 selectParentDialog.show();
+                                 controller.state = 'stateSelectParent';
+                                 return 'stateHome';
+                             }
+                         }
+                     })(),
+                     stateSelectParent(event){
+                         console.assert(event.type == 'load', event);
+                         asyncSchedule(loadDirParentHandle, model);
+                         return 'stateAwaitDirHandleLoad';
+                     },
 
+                 };
+                 console.error("machine=", controller.state, machine[controller.state]);
+                 let nextState = machine[controller.state](event);
+                 console.error("nextState = ", nextState);
+//                 if(nextState !== controller.state)
+//                     machine[nextState]('@enter', event);
+                 controller.state = nextState;
 
-
-                 switch(controller.state){
+                 if(false)switch(controller.state){
                      case 'Crash' :
                          controller.crash(event.detail);
                          console.log("crash.");
                          controller.state = 'Crash';
-                         //                         views.push('Crash');
-                         break;
-                     case 'Crash' :
-                         console.log("crashed.");
                          break;
                      case 'load' :
                          console.assert(event.type == 'load', event);
                          asyncSchedule(loadDirParentHandle, model);
                          controller.state = 'AwaitDirHandleLoad';
                          break;
-                         //                     case 'AwaitDirHandleLoad' :
-                         //                         break;
                      case 'AwaitDirHandleLoad' :
                          console.assert(event.type == 'asyncComplete');
                          views.loadTemplates();
@@ -3234,19 +3394,19 @@
                      new CustomEvent('command',{ detail:args })));
              }
              controller.states = new Set([
-                 'AwaitAsyncComplete',
-                 'AwaitDirHandleLoad',
+                 'stateAwaitAsyncComplete',
+                 'stateAwaitDirHandleLoad',
                  'ContextMenu',
-                 'Crash',
+                 'stateCrash',
                  'EditingSection',
                  'EditingView',
                  'Export',
                  'evalTemplates',
-                 'home',
-                 'load',
+                 'stateHome',
+                 'stateLoad',
                  'openProject',
                  'PickOrCreateProject',
-                 'SelectParent',
+                 'stateSelectParent',
                  'SelectingParent',
                  'SelectingParentHashChanged',
                  'test',
@@ -3261,7 +3421,7 @@
              });
              
              controller.inSync = false;
-             controller.state  = 'load';
+             controller.state  = 'stateLoad';
 
              function getBaseClass(template){
                  let baseClass = HTMLElement;
@@ -3337,6 +3497,39 @@
                  
                  return result;
              }
+             function scopedEval3(script, scriptName, globalEnv, scriptThis){
+                 function require(thing){
+                     // split into non-empty args
+                     let things = thing.split(/[ ,]+/).filter(i=>i.length);
+                     // if it was simply require('singleItem')
+                     if(things.length == 1){
+                         if(thing in globalEnv)
+                             return globalEnv[thing];
+                         else
+                             assert(false,
+                                    `'${thing}': undefined name for require`);
+                     }
+                     // else we are returning a set of sets, more or less
+                     let finalObj = {};
+                     things.forEach(function requireFinalLoop(i){
+                         console.assert(i in globalEnv, i);
+                         finalObj[i] = globalEnv[i];
+                     });
+                     return finalObj;
+                 }
+
+                 let sourceMap = "\n//# sourceURL=" + scriptName + "\n";
+                 console.log("before scopedEval2 return");
+                 controller.script = script;
+                 controller.scriptName = scriptName;
+                 const result = new Function(
+                     "require", "LP5Base", '"use strict";' + script + sourceMap).call(
+                         scriptThis, require, globalEnv["LP5Base"]);
+                 controller.script = null;
+                 
+                 return result;
+             }
+
              function scopedEval(script, iView){
                  console.log("scopedEval ", iView ); //, script);
                  for(const element of iView.rootNode.shadowRoot.querySelectorAll("[data-ID]")){
@@ -3470,8 +3663,14 @@
                      console.log("evalTemplates!")
                      this.loadTemplates()
                  },
-                 loadTemplates(rootElement=document, parentView=null){
+                 loadTemplates(rootElement=document.body, parentView=null){
                      console.log("views.loadTemplates()", rootElement);
+                     document.querySelectorAll('[data-popup]').forEach(el => {
+                         const name = el.getAttribute('data-popup');
+                         window.LP5.popup[name] = el;
+                     });
+
+
                      function extractScript(t){
                          // move the <script> node to a separate variable
                          let scriptNode = null;
@@ -3490,18 +3689,19 @@
                          return scriptNode;
                      }
 
-                     let templates = rootElement.querySelectorAll('template, link[rel="template"]');
+                     let templates = rootElement.querySelectorAll(':scope > template');
                      console.log(`${templates.length} templates in document`);
                      window.MyTemplates = {};
 
                      templates.forEach((t)=>{
                          console.log("    forEach template ", t);
-                         const customName = t.dataset.custom;
+                         let customName = t.dataset.custom;
                          if(customName){
                              const globalEnv = {
                                  template: t,
                                  LP5Element: getBaseClass(t),
-                                 controller: controller,
+                                 controller,
+                                 model,
                              };
                              t.remove();
                              const script = extractScript(t);
@@ -3519,10 +3719,38 @@
                              */
                              customElements.define(customName, customClass);
                              return;
+                         }                              
+                         customName = t.dataset.custom2;
+                         if(customName){
+                             const globalEnv = {
+                                 template: t,
+                                 LP5Base: getBaseClass(t),
+                                 controller,
+                                 model,
+                             };
+                             t.remove();
+                             const script = extractScript(t);
+
+                             const customClass = scopedEval3(
+                                 script.textContent, customName, globalEnv, t);
+                             console.assert(!Object.prototype.hasOwnProperty.call(customClass, 'template'),
+                                            `${customName}: static field 'template' should not be defined`);
+                             customClass.template = t;
+                             
+/*
+                             console.assert(customClass.prototype instanceof LP5Element,
+                                            `return of ${customName} must be type LP5Element`,
+                                            customClass);
+                             */
+                             customElements.define(customName, customClass);
+                             return;
                          }
                          let templateName = t.dataset.name;
+                         if(!templateName){
+                             console.error("template w/o data-name", t.innerText, t.dataset);
+                         }
                          // save reference to template, by name
-                         assert(t.dataset.name, `template w/o data-name`, t);
+                         console.assert(t.dataset.name, `template w/o data-name`, t);
                          assert(
                              window.MyTemplates[templateName] == null,
                              `duplicate template name ${templateName}`);
@@ -3556,7 +3784,7 @@
 
                          // Removing the open attribute will usually hide the dialog.
                          // However, doing so has strange additional consequences:
-                         // https://html.spec.whatwg.org/multipage/interactive-elements.html#the-dialog-element
+                         // https://html.spec.whatwg.org/multipage/interactive-elements.html#the-dialog-element 
                          //                     let script = templateRoot.querySelector('script');
                          if(scriptNode){
                              let script = scriptNode.innerHTML;

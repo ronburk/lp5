@@ -25,6 +25,13 @@ NITS
 [ ] do dialogs have to hide the home window?
 [ ] code name header is indented by one space looks like
 
+2025/04/23
+Motivation for hierarchical state machine in controller is dialog/menu.
+When a dialog opens, the controller is going to create a bit of state
+(the HTML element for the dialog) that it must track. We want to be able
+to read the code and clearly see where dialog is allocated, and how it
+must be de-allocated (closed).
+
 2025/04/11
 
 
