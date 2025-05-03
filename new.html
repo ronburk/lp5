@@ -44,11 +44,62 @@
              get(target, prop) {return document.createElement(prop);}
          });
 
+         function parseTemplate(t) {
+             const result = {
+                 style: null,
+                 script: null,
+                 nodes: [],
+                 namedNodes: {},
+                 eventNodes: [],
+             };
+
+             for (const node of t.content.children) {
+                 if (node.tagName === 'STYLE') {
+                     result.style = node;
+                 } else if (node.tagName === 'SCRIPT') {
+                     result.script = node;
+                 } else {
+                     result.nodes.push(node);
+                 }
+             }
+             const walk = (node) => {
+                 if (node.nodeType !== Node.ELEMENT_NODE) return;
+
+                 // Named node
+                 const name = node.getAttribute('data-name');
+                 if (name) {
+                     result.namedNodes[name] = node;
+                 }
+
+                 // Event nodes
+                 for (const attr of node.attributes) {
+                     if (attr.name.startsWith('@')) {
+                         const eventName = attr.name.slice(1);
+                         result.eventNodes.push([eventName, node]);
+                     }
+                 }
+
+                 for (const child of node.children) {
+                     walk(child);
+                 }
+             };
+
+             for (const node of result.nodes) {
+                 walk(node);
+             }
+
+             return result;
+         }
+
+
+
          function trimLines(text) {
              return text
                  .replace(/^\s*[\r\n]+/, '')  // Remove leading blank lines
                  .replace(/[\r\n]+\s*$/, ''); // Remove trailing blank lines
          }
+
+
 
          function parseTag(str, startPos){
              const result = {
@@ -613,15 +664,32 @@
         <template data-custom2="lp5-dialog">
             <style></style>
             <script>
+             const extractScript = require('extractScript');
+             function getTemplate(node){
+                 const templates = node.querySelectorAll(':scope > template');
+                 console.error(node);
+                 console.assert(templates.length === 1,
+                                `<${node.tagName.toLowerCase()}> must contain exactly one direct child <template>`);
+                 return templates[0];
+             }
              return class LP5Dialog extends HTMLElement {
                  #dialog
                  constructor(){
                      super();
+                     for(const el of this.childNodes){
+                         console.error("el = ", el);
+                     }
+                     const t = getTemplate(this);
+                     const parsedTemplate = parseTemplate(t);
+                     console.error("parsed = ", parsedTemplate);
+                     const script = extractScript(t);
+                     console.error("script is ", script);
                      this.#dialog = elementFoundry.dialog;
                      this.#dialog.append("text stuff!");
                      this.append(this.#dialog);
                  }
                  connectedCallback(){
+                     console.error("child2", this.childNodes);
                  }
                  show(){
                      console.error("Show!!!", this.#dialog);
@@ -1034,7 +1102,7 @@
                      render(){
                          console.log("SelectParentDialog render!!!!!!");
                          if(model.dirParentHandle){
-                             console.log("Show button ", dirParentHandle.name);
+                             console.log("Show button ",  dirParentHandle.name);
                              auxDiv.style.display = 'block';
                              previousDir.value    = dirParentHandle.name;
                          } else {
@@ -2983,7 +3051,10 @@
                          asyncSchedule(loadDirParentHandle, model);
                          return 'stateAwaitDirHandleLoad';
                      },
-
+                     stateHome(event){
+                         console.log("In home state!");
+                         return 'stateHome';
+                     }
                  };
                  console.error("machine=", controller.state, machine[controller.state]);
                  let nextState = machine[controller.state](event);
@@ -3699,6 +3770,7 @@
                          if(customName){
                              const globalEnv = {
                                  template: t,
+                                 extractScript,
                                  LP5Element: getBaseClass(t),
                                  controller,
                                  model,
@@ -3724,6 +3796,7 @@
                          if(customName){
                              const globalEnv = {
                                  template: t,
+                                 extractScript,
                                  LP5Base: getBaseClass(t),
                                  controller,
                                  model,
