@@ -26,9 +26,21 @@
         <script>
          "use strict";
          
-         window.LP5       = window.LP5       || {};
-         window.LP5.popup = window.LP5.popup || {};
+         window.LP5        = {};
+         window.LP5.eggGlobals = {
+             Article:        null,
+             controller:     null,
+             elementFoundry: null,
+             eggFromTemplate:null,
+             model:          null,
+             scopedEval:     null,
+         };
+         window.LP5.popup  = {};
+         window.LP5.test   = function(){
+             document.body.setAttribute("data-test-ran", "yes");
+             console.error("TEST!!!"); return true; }
 
+         console.error("LP5 is ", LP5);
          const originalAssert = console.assert;
          console.assert = function(condition, message, ...optionalParams) {
              if (!condition) {
@@ -40,58 +52,79 @@
 
          window.lp5 = {};
 
-         const elementFoundry = new Proxy({}, {
+         window.LP5.eggGlobals.elementFoundry = new Proxy({}, {
              get(target, prop) {return document.createElement(prop);}
          });
 
-         function parseTemplate(t) {
-             const result = {
-                 style: null,
-                 script: null,
-                 nodes: [],
-                 namedNodes: {},
-                 eventNodes: [],
-             };
+         window.LP5.eggGlobals.scopedEval = function(script, scriptName, scriptThis){
+             const controller = window.LP5.eggGlobals.controller;
+             let sourceMap = `\n//# sourceURL=${scriptName}\n`;
+             console.log("before scopedEval4 return");
+             controller.script = script;
+             controller.scriptName = scriptName;
+             const result = new Function(
+                 '"use strict";' + script + sourceMap).call(scriptThis);
+             controller.script = null;
+             return result;
+         }
 
-             for (const node of t.content.children) {
+         window.LP5.eggGlobals.eggFromTemplate = function(template) {
+             const result = {
+                 style:         null,
+                 script:        null,
+                 instance:      instance,
+                 children:      [],
+                 namedNodes:    {},
+                 eventNodes:    [],
+                 globals:       window.LP5.eggGlobals,
+             };
+             const content = template.content;
+             if(object)  // if it's a container, allow multiple instances
+                 content = content.cloneNode(true);
+             
+             const autoNamedNodes = {};
+             const namedNodes     = {};
+             for (const node of content.children) {
                  if (node.tagName === 'STYLE') {
                      result.style = node;
                  } else if (node.tagName === 'SCRIPT') {
                      result.script = node;
                  } else {
-                     result.nodes.push(node);
+                     result.children.push(node);
                  }
              }
              const walk = (node) => {
-                 if (node.nodeType !== Node.ELEMENT_NODE) return;
-
-                 // Named node
-                 const name = node.getAttribute('data-name');
-                 if (name) {
-                     result.namedNodes[name] = node;
-                 }
-
-                 // Event nodes
-                 for (const attr of node.attributes) {
-                     if (attr.name.startsWith('@')) {
-                         const eventName = attr.name.slice(1);
-                         result.eventNodes.push([eventName, node]);
+                 if (node.nodeType === Node.ELEMENT_NODE){
+                     // Named node
+                     const name = node.getAttribute('data-name');
+                     if (name)
+                         namedNodes[name] = node;
+                     else {
+                         const tag = node.tagName.toLowerCase();
+                         if(!(tag in autoNamedNodes))
+                             autoNamedNodes[tag] = node;
                      }
-                 }
-
-                 for (const child of node.children) {
-                     walk(child);
+                     // Event nodes
+                     for (const attr of node.attributes)
+                         if (attr.name.startsWith('@')) {
+                             const eventName = attr.name.slice(1);
+                             result.eventNodes.push([eventName, node]);
+                         }
+                     for (const child of node.children)
+                         walk(child);
                  }
              };
-
-             for (const node of result.nodes) {
+             for (const node of result.nodes)
                  walk(node);
-             }
+             result.namedNodes = Object.setPrototypeOf(namedNodes, autoNamedNodes);
+             if(result.nodes.length === 1 && result.nodes[0].tagName === 'TEMPLATE')
+                 result.templateChild = result.nodes[0];
 
+             const instance = window.LP5.eggGlobals.scopedEval(script, "foo", result);
+             
+             console.error("eggFromTemplate returns ", result);
              return result;
          }
-
-
 
          function trimLines(text) {
              return text
@@ -662,38 +695,71 @@
             </script>
         </template>
         <template data-custom2="lp5-dialog">
-            <style></style>
+            <style>
+             dialog {
+                 position: fixed;
+                 top: 50%;
+                 left: 50%;
+                 transform: translate(-50%, -50%);
+             }
+            </style>
+            <dialog>
+                <slot></slot>
+            </dialog>
             <script>
-             const extractScript = require('extractScript');
+             const globals = this;
+             const {extractScript, template, elementFoundry, eggFromTemplate} = globals;
+             console.error("template in custom element is", template);
+
              function getTemplate(node){
+                 console.error("getTemplate, node= ", node);
                  const templates = node.querySelectorAll(':scope > template');
                  console.error(node);
                  console.assert(templates.length === 1,
-                                `<${node.tagName.toLowerCase()}> must contain exactly one direct child <template>`);
+                                `<${node.tagName.toLowerCase()}> must contain exactly one direct child <template>`, templates.length);
                  return templates[0];
              }
              return class LP5Dialog extends HTMLElement {
-                 #dialog
+                 #dialog;
+                 #egg;
+                 #content;
                  constructor(){
                      super();
-                     for(const el of this.childNodes){
-                         console.error("el = ", el);
-                     }
+                     this.#egg = eggFromTemplate(template, this);
+                     this.#dialog = this.#egg.namedNodes.dialog;
+                     const contentNodes = this.#egg.namedNodes.slot.assignedNodes();
+                     console.error("constructor of ", this, contentNodes, contentNodes.length);
+                     
                      const t = getTemplate(this);
-                     const parsedTemplate = parseTemplate(t);
-                     console.error("parsed = ", parsedTemplate);
-                     const script = extractScript(t);
-                     console.error("script is ", script);
-                     this.#dialog = elementFoundry.dialog;
-                     this.#dialog.append("text stuff!");
-                     this.append(this.#dialog);
+                     const contentEgg = eggFromTemplate(t);
+//                     this.#content = globals.scopedEval(contentEgg.script.textContent, "foo", globals);
+                     console.error("contentEgg is", t, contentEgg);
+                     const shadow = this.attachShadow({mode:'open',delegatesFocus:true});
+
+                     shadow.append(contentEgg.style);
+                     shadow.append(this.#egg.style);
+                     
+                     console.error("t.nodes", contentEgg.nodes);
+//                     shadow.append(... contentEgg.nodes.map(n => n.cloneNode(true)));
+
+                     shadow.append(this.#dialog);
+                     this.#egg.namedNodes.slot.replaceWith(
+                         ... contentEgg.nodes
+                     );
+//                     this.#egg.namedNodes.slot.replaceWith(
+//                         ... contentEgg.nodes.map(n => n.cloneNode(true)));
                  }
                  connectedCallback(){
+                     const contentNodes = this.#egg.namedNodes.slot.assignedNodes();
+                     console.error("connectedCallback of ", this, contentNodes, contentNodes.length);
+
                      console.error("child2", this.childNodes);
                  }
                  show(){
                      console.error("Show!!!", this.#dialog);
                      this.#dialog.show();
+                 }
+                 render(){
                  }
              }
             </script>
@@ -733,7 +799,9 @@
             <dialog data-id="dialog" class="lp5-context">
             </dialog>
             <script>
-             class LP5PopMenu extends LP5Base {
+             const {LP5Base} = this;
+
+             class LP5PopMenu extends HTMLElement {
                  #dialog;
                  #template;
                  constructor(){
@@ -1070,69 +1138,40 @@
             <template>
                 <style>
                 </style>
-                <dialog data-id="dialog">
-                    <center>
-                        <p>
-                            Select <em>parent</em> directory of existing
-                            or new lp5 project.
-                            <span style="background-color:#ffffa0; border-radius:50%; cursor:help;" title="I need access to the parent directory to place generated files there.&#10;A user click is required by Chrome for me to ask for this permission.">&#9432;a</span>
-                        </p>
-                        <input id="SelectParentDirButton"
-                               autofocus type="button" value="Select"
-                               data-id="selectButton" >
-                        <div data-id="auxDiv">
-                            <p>or select previous parent directory:</p>
-                            <input id="SelectParentDirPreviousButton"
-                                   data-id="previousDir" type="button">
-                        </div>
-                    </center>
-                </dialog>
-                <script>
-                 const {dirParentHandle} = require('model')
-                 class LP5SelectParent extends LP5Element {
-                     #template;
-                     #namedNodes;
-                     constructor(){
-                         super();
-                         this.#template   = new LP5Element.TemplateInstance();
-                         this.#namedNodes = this.#template.namedNodes
-                     }
-                     connectedCallback(){
-                     }
-                     render(){
-                         console.log("SelectParentDialog render!!!!!!");
-                         if(model.dirParentHandle){
-                             console.log("Show button ",  dirParentHandle.name);
-                             auxDiv.style.display = 'block';
-                             previousDir.value    = dirParentHandle.name;
-                         } else {
-                             auxDiv.style.display = 'none';
-                         }
-                     }
-                 };
-                 return LP5SelectParent;
+                <center>
+                    <p>
+                        Select <em>parent</em> directory of existing
+                        or new lp5 project.
+                        <span style="background-color:#ffffa0; border-radius:50%; cursor:help;" title="I need access to the parent directory to place generated files there.&#10;A user click is required by Chrome for me to ask for this permission.">&#9432;a</span>
+                    </p>
+                    <input id="SelectParentDirButton"
+                           autofocus type="button" value="Select"
+                           data-name="selectButton" >
+                    <div data-name="auxDiv">
+                        <p>or select previous parent directory:</p>
+                        <input id="SelectParentDirPreviousButton"
+                               data-name="previousDir" type="button">
+                    </div>
+                </center>
+                <script data-name="[SelectParentDialog]">
+                 const egg                   = this;
+                 const {auxDiv, previousDir} = egg.namedNodes;
+                 const {dirParentHandle}     = egg.model;
 
-                 const model = require('model');
-                 const iView = require('iView');
-                 const {auxDiv, selectButton, previousDir} = iView.dataID;
-
-                 function init(){
-                     console.log("SelectParentDialog page script init!!!!!!");
-                     auxDiv.style.display = 'none';
-                 }
-
-                 function renderSelectParentDialog(){
-                     console.log("SelectParentDialog render!!!!!!");
-                     if(model.dirParentHandle){
-                         console.log("Show button ", model.dirParentHandle.name);
+                 function render(){
+                     console.error("SelectParentDialog render!!!!!!");
+                     if(dirParentHandle){
+                         console.log("Show button ",  dirParentHandle.name);
                          auxDiv.style.display = 'block';
-                         previousDir.value    = model.dirParentHandle.name;
+                         previousDir.value    = dirParentHandle.name;
                      } else {
                          auxDiv.style.display = 'none';
                      }
                  }
-                 let result = { init: init, render: renderSelectParentDialog };
-                 return result;
+                 render();
+                 return class SelectParentDialog {
+                 };
+
                 </script>
             </template>
         </lp5-dialog>
@@ -3360,6 +3399,8 @@
                  e,
                  controller,
                  true));
+             window.LP5.eggGlobals.controller = controller;
+             console.error("eggGlobals", window.LP5.eggGlobals);
              window.onerror = function(message, file, lineNumber) {
                  var browser_ = encodeURI(navigator.appVersion);
                  var error_ = encodeURI("msg:"+ message + "\n\tfile:"+file+"\n\tln:"+lineNumber);
@@ -3568,36 +3609,27 @@
                  
                  return result;
              }
-             function scopedEval3(script, scriptName, globalEnv, scriptThis){
-                 function require(thing){
-                     // split into non-empty args
-                     let things = thing.split(/[ ,]+/).filter(i=>i.length);
-                     // if it was simply require('singleItem')
-                     if(things.length == 1){
-                         if(thing in globalEnv)
-                             return globalEnv[thing];
-                         else
-                             assert(false,
-                                    `'${thing}': undefined name for require`);
-                     }
-                     // else we are returning a set of sets, more or less
-                     let finalObj = {};
-                     things.forEach(function requireFinalLoop(i){
-                         console.assert(i in globalEnv, i);
-                         finalObj[i] = globalEnv[i];
-                     });
-                     return finalObj;
-                 }
+             function scopedEval3(script, scriptName, globalEnv){
 
                  let sourceMap = "\n//# sourceURL=" + scriptName + "\n";
-                 console.log("before scopedEval2 return");
+                 console.log("before scopedEval3 return");
                  controller.script = script;
                  controller.scriptName = scriptName;
                  const result = new Function(
-                     "require", "LP5Base", '"use strict";' + script + sourceMap).call(
-                         scriptThis, require, globalEnv["LP5Base"]);
+                     '"use strict";' + script + sourceMap).call(globalEnv);
                  controller.script = null;
                  
+                 return result;
+             }
+
+             function scopedEval4(script, scriptName, scriptThis){
+                 let sourceMap = `\n//# sourceURL=${scriptName}\n`;
+                 console.log("before scopedEval4 return");
+                 controller.script = script;
+                 controller.scriptName = scriptName;
+                 const result = new Function(
+                     '"use strict";' + script + sourceMap).call(scriptThis);
+                 controller.script = null;
                  return result;
              }
 
@@ -3735,7 +3767,7 @@
                      this.loadTemplates()
                  },
                  loadTemplates(rootElement=document.body, parentView=null){
-                     console.log("views.loadTemplates()", rootElement);
+//                     console.log("views.loadTemplates()", rootElement);
                      document.querySelectorAll('[data-popup]').forEach(el => {
                          const name = el.getAttribute('data-popup');
                          window.LP5.popup[name] = el;
@@ -3761,11 +3793,11 @@
                      }
 
                      let templates = rootElement.querySelectorAll(':scope > template');
-                     console.log(`${templates.length} templates in document`);
+//                     console.log(`${templates.length} templates in document`);
                      window.MyTemplates = {};
 
                      templates.forEach((t)=>{
-                         console.log("    forEach template ", t);
+//                         console.log("    forEach template ", t);
                          let customName = t.dataset.custom;
                          if(customName){
                              const globalEnv = {
@@ -3794,18 +3826,14 @@
                          }                              
                          customName = t.dataset.custom2;
                          if(customName){
-                             const globalEnv = {
-                                 template: t,
-                                 extractScript,
-                                 LP5Base: getBaseClass(t),
-                                 controller,
-                                 model,
-                             };
                              t.remove();
                              const script = extractScript(t);
+                             const globalEnv = Object.setPrototypeOf(
+                                 { template:t }, window.LP5.eggGlobals);
 
-                             const customClass = scopedEval3(
-                                 script.textContent, customName, globalEnv, t);
+
+                             const customClass = scopedEval4(
+                                 script.textContent, customName, globalEnv);
                              console.assert(!Object.prototype.hasOwnProperty.call(customClass, 'template'),
                                             `${customName}: static field 'template' should not be defined`);
                              customClass.template = t;
@@ -4037,6 +4065,8 @@
              }
 
              let model = {};
+             window.LP5.eggGlobals.model = model;
+
              model.nextArticleID    = 0;
              model.storage          = null;
              //             model.dirHandle        = null;
