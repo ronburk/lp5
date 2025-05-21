@@ -35,6 +35,7 @@
              model:          null,
              scopedEval:     null,
          };
+//console.error("eggGlobals ", window.LP5.eggGlobals);
          window.LP5.popup  = {};
          window.LP5.test   = function(){
              document.body.setAttribute("data-test-ran", "yes");
@@ -68,63 +69,103 @@
              return result;
          }
 
-         window.LP5.eggGlobals.eggFromTemplate = function(template) {
-             const result = {
-                 style:         null,
-                 script:        null,
-                 instance:      instance,
-                 children:      [],
-                 namedNodes:    {},
-                 eventNodes:    [],
-                 globals:       window.LP5.eggGlobals,
-             };
-             const content = template.content;
-             if(object)  // if it's a container, allow multiple instances
-                 content = content.cloneNode(true);
-             
-             const autoNamedNodes = {};
-             const namedNodes     = {};
-             for (const node of content.children) {
-                 if (node.tagName === 'STYLE') {
-                     result.style = node;
-                 } else if (node.tagName === 'SCRIPT') {
-                     result.script = node;
-                 } else {
-                     result.children.push(node);
-                 }
-             }
-             const walk = (node) => {
-                 if (node.nodeType === Node.ELEMENT_NODE){
-                     // Named node
-                     const name = node.getAttribute('data-name');
-                     if (name)
-                         namedNodes[name] = node;
-                     else {
-                         const tag = node.tagName.toLowerCase();
-                         if(!(tag in autoNamedNodes))
-                             autoNamedNodes[tag] = node;
-                     }
-                     // Event nodes
-                     for (const attr of node.attributes)
-                         if (attr.name.startsWith('@')) {
-                             const eventName = attr.name.slice(1);
-                             result.eventNodes.push([eventName, node]);
-                         }
-                     for (const child of node.children)
-                         walk(child);
-                 }
-             };
-             for (const node of result.nodes)
-                 walk(node);
-             result.namedNodes = Object.setPrototypeOf(namedNodes, autoNamedNodes);
-             if(result.nodes.length === 1 && result.nodes[0].tagName === 'TEMPLATE')
-                 result.templateChild = result.nodes[0];
 
-             const instance = window.LP5.eggGlobals.scopedEval(script, "foo", result);
-             
-             console.error("eggFromTemplate returns ", result);
-             return result;
+         /* Egg.instance(template)
+          *     - parse into egg
+          *     - bind names
+          *     - instance = scopedEval()
+          *     - bind instance events
+          * Egg.factory(template)
+          *     - parse into egg
+          *     - class = scopedEval()
+          *     - class.constructor()
+          *         - egg.clone(this)
+          */
+
+         window.LP5.Egg = class Egg {
+             clone(){
+                 const eggClone = { ...this };
+                 eggClone.children = this.children.map(node => node.cloneNode(true));
+                 this.#bindNames(eggClone);
+                 this.#bindEvents(eggClone);
+                 return eggClone;
+             }
+             template   = null;
+             style      = null;
+             script     = null;
+             object     = null;
+             children   = [];
+             namedNodes = {};
+             globals    = window.LP5.eggGlobals;
+             #parseTemplate(template){
+                 for (const node of template.content.children)
+                     switch (node.tagName) {
+                         case 'STYLE':  this.style = node;        break;
+                         case 'SCRIPT': this.script = node;       break;
+                         default:       this.children.push(node); break;
+                     }
+             }
+             static #scopedEval(script, scriptName, scriptThis){
+                 const controller = window.LP5.eggGlobals.controller;
+                 let sourceMap = `\n//# sourceURL=${scriptName}\n`;
+                 console.log("before scopedEval4 return");
+                 controller.script = script;
+                 controller.scriptName = scriptName;
+                 const result = new Function(
+                     '"use strict";' + script.innerText + sourceMap).call(scriptThis);
+                 controller.script = null;
+                 return result;
+             }
+
+             #bindNames(egg){
+                 const autoNamedNodes = {};
+                 const walk = (node) => {
+                     if (node.nodeType == Node.ELEMENT_NODE) {
+                         const name = node.getAttribute('data-name');
+                         if (name)
+                             egg.namedNodes[name] = node;
+                         else
+                             autoNamedNodes[node.tagName.toLowerCase()] ??= node;
+                         for (const child of node.children) walk(child);
+                     }
+                 };
+                 for (const node of egg.children)  walk(node);
+                 Object.setPrototypeOf(egg.namedNodes, autoNamedNodes);
+             }
+             #bindEvents(egg){
+                 const walk = (node) => {
+                     if (node.nodeType !== Node.ELEMENT_NODE) return
+                     for (const attr of node.attributes){
+                         if(attr.name.startsWith('@')){
+                             const name    = attr.name.slice(1);
+                             const handler = egg.object[name];
+                             if(!handler)
+                                 console.warn(`missing event handler for ${name}`);
+                             else
+                                 node.addEventListener(name, handler.bind(egg.object));
+                         }
+                         for (const child of node.children) walk(child);
+                     }
+                 };
+                 for (const node of egg.children)  walk(node);
+             }
+             static instance(template){
+                 const egg = new Egg();
+                 egg.#parseTemplate(template);
+                 egg.#bindNames(egg);
+                 egg.object = this.#scopedEval(egg.script, "need name!", egg);
+                 egg.#bindEvents(egg);
+                 return egg;
+             }
+             static factory(template){
+                 const egg  = new Egg();
+                 egg.#parseTemplate(template);
+                 egg.object = this.#scopedEval(egg.script, "need name 2!", egg);
+                 return egg;
+             }
          }
+
+
 
          function trimLines(text) {
              return text
@@ -707,9 +748,8 @@
                 <slot></slot>
             </dialog>
             <script>
-             const globals = this;
-             const {extractScript, template, elementFoundry, eggFromTemplate} = globals;
-             console.error("template in custom element is", template);
+             const containerEgg = this;
+             const globals      = containerEgg.globals;
 
              function getTemplate(node){
                  console.error("getTemplate, node= ", node);
@@ -725,13 +765,13 @@
                  #content;
                  constructor(){
                      super();
-                     this.#egg = eggFromTemplate(template, this);
+                     this.#egg    = containerEgg.clone();
                      this.#dialog = this.#egg.namedNodes.dialog;
                      const contentNodes = this.#egg.namedNodes.slot.assignedNodes();
                      console.error("constructor of ", this, contentNodes, contentNodes.length);
-                     
                      const t = getTemplate(this);
-                     const contentEgg = eggFromTemplate(t);
+                     console.error("the egg!", LP5.Egg);
+                     const contentEgg = LP5.Egg.instance(t);
 //                     this.#content = globals.scopedEval(contentEgg.script.textContent, "foo", globals);
                      console.error("contentEgg is", t, contentEgg);
                      const shadow = this.attachShadow({mode:'open',delegatesFocus:true});
@@ -739,15 +779,12 @@
                      shadow.append(contentEgg.style);
                      shadow.append(this.#egg.style);
                      
-                     console.error("t.nodes", contentEgg.nodes);
-//                     shadow.append(... contentEgg.nodes.map(n => n.cloneNode(true)));
+                     console.error("t.nodes", contentEgg.children);
 
                      shadow.append(this.#dialog);
                      this.#egg.namedNodes.slot.replaceWith(
-                         ... contentEgg.nodes
+                         ... contentEgg.children
                      );
-//                     this.#egg.namedNodes.slot.replaceWith(
-//                         ... contentEgg.nodes.map(n => n.cloneNode(true)));
                  }
                  connectedCallback(){
                      const contentNodes = this.#egg.namedNodes.slot.assignedNodes();
@@ -1156,8 +1193,9 @@
                 <script data-name="[SelectParentDialog]">
                  const egg                   = this;
                  const {auxDiv, previousDir} = egg.namedNodes;
-                 const {dirParentHandle}     = egg.model;
+                 const {dirParentHandle}     = egg.globals.model;
 
+                 console.error("SelectParentDialog code!");
                  function render(){
                      console.error("SelectParentDialog render!!!!!!");
                      if(dirParentHandle){
@@ -1167,10 +1205,9 @@
                      } else {
                          auxDiv.style.display = 'none';
                      }
-                 }
-                 render();
-                 return class SelectParentDialog {
                  };
+                 render();
+                 return  { render };
 
                 </script>
             </template>
@@ -3827,6 +3864,10 @@
                          customName = t.dataset.custom2;
                          if(customName){
                              t.remove();
+                             const eggCustom = LP5.Egg.factory(t);
+                             customElements.define(customName, eggCustom.object);
+                             return;
+
                              const script = extractScript(t);
                              const globalEnv = Object.setPrototypeOf(
                                  { template:t }, window.LP5.eggGlobals);
