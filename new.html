@@ -23,10 +23,468 @@
         </style>
         <meta charset="utf-8" >
         <title>lp5</title>
+
+<script type="text/state-machine" id="lp5StateMachine">
+        const {asyncSchedule} = window.LP5.modSchedule;
+        const {views, model}  = window.LP5;
+state   load
+        const {loadDirParentHandle} = window.LP5.modStorage;
+        views.loadTemplates();
+        views.change('home');
+        // if we have previous dir handle, fetch it
+        asyncSchedule(loadDirParentHandle);
+    ->  awaitDirHandleLoad
+
+state   awaitDirHandleLoad
+    on  lp5AsyncComplete
+        const handle = event.detail;
+        console.assert(handle == null || handle instanceof FileSystemDirectoryHandle);
+        window.LP5.model.dirParentHandle = handle;
+        asyncSchedule(() => model.scanForProjects());
+    ->*
+        console.error("got async complete?", event);
+    ->  awaitScanForProjects
+        views.popup('lp5-selectparent');
+    ->  selectParent;
+
+state   awaitScanForProjects
+    on  lp5AsyncComplete
+    ->  awaitScanForProjects
+
+state   selectParent
+    on  lp5SelectParentDir
+        asyncSchedule(window.LP5.modFileSystem.showDirectoryPicker)
+    ->  awaitDirectoryPicker
+    on  lp5UsePreviousParentDir
+        const {model} = window.LP5;
+        asyncSchedule(model.openProject.bind(model), "??");
+    ->  home
+    on  *
+    ->  selectParent
+state awaitDirectoryPicker
+    on  lp5AsyncComplete
+        if(event.detail === null)
+    ->      awaitDirectoryPicker
+        console.assert(event.detail instanceof FileSystemDirectoryHandle);
+state home
+    on  *
+    ->  home
+        </script>
+
         <script>
          "use strict";
          
+         console.error("Got HERE!");
          window.LP5        = {};
+         window.LP5.modFileSystem = (function(){
+             async function showDirectoryPicker(){
+                 let handle  = null;
+                 try {
+                     handle  = await window.showDirectoryPicker({mode:'readwrite'});
+                 } catch(error) {
+                     if(error.name != "AbortError"){
+                         console.error("Unexpected error:", error);
+                     }
+                 }
+                 return handle;
+             }
+             async function scanDir(parentHandle, match) {
+                 const result = {};
+
+                 try {
+                     for await (const [name, handle] of parentHandle.entries())
+                     if (match(name, handle))
+                         result[name] = handle;
+                 } catch(e) {
+                     console.error("scanDir failed", e);
+                     result = null;
+                 }
+                 return result;
+             }
+             return {showDirectoryPicker, scanDir};
+         }());
+         window.LP5.modSchedule = (function(){
+             function asyncSchedule(func, ...args){
+                 function createErrorEvent(error) {
+                     return new ErrorEvent('error', {
+                         error: error,
+                         message: error.message,
+                         filename: document.location.href,  // You can use the current file URL
+                         lineno: 1,  // Adjust based on your error location
+                         colno: 1    // Adjust based on your error location
+                     });
+                 }
+
+                 async function notifyWhenDone(){
+                     try {
+                         asyncComplete(await func(...args));
+                     }catch(err){
+                         console.error(err);
+                         asyncComplete(createErrorEvent(err));
+                     }
+                 }
+                 setTimeout(notifyWhenDone);
+             }
+             function asyncComplete(value){
+                 console.log("inside asyncComplete, value is", value);
+                 queueMicrotask(
+                     function controller_asyncComplete() {
+                         let event = null;
+                         if(value instanceof Event)
+                             event = value;
+                         else
+                             event = new CustomEvent('lp5AsyncComplete', { detail:value});
+                         document.dispatchEvent(event);
+                 });
+                 console.log("exit asyncComplete");
+             };
+             return { asyncSchedule, asyncComplete };
+         }());
+        </script>
+        <script>
+
+         window.LP5.modIndexedDB = (function(){
+             const DB_NAME = "lp5-001";
+             const STORE_NAME = "handles";
+             const VERSION = 2;
+
+             let dbPromise = null;
+
+             function openDB() {
+                 if (dbPromise) return dbPromise;
+                 dbPromise = new Promise((resolve, reject) => {
+                     const request = indexedDB.open(DB_NAME, VERSION);
+
+                     request.onupgradeneeded = (event) => {
+                         const db = event.target.result;
+                         if (db.objectStoreNames.contains(STORE_NAME)) {
+                             db.deleteObjectStore(STORE_NAME);
+                         }
+                         db.createObjectStore(STORE_NAME);
+                     };
+
+                     request.onsuccess = () => resolve(request.result);
+                     request.onerror = (e) => reject(wrapError("open", null, "DB open failed", e.target.error));
+                 });
+
+                 return dbPromise;
+             }
+
+             function wrapError(op, key, message, cause) {
+                 return { op, key, message, cause };
+             }
+
+             async function put(key, value) {
+                 try {
+                     const db = await openDB();
+                     return await new Promise((resolve, reject) => {
+                         const store = db.transaction([STORE_NAME], "readwrite").objectStore(STORE_NAME);
+                         const req = store.put(value, key);
+                         req.onsuccess = () => resolve();
+                         req.onerror = (e) => reject(wrapError("put", key, "DB write failed", e.target.error));
+                     });
+                 } catch (e) {
+                     if (e.op) throw e;
+                     throw wrapError("put", key, "Unexpected failure", e);
+                 }
+             }
+
+             async function get(key) {
+                 try {
+                     const db = await openDB();
+                     return await new Promise((resolve, reject) => {
+                         const store = db.transaction([STORE_NAME], "readonly").objectStore(STORE_NAME);
+                         const req = store.get(key);
+                         req.onsuccess = () => resolve(req.result);
+                         req.onerror = (e) => reject(wrapError("get", key, "DB read failed", e.target.error));
+                     });
+                 } catch (e) {
+                     if (e.op) throw e;
+                     throw wrapError("get", key, "Unexpected failure", e);
+                 }
+             }
+
+             return { get, put };
+         })();
+
+         window.LP5.modStorage = (function(){
+             const {get} = window.LP5.modIndexedDB;
+
+             // Attempt to load and validate a previously saved directory handle
+             async function loadDirParentHandle() {
+                 const handle = await get("handle");
+                 if (!handle) return null;
+
+                 const option = { mode: 'readwrite' };
+
+                 try {
+                     let perms = await handle.queryPermission(option);
+                     if (perms !== 'granted') {
+                         perms = await handle.requestPermission(option);
+                     }
+                     return perms === 'granted' ? handle : null;
+                 } catch (e) {
+                     console.error("Permission check failed:", e);
+                     return null;
+                 }
+             }
+
+             return { loadDirParentHandle };
+         }());
+        </script>
+        <script>
+         window.LP5.modStateMachine = (function(){
+
+             function compileStateMachine(src) {
+                 const lines            = src.split(/\r?\n/);
+                 const preamble         = [];
+                 const definedStates    = new Set();
+                 const referencedStates = new Set();
+                 const stateBodies      = {};
+                 let currentState       = null;
+                 let currentBody        = [];
+                 let seenFirstState     = false;
+                 let openBlock          = false;
+
+                 function flushOpenBlock() {
+                     if (openBlock) {
+                         currentBody.push('        }');
+                         openBlock = false;
+                     }
+                 }
+
+                 function flushState() {
+                     if (!currentState) return;
+                     if (definedStates.has(currentState))
+                         throw new Error(`Duplicate state: ${currentState}`);
+                     definedStates.add(currentState);
+                     stateBodies[currentState] = currentBody.slice();
+                     currentState = null;
+                     currentBody = [];
+                     openBlock = false;
+                 }
+
+                 for (const rawLine of lines) {
+                     if (!seenFirstState && rawLine.trim().startsWith('state ')) {
+                         seenFirstState = true;
+                     }
+                     if (!seenFirstState) {
+                         preamble.push(rawLine);
+                         continue;
+                     }
+
+                     const trimmed = rawLine.trim();
+                     if (trimmed === '') continue;
+
+                     if (trimmed.startsWith('state ')) {
+                         flushOpenBlock();
+                         flushState();
+                         currentState = trimmed.match(/^state\s+(\w+)/)[1];
+                         continue;
+                     }
+
+                     if (!currentState)
+                         throw new Error(`Code found outside of any state: ${rawLine}`);
+
+                     const onMatch = /^\s*on\s+(\*|\w+)/.exec(rawLine);
+                     if (onMatch) {
+                         flushOpenBlock();
+                         const ev = onMatch[1];
+                         currentBody.push(ev === '*'
+                                        ? '        {'
+                                        : `        if (event.type === '${ev}') {`);
+                         openBlock = true;
+                         continue;
+                     }
+
+                     const arrowMatch = /^\s*->\s*(\*|\w+)/.exec(rawLine);
+                     if (arrowMatch) {
+                         const target = arrowMatch[1];
+                         if (target === '*') {
+                             // "-> *" means wait for next event
+                             currentBody.push('        event = yield;');
+                         } else {
+                             referencedStates.add(target);
+                             currentBody.push(`        { state = '${target}'; break; }`);
+                         }
+                         continue;
+                     }
+
+                     currentBody.push('        ' + rawLine);
+                 }
+
+                 flushOpenBlock();
+                 flushState();
+
+                 // Warn about unreachable and undefined states
+                 const unreachable = [...definedStates].filter((s, i) => i > 0 && !referencedStates.has(s));
+                 const undefinedTargets = [...referencedStates].filter(s => !definedStates.has(s));
+                 if (unreachable.length > 0)
+                     console.error(`Unreachable state(s): ${unreachable.join(', ')}`);
+                 if (undefinedTargets.length > 0)
+                     console.error(`-> to undefined state(s): ${undefinedTargets.join(', ')}`);
+
+                 // Build the generator function
+                 const output = [];
+                 output.push('(() => {');
+                 output.push(...preamble);
+                 output.push('  function* machine() {');
+                 output.push(`    let state = '${[...definedStates][0]}';`);
+                 output.push('    let event = null;');
+                 output.push('    while (true) {');
+                 output.push('      event = yield;');
+                 output.push('      switch (state) {');
+
+                 for (const [state, body] of Object.entries(stateBodies)) {
+                     output.push(`        case '${state}':`);
+                     output.push('          {');
+                     output.push(...body);
+                     output.push('          }');
+                     output.push('          break;');
+                 }
+
+                 output.push('      }');
+                 output.push('    }');
+                 output.push('  }');
+                 output.push('  const gen = machine();');
+                 // output.push('  gen.next();');
+                 output.push('  return {');
+                 output.push('    send(event) { gen.next(event); },');
+                 output.push('    currentState() { return state; }');
+                 output.push('  };');
+                 output.push('})()');
+
+                 return output.join('\n');
+             }
+             function compile(){
+                 const machineSource = document.getElementById('lp5StateMachine').textContent;
+                 console.error("machine source", machineSource);
+                 const compiled = compileStateMachine(machineSource);
+                 console.error("compiled machine", compiled);
+                 const machine = eval(compiled);
+                 console.error("MACHINE = ", machine);
+                 return machine;
+             }
+             return compile();
+         })();
+        </script>
+        <script>
+         window.LP5.modStateMachine = (function(){
+             function compileStateMachine(src) {
+                 const lines            = src.split(/\r?\n/);
+                 const output           = [];
+                 const definedStates    = new Set();
+                 const referencedStates = new Set();
+                 const compiledStates   = [];
+                 const preamble         = [];
+
+                 let currentState       = null;
+                 let currentBody        = [];
+                 let openBlock          = false;
+                 let seenFirstState     = false;
+
+                 function flushOpenBlock() {
+                     if (openBlock) {
+                         currentBody.push('  }');
+                         openBlock = false;
+                     }
+                 }
+
+                 function flushState() {
+                     if (!currentState) return;
+                     if (definedStates.has(currentState)) {
+                         throw new Error(`Duplicate state: ${currentState}`);
+                     }
+
+                     definedStates.add(currentState);
+                     output.push(`  function ${currentState}(event) {`);
+                     output.push(...currentBody.map(line => '    ' + line));
+                     output.push(`  }`);
+                     compiledStates.push(currentState);
+                     currentState = null;
+                     currentBody = [];
+                     openBlock = false;
+                 }
+
+                 for (const rawLine of lines) {
+                     if (!seenFirstState && rawLine.trim().startsWith('state ')) {
+                         seenFirstState = true;
+                     }
+
+                     if (!seenFirstState) {
+                         preamble.push(rawLine);
+                         continue;
+                     }
+                     const line = rawLine.trim();
+                     if (line === '') continue;
+
+                     const leadingSpace = rawLine.match(/^\s*/)[0].length;
+
+                     if (line.startsWith('state ')) {
+                         flushOpenBlock();
+                         flushState();
+
+                         const stateMatch = /^state\s+(\w+)/.exec(line);
+                         if (!stateMatch) {
+                             throw new Error(`Malformed state declaration: ${rawLine}`);
+                         }
+                         currentState = stateMatch[1];
+                         continue;
+                     }
+                     if (!currentState)
+                         throw new Error(`Code found outside of any state: ${rawLine}`);
+
+                     const onMatch = /^\s*on\s+(\*|\w+)/.exec(rawLine);
+                     if (onMatch) {
+                         flushOpenBlock();
+                         const ev = onMatch[1];
+                         if (ev === '*') {
+                             currentBody.push(`{`);
+                         } else {
+                             currentBody.push(`if (event.type === '${ev}') {`);
+                         }
+                         openBlock = true;
+                         continue;
+                     }
+
+                     const arrowMatch = /^\s*->\s+(\w+)/.exec(rawLine);
+                     if (arrowMatch) {
+                         const target = arrowMatch[1];
+                         referencedStates.add(target);
+                         currentBody.push(`return '${target}';`);
+                         continue;
+                     }
+
+                     currentBody.push(rawLine);
+                 }
+
+                 flushOpenBlock();
+                 flushState();
+
+                 const unreachable = [...definedStates].filter((s, i) => i > 0 && !referencedStates.has(s));
+                 const undefinedTargets = [...referencedStates].filter(s => !definedStates.has(s));
+
+                 if (unreachable.length > 0)
+                     console.error(`Unreachable state(s): ${unreachable.join(', ')}`);
+                 if (undefinedTargets.length > 0)
+                     console.error(`-> to undefined state(s): ${undefinedTargets.join(', ')}`);
+
+                 output.push(`  return { ${compiledStates.join(', ')} };`);
+                 return ['(() => {', ...preamble, ...output, '})()'].join('\n');
+             }
+             
+             function compile(){
+                 const machineSource = document.getElementById('lp5StateMachine').textContent;
+                 console.error("machine source", machineSource);
+                 const compiled = compileStateMachine(machineSource);
+                 console.error("compiled machine", compiled);
+                 const machine = eval(compiled);
+                 return machine;
+             }
+             return {compile};
+         })();
+        </script>
+        <script>
          window.LP5.eggGlobals = {
              Article:        null,
              controller:     null,
@@ -35,7 +493,7 @@
              model:          null,
              scopedEval:     null,
          };
-//console.error("eggGlobals ", window.LP5.eggGlobals);
+         //console.error("eggGlobals ", window.LP5.eggGlobals);
          window.LP5.popup  = {};
          window.LP5.test   = function(){
              document.body.setAttribute("data-test-ran", "yes");
@@ -96,7 +554,7 @@
              object     = null;
              children   = [];
              namedNodes = {};
-             globals    = window.LP5.eggGlobals;
+//             globals    = window.LP5.eggGlobals;
              #parseTemplate(template){
                  for (const node of template.content.children)
                      switch (node.tagName) {
@@ -106,7 +564,7 @@
                      }
              }
              static #scopedEval(script, scriptName, scriptThis){
-                 const controller = window.LP5.eggGlobals.controller;
+                 const {controller} = window.LP5;
                  let sourceMap = `\n//# sourceURL=${scriptName}\n`;
                  console.log("before scopedEval4 return");
                  controller.script = script;
@@ -134,21 +592,36 @@
              }
              #bindEvents(egg){
                  const walk = (node) => {
-                     if (node.nodeType !== Node.ELEMENT_NODE) return
-                     for (const attr of node.attributes){
-                         if(attr.name.startsWith('@')){
-                             const name    = attr.name.slice(1);
-                             const handler = egg.object[name];
-                             if(!handler)
-                                 console.warn(`missing event handler for ${name}`);
-                             else
-                                 node.addEventListener(name, handler.bind(egg.object));
+                     if (node.nodeType !== Node.ELEMENT_NODE) return;
+                     for (const attr of node.attributes) {
+                         if (attr.name.startsWith('@')) {
+                             const eventName = attr.name.slice(1);
+                             let handlerName = attr.value?.trim();
+
+                             // If no value or empty string, use event name
+                             if (!handlerName) {
+                                 handlerName = eventName;
+                             }
+
+                             // Strip quotes if present
+                             if ((handlerName.startsWith('"') && handlerName.endsWith('"')) ||
+                                 (handlerName.startsWith("'") && handlerName.endsWith("'"))) {
+                                 handlerName = handlerName.slice(1, -1);
+                             }
+
+                             const handler = egg.object[handlerName];
+                             if (!handler) {
+                                 console.error(`missing handler '${handlerName}' for event '${eventName}'`);
+                             } else {
+                                 node.addEventListener(eventName, handler.bind(egg.object));
+                             }
                          }
-                         for (const child of node.children) walk(child);
                      }
+                     for (const child of node.children) walk(child);
                  };
-                 for (const node of egg.children)  walk(node);
+                 for (const node of egg.children) walk(node);
              }
+
              static instance(template){
                  const egg = new Egg();
                  egg.#parseTemplate(template);
@@ -1179,21 +1652,22 @@
                     <p>
                         Select <em>parent</em> directory of existing
                         or new lp5 project.
-                        <span style="background-color:#ffffa0; border-radius:50%; cursor:help;" title="I need access to the parent directory to place generated files there.&#10;A user click is required by Chrome for me to ask for this permission.">&#9432;a</span>
+                        <span style="background-color:#ffffa0; border-radius:50%; cursor:help;" title="I need access to the parent directory to place generated files there.&#10;A user click is required by Chrome for me to ask for this permission.">&#9432;</span>
                     </p>
                     <input id="SelectParentDirButton"
                            autofocus type="button" value="Select"
-                           data-name="selectButton" >
+                           data-name="selectButton" @click="clickFind">
                     <div data-name="auxDiv">
                         <p>or select previous parent directory:</p>
                         <input id="SelectParentDirPreviousButton"
-                               data-name="previousDir" type="button">
+                               data-name="previousDir" type="button" @click="clickReuse">
                     </div>
                 </center>
                 <script data-name="[SelectParentDialog]">
                  const egg                   = this;
                  const {auxDiv, previousDir} = egg.namedNodes;
-                 const {dirParentHandle}     = egg.globals.model;
+                 const {dirParentHandle}     = window.LP5.model;
+                 const {publish}             = window.LP5.controller;
 
                  console.error("SelectParentDialog code!");
                  function render(){
@@ -1207,7 +1681,16 @@
                      }
                  };
                  render();
-                 return  { render };
+                 function clickFind(event){
+                     const target = event.composedPath()[0];
+                     publish('lp5SelectParentDir');
+                 }
+                 function clickReuse(event){
+                     const target = event.composedPath()[0];
+                     publish('lp5UsePreviousParentDir');
+                 }
+
+                 return  { render, clickFind, clickReuse };
 
                 </script>
             </template>
@@ -2359,7 +2842,7 @@
                                      if(targets)
                                          for(const target of targets){
                                              (this.referencedBy[target] ??= []).
-                                          push(article);
+                                     push(article);
                                          }
                                  }
                              }
@@ -2467,7 +2950,7 @@
                          }
                          //this.codeParsed = parseCode(this.escapedScript);
                          this.codeParsed = parseCode(this.unindentCode(this.escapedScript));
-//                         this.code = this.sections.script?.innerText.trim() || null;
+                         //                         this.code = this.sections.script?.innerText.trim() || null;
                          this.name = this.sections.name?.innerText.trim() || null;
                          this.childrenIDs = [];
                          this.childCount  = 0;
@@ -2818,7 +3301,10 @@
                  return new Promise((resolve, reject) => {
                      console.log("indexedDB.open");
                      const request = window.indexedDB.open("lp5-001", 2);
-                     request.onerror   = (event) => { console.log("dberror");reject("db error!" + event.target.errorCode); }
+                     request.onerror   = (event) => {
+                         console.error("openDB error:", event.target.error);
+                         reject("db error!" + event.target.error);
+                     }
                      request.onsuccess = (event) => { resolve(request.result);  };
                      request.onupgradeneeded = (event) => {
                          console.log("upgrade needed.");
@@ -2832,6 +3318,9 @@
                      };
                  });
              }
+
+             
+
              async function putDB(db, key, value){
                  console.log("putDB: ", key, value);
                  return new Promise((resolve, reject) => {
@@ -2860,8 +3349,9 @@
              }
 
              // load any previously stored handle to our parent directory
-             async function loadDirParentHandle(model){
-                 let db = await openDB();
+             async function loadDirParentHandle(){
+                 let result = null;
+                 let db     = await openDB();
                  let handle = await getDB(db, "handle");
                  if(false){
                      let option = {mode:'readwrite'};
@@ -2873,14 +3363,13 @@
                              console.log("Well hell");
                          }
                          else
-                             model.dirParentHandle = handle;
+                             result = handle;
                      }
                  }else{
-                     model.dirParentHandle       = handle;
+                     result       = handle;
                  }
-                 return true;
+                 return result;
              }
-
              async function selectParentDir(model, targetID){
                  console.log(`selectParentDir(${targetID})`);
 
@@ -3018,7 +3507,7 @@
                      console.log("Got event, but controller is crashed.", event);
                      return;
                  }
-                 if(event.type == 'asyncComplete' && event.detail instanceof Error){
+                 if(event.type == 'lp5AsyncComplete' && event.detail instanceof Error){
                      views.push('Crash', event.detail);
                      controller.state = 'Crash';
                  }
@@ -3038,7 +3527,7 @@
                  }
                  const currentViewName = views.currentView
                                        ? views.currentView.name : "";
-                 console.log(`>>>>>>>>>>>>>>>>>>enter controller {${currentViewName}}`,
+                 console.log(`>>>>>>>>>>>>>>>>>>enter controller {${currentViewName}} {${event.type}}`,
                              controller.state, model.articles.length, arguments.length);
                  console.log("focus ", getDeepFocus());
                  console.log("event ", event, event.composedPath());
@@ -3094,49 +3583,88 @@
                      console.assert(!controller.inSync);
                  controller.inSync = true;
 
-                 const machine = {
-                     Crash(event){
-                         controller.crash(event.detail);
-                         console.log("crash.");
-                         return 'Crash';
-                     },
-                     ...(() => {
-                         let selectParentDialog;
-                         return {
-                             stateLoad(event){
-                                 console.assert(event.type == 'load', event);
-                                 asyncSchedule(loadDirParentHandle, model);
-                                 return 'stateAwaitDirHandleLoad';
-                             },
-                             stateAwaitDirHandleLoad(event){
-                                 if(event.type != 'asyncComplete')
-                                     console.error("event.type = ", event.type);
-                                 console.assert(event.type == 'asyncComplete');
-                                 views.loadTemplates();
-                                 views.change('home');
-                                 selectParentDialog = window.LP5.popup['lp5-selectparent']
-                                 document.body.append(selectParentDialog);
-                                 selectParentDialog.show();
-                                 controller.state = 'stateSelectParent';
-                                 return 'stateHome';
+                 
+                 if(false){
+                     const machine = {
+                         Crash(event){
+                             controller.crash(event.detail);
+                             console.log("crash.");
+                             return 'Crash';
+                         },
+                         ...(() => {
+                             let selectParentDialog;
+                             return {
+                                 stateLoad(event){
+                                     console.assert(event.type == 'load', event);
+                                     asyncSchedule(loadDirParentHandle, model);
+                                     return 'stateAwaitDirHandleLoad';
+                                 },
+                                 stateAwaitDirHandleLoad(event){
+                                     if(event.type != 'lp5AsyncComplete')
+                                         console.error("event.type = ", event.type);
+                                     console.assert(event.type == 'lp5AsyncComplete');
+                                     views.loadTemplates();
+                                     views.change('home');
+                                     selectParentDialog = window.LP5.popup['lp5-selectparent']
+                                     document.body.append(selectParentDialog);
+                                     selectParentDialog.show();
+                                     controller.state = 'stateSelectParent';
+                                     return 'stateSelectParent';
+                                 }
                              }
+                         })(),
+                         stateSelectParent(event){
+                             let path   = event.composedPath();
+                             let target = path[0];
+                             if(target.id == 'SelectParentDirButton'
+                                || target.id == 'SelectParentDirPreviousButton'){
+                                 //                             console.assert(event.type == 'click');
+                                 asyncSchedule(selectParentDir, model, target.id);
+                                 controller.state = 'SelectingParent';
+                             } else if(event.type == 'click') {
+                                 console.log("SelectParent got clicks");
+                                 // let the view handle clicks
+                             } else if(event.type == 'close') {
+                                 console.log("'close' event came in");
+                             } else {
+                                 console.assert(false, event);
+                             }
+                             return 'stateSelectingParent';
+                             console.assert(event.click == 'load', event);
+                             asyncSchedule(loadDirParentHandle, model);
+                             return 'stateAwaitDirHandleLoad';
+                         },
+                         stateSelectingParent(event){
+                             if(event.type == 'hashchange'){
+                                 controller.state = 'SelectingParentHashChanged';
+                                 controller.oldURL = event.oldURL;
+                             } else {
+                                 console.assert(event.type == 'lp5AsyncComplete', event);
+                                 views.pop();
+                                 if(event.detail){
+                                     console.assert(model.dirParentHandle);
+                                     controller.state = 'PickOrCreateProject';
+                                     views.push('PickOrCreateProject');
+                                 } else {
+                                     views.push('SelectParent');
+                                     controller.state = 'SelectParent';
+                                 }
+                             }
+
+                         },
+                         stateHome(event){
+                             console.log("In home state!");
+                             return 'stateHome';
                          }
-                     })(),
-                     stateSelectParent(event){
-                         console.assert(event.type == 'load', event);
-                         asyncSchedule(loadDirParentHandle, model);
-                         return 'stateAwaitDirHandleLoad';
-                     },
-                     stateHome(event){
-                         console.log("In home state!");
-                         return 'stateHome';
-                     }
-                 };
-                 console.error("machine=", controller.state, machine[controller.state]);
-                 let nextState = machine[controller.state](event);
+                     };
+                 }
+                 console.error("machine=", controller.state, LP5.stateMachine[controller.state]);
+                 let nextState = LP5.stateMachine[controller.state](event);
+                 if(!(nextState in LP5.stateMachine))
+                     console.error("Unknown state: ", nextState);
                  console.error("nextState = ", nextState);
-//                 if(nextState !== controller.state)
-//                     machine[nextState]('@enter', event);
+                 //                 if(nextState !== controller.state)
+                 //                     machine[nextState]('@enter', event);
                  controller.state = nextState;
 
                  if(false)switch(controller.state){
@@ -3151,7 +3679,7 @@
                          controller.state = 'AwaitDirHandleLoad';
                          break;
                      case 'AwaitDirHandleLoad' :
-                         console.assert(event.type == 'asyncComplete');
+                         console.assert(event.type == 'lp5AsyncComplete');
                          views.loadTemplates();
                          views.change('home');
                          views.push('SelectParent');
@@ -3179,7 +3707,7 @@
                              controller.state = 'SelectingParentHashChanged';
                              controller.oldURL = event.oldURL;
                          } else {
-                             console.assert(event.type == 'asyncComplete', event);
+                             console.assert(event.type == 'lp5AsyncComplete', event);
                              views.pop();
                              if(event.detail){
                                  console.assert(model.dirParentHandle);
@@ -3193,7 +3721,7 @@
                          break;
                          // unusual case where user changed hash while sysdialog was up
                      case 'SelectingParentHashChanged' :
-                         console.assert(event.type == 'asyncComplete');
+                         console.assert(event.type == 'lp5AsyncComplete');
                          window.location = controller.oldURL;
                          views.pop();
                          views.push('SelectParent');
@@ -3211,14 +3739,14 @@
                          }
                          break;
                      case 'openProject' : // waiting for project to open
-                         console.assert(event.type == 'asyncComplete');
+                         console.assert(event.type == 'lp5AsyncComplete');
                          controller.state = 'home';
                          model.updateDerivedState();
                          views.render();
                          console.log("Back from render!");
                          break;
                      case 'AwaitAsyncComplete' :
-                         console.assert(event.type == 'asyncComplete');
+                         console.assert(event.type == 'lp5AsyncComplete');
                          if(event.detail instanceof Error){
                              controller.state = 'Crash';
                              alert(event.detail);
@@ -3393,7 +3921,7 @@
                          controller.state = 'home';
                          break;
                      case 'test' :
-                         if(event.type == 'asyncComplete')
+                         if(event.type == 'lp5AsyncComplete')
                              controller.state = 'home';
                          break;
                      default:
@@ -3406,7 +3934,7 @@
              }
 
              [
-                 'asyncComplete',
+                 'lp5AsyncComplete',
                  'cancel',
                  'change',
                  'click',
@@ -3420,6 +3948,8 @@
                  'lp5DialogSave',
                  'lp5DialogCancel',
                  'lp5NavSelect',
+                 'lp5SelectParentDir',
+                 'lp5UsePreviousParentDir',
                  'error',
                  'hashchange',
                  'input',
@@ -3436,8 +3966,8 @@
                  e,
                  controller,
                  true));
-             window.LP5.eggGlobals.controller = controller;
-             console.error("eggGlobals", window.LP5.eggGlobals);
+             //             window.LP5.eggGlobals.controller = controller;
+             //             console.error("eggGlobals", window.LP5.eggGlobals);
              window.onerror = function(message, file, lineNumber) {
                  var browser_ = encodeURI(navigator.appVersion);
                  var error_ = encodeURI("msg:"+ message + "\n\tfile:"+file+"\n\tln:"+lineNumber);
@@ -3530,7 +4060,7 @@
                          if(value instanceof Event)
                              event = value;
                          else
-                             event = new CustomEvent('asyncComplete', { detail:value});
+                             event = new CustomEvent('lp5AsyncComplete', { detail:value});
                          document.dispatchEvent(event);
                  });
                  console.log("exit asyncComplete");
@@ -3564,13 +4094,13 @@
              Object.defineProperty(controller, 'state', {
                  get() { return controller.state_; },
                  set(val) {
-                     console.assert(controller.states.has(val), `${val} is not defined in controller.states`);
+                     //                     console.assert(controller.states.has(val), `${val} is not defined in controller.states`);
                      controller.state_ = val;
                  }
              });
              
              controller.inSync = false;
-             controller.state  = 'stateLoad';
+             controller.state  = 'load';
 
              function getBaseClass(template){
                  let baseClass = HTMLElement;
@@ -3612,7 +4142,7 @@
                  newClass.TemplateInstance = TemplateInstance;
                  return newClass;
              }
-//             customElements.define('lp5-element', LP5Element);
+             //             customElements.define('lp5-element', LP5Element);
              
              function scopedEval2(script, scriptName, globalEnv, scriptThis){
                  function require(thing){
@@ -3784,12 +4314,14 @@
                  }
              }
 
+             window.LP5.controller = controller;
              controller.views = {
                  views       : {},
                  listeners   : {},
                  stack       : [],
                  inProgress  : 0,
                  currentView : null,
+                 dialog      : null,
                  notifyModelChange(info){
                      Object.keys(listeners).forEach(
                          function(k){
@@ -3799,12 +4331,23 @@
                          }
                      );
                  },
+                 popup(name){
+                     this.dialog = window.LP5.popup[name];
+                     console.assert(this.dialog, `${name}: undefined popup!`);
+                     document.body.append(this.dialog);
+                     this.dialog.show();
+                 },
+                 close(){
+                     this.dialog.close();
+                     this.dialog = null;
+                 },
+                 
                  evalTemplates(){
                      console.log("evalTemplates!")
                      this.loadTemplates()
                  },
                  loadTemplates(rootElement=document.body, parentView=null){
-//                     console.log("views.loadTemplates()", rootElement);
+                     //                     console.log("views.loadTemplates()", rootElement);
                      document.querySelectorAll('[data-popup]').forEach(el => {
                          const name = el.getAttribute('data-popup');
                          window.LP5.popup[name] = el;
@@ -3830,11 +4373,11 @@
                      }
 
                      let templates = rootElement.querySelectorAll(':scope > template');
-//                     console.log(`${templates.length} templates in document`);
+                     //                     console.log(`${templates.length} templates in document`);
                      window.MyTemplates = {};
 
                      templates.forEach((t)=>{
-//                         console.log("    forEach template ", t);
+                         //                         console.log("    forEach template ", t);
                          let customName = t.dataset.custom;
                          if(customName){
                              const globalEnv = {
@@ -3853,11 +4396,11 @@
                                             `${customName}: static field 'template' should not be defined`);
                              customClass.template = t;
                              
-/*
-                             console.assert(customClass.prototype instanceof LP5Element,
-                                            `return of ${customName} must be type LP5Element`,
-                                            customClass);
-                             */
+                             /*
+                                console.assert(customClass.prototype instanceof LP5Element,
+                                `return of ${customName} must be type LP5Element`,
+                                customClass);
+                              */
                              customElements.define(customName, customClass);
                              return;
                          }                              
@@ -3879,11 +4422,11 @@
                                             `${customName}: static field 'template' should not be defined`);
                              customClass.template = t;
                              
-/*
-                             console.assert(customClass.prototype instanceof LP5Element,
-                                            `return of ${customName} must be type LP5Element`,
-                                            customClass);
-                             */
+                             /*
+                                console.assert(customClass.prototype instanceof LP5Element,
+                                `return of ${customName} must be type LP5Element`,
+                                customClass);
+                              */
                              customElements.define(customName, customClass);
                              return;
                          }
@@ -4105,7 +4648,11 @@
                  return output;
              }
 
+             window.LP5.views = controller.views;
+             console.error("assigning views!", window.LP5.views);
+
              let model = {};
+             window.LP5.model = model;
              window.LP5.eggGlobals.model = model;
 
              model.nextArticleID    = 0;
@@ -4147,7 +4694,7 @@
                  for(const article of model.tocOrder){
                      if(article.code){
                          (articlesFromName[article.getCodeName()] ??= []).
-                               push(article);
+                                          push(article);
                          const name = article.getCodeName();
                          for(const item of article.codeParsed){
                              //                             console.log(`'${name}' '${item}'`, name, item);
@@ -4328,6 +4875,9 @@
                  let result = Articles.create(filename, parent, text);
                  return result;
              }
+             model.scanForProjects = async function(){
+                 console.error("scanForProjects not written");
+             }
              model.loadTOC = async function(dirHandle, name, parent=null){
                  console.log("loadTOC ", name);
                  if(parent == null)
@@ -4343,16 +4893,6 @@
                      let child = await this.loadTOC(dirHandle, id, article);
                      console.log("loaded child", child);
                  }
-                 //                 if(children.length){
-                 //                     console.log(`in loadTOC, article "${name}" has a ul`);
-                 //                     const entries = children.querySelectorAll('li');
-                 //                     for(const li of entries){
-                 //                         let ID = li.getAttribute('id');
-                 //                         let child = await this.loadTOC(dirHandle, ID, article);
-                 //                         article.children.push(child);
-                 //                 }
-                 //                 } else
-                 //                     console.log(`in loadTOC, article "${name}" has NO ul`);
                  controller.deferEvent(document, "lp5Render");
                  console.log(`loadTOC(${name}) returns `, article);
                  return article;
@@ -4372,6 +4912,7 @@
              }
              controller.model = model;
          }();
+         window.LP5.stateMachine = window.LP5.modStateMachine.compile();
         </script>
     </body>
 </html>
