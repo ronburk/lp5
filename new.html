@@ -28,12 +28,26 @@
         const {asyncSchedule} = window.LP5.modSchedule;
         const {views, model}  = window.LP5;
 state   load
-        const {loadDirParentHandle} = window.LP5.modStorage;
+        const {loadPreviousHandle} = window.LP5.modStorage;
         views.loadTemplates();
         views.change('home');
         // if we have previous dir handle, fetch it
-        asyncSchedule(loadDirParentHandle);
-    ->  awaitDirHandleLoad
+        asyncSchedule(loadPreviousHandle);
+    ->  * 
+        if(event.detail !== null) // if no previous handle
+    ->      home
+        views.popup('lp5-selectorcreate');
+    ->  selectOrCreateProject
+
+state   selectOrCreateProject
+        const {showDirectoryPicker} = window.LP5.modFileSystem;
+    on  lp5SelectProject
+        asyncSchedule(showDirectoryPicker);
+    ->*
+        if(event.detail)
+    ->      loadProject
+    on  lp5CreateProject
+        views.popup('lp5-createproject');
 
 state   awaitDirHandleLoad
     on  lp5AsyncComplete
@@ -74,10 +88,42 @@ state home
         <script>
          "use strict";
          
-         console.error("Got HERE!");
-         window.LP5        = {};
-         window.LP5.modFileSystem = (function(){
-             async function showDirectoryPicker(){
+         window.LP5 = {
+         };
+         window.LP5.events = new Set( [
+             'lp5AsyncComplete',
+             'cancel',
+             'change',
+             'click',
+             //                 'close',
+             'closeDialog',
+             'contextmenu',
+             'command',
+             'DataCloneError',
+             // 'lp5-treeview:select',
+             'lp5ArticleContext',
+             'lp5CreateProject',
+             'lp5DialogSave',
+             'lp5DialogCancel',
+             'lp5NavSelect',
+             'lp5SelectParentDir',
+             'lp5SelectProject',
+             'lp5UsePreviousParentDir',
+             'error',
+             'hashchange',
+             'input',
+             'keydown',
+             'load',
+             //                 'mousemove',
+             'reload',
+             'saveArticle',
+             'selectProject',
+             'SelectArticle',
+             'SyntaxError',
+             'unhandledrejection',
+         ]);
+             window.LP5.modFileSystem = (function(){
+                 async function showDirectoryPicker(){
                  let handle  = null;
                  try {
                      handle  = await window.showDirectoryPicker({mode:'readwrite'});
@@ -103,6 +149,45 @@ state home
              }
              return {showDirectoryPicker, scanDir};
          }());
+         window.LP5.modString = (function(){
+             function getIndent(line){
+                 let indent = -1;
+                 line = line.replace(/\s+$/,'');
+                 if(line.length)
+                     indent = line.search(/\S|$/);
+                 return indent;
+             }
+             function unindent(text, moreIndent=0){
+                 let result = text;
+                 if(text){
+                     // remove leading empty lines & trailing space, ensure final '\n'
+                     text = text.replace(/^\s*[\r\n]+/,'');
+                     text = text.replace(/\s*$/,'') + '\n';
+                     let lines = text.split(/\r?\n/);
+                     let minIndent = -1;
+                     for(let line of lines){
+                         let thisIndent = getIndent(line);
+                         if(minIndent == -1 || thisIndent < minIndent)
+                             minIndent = thisIndent;
+                     }
+                     if(minIndent > 0){
+                         let space = " ".repeat(minIndent);
+                         let regex = new RegExp("^" + space, 'gm');
+                         result = text.replace(regex, '');
+                         console.assert(result != text);
+                     } else
+                         result = text;
+                     if(moreIndent > 0){
+                         let space = " ".repeat(moreIndent);
+                         let regex = /^(?=\S)/gm;
+                         result = result.replace(regex, space);
+                     }
+                 }
+                 console.error("unindent returns", result);
+                 return result;
+             }
+             return {unindent, getIndent};
+         })();
          window.LP5.modSchedule = (function(){
              function asyncSchedule(func, ...args){
                  function createErrorEvent(error) {
@@ -211,8 +296,8 @@ state home
              const {get} = window.LP5.modIndexedDB;
 
              // Attempt to load and validate a previously saved directory handle
-             async function loadDirParentHandle() {
-                 const handle = await get("handle");
+             async function loadPreviousHandle() {
+                 const handle = await get("lp5PreviousHandle");
                  if (!handle) return null;
 
                  const option = { mode: 'readwrite' };
@@ -229,260 +314,8 @@ state home
                  }
              }
 
-             return { loadDirParentHandle };
+             return { loadPreviousHandle };
          }());
-        </script>
-        <script>
-         window.LP5.modStateMachine = (function(){
-
-             function compileStateMachine(src) {
-                 const lines            = src.split(/\r?\n/);
-                 const preamble         = [];
-                 const definedStates    = new Set();
-                 const referencedStates = new Set();
-                 const stateBodies      = {};
-                 let currentState       = null;
-                 let currentBody        = [];
-                 let seenFirstState     = false;
-                 let openBlock          = false;
-
-                 function flushOpenBlock() {
-                     if (openBlock) {
-                         currentBody.push('        }');
-                         openBlock = false;
-                     }
-                 }
-
-                 function flushState() {
-                     if (!currentState) return;
-                     if (definedStates.has(currentState))
-                         throw new Error(`Duplicate state: ${currentState}`);
-                     definedStates.add(currentState);
-                     stateBodies[currentState] = currentBody.slice();
-                     currentState = null;
-                     currentBody = [];
-                     openBlock = false;
-                 }
-
-                 for (const rawLine of lines) {
-                     if (!seenFirstState && rawLine.trim().startsWith('state ')) {
-                         seenFirstState = true;
-                     }
-                     if (!seenFirstState) {
-                         preamble.push(rawLine);
-                         continue;
-                     }
-
-                     const trimmed = rawLine.trim();
-                     if (trimmed === '') continue;
-
-                     if (trimmed.startsWith('state ')) {
-                         flushOpenBlock();
-                         flushState();
-                         currentState = trimmed.match(/^state\s+(\w+)/)[1];
-                         continue;
-                     }
-
-                     if (!currentState)
-                         throw new Error(`Code found outside of any state: ${rawLine}`);
-
-                     const onMatch = /^\s*on\s+(\*|\w+)/.exec(rawLine);
-                     if (onMatch) {
-                         flushOpenBlock();
-                         const ev = onMatch[1];
-                         currentBody.push(ev === '*'
-                                        ? '        {'
-                                        : `        if (event.type === '${ev}') {`);
-                         openBlock = true;
-                         continue;
-                     }
-
-                     const arrowMatch = /^\s*->\s*(\*|\w+)/.exec(rawLine);
-                     if (arrowMatch) {
-                         const target = arrowMatch[1];
-                         if (target === '*') {
-                             // "-> *" means wait for next event
-                             currentBody.push('        event = yield;');
-                         } else {
-                             referencedStates.add(target);
-                             currentBody.push(`        { state = '${target}'; break; }`);
-                         }
-                         continue;
-                     }
-
-                     currentBody.push('        ' + rawLine);
-                 }
-
-                 flushOpenBlock();
-                 flushState();
-
-                 // Warn about unreachable and undefined states
-                 const unreachable = [...definedStates].filter((s, i) => i > 0 && !referencedStates.has(s));
-                 const undefinedTargets = [...referencedStates].filter(s => !definedStates.has(s));
-                 if (unreachable.length > 0)
-                     console.error(`Unreachable state(s): ${unreachable.join(', ')}`);
-                 if (undefinedTargets.length > 0)
-                     console.error(`-> to undefined state(s): ${undefinedTargets.join(', ')}`);
-
-                 // Build the generator function
-                 const output = [];
-                 output.push('(() => {');
-                 output.push(...preamble);
-                 output.push('  function* machine() {');
-                 output.push(`    let state = '${[...definedStates][0]}';`);
-                 output.push('    let event = null;');
-                 output.push('    while (true) {');
-                 output.push('      event = yield;');
-                 output.push('      switch (state) {');
-
-                 for (const [state, body] of Object.entries(stateBodies)) {
-                     output.push(`        case '${state}':`);
-                     output.push('          {');
-                     output.push(...body);
-                     output.push('          }');
-                     output.push('          break;');
-                 }
-
-                 output.push('      }');
-                 output.push('    }');
-                 output.push('  }');
-                 output.push('  const gen = machine();');
-                 // output.push('  gen.next();');
-                 output.push('  return {');
-                 output.push('    send(event) { gen.next(event); },');
-                 output.push('    currentState() { return state; }');
-                 output.push('  };');
-                 output.push('})()');
-
-                 return output.join('\n');
-             }
-             function compile(){
-                 const machineSource = document.getElementById('lp5StateMachine').textContent;
-                 console.error("machine source", machineSource);
-                 const compiled = compileStateMachine(machineSource);
-                 console.error("compiled machine", compiled);
-                 const machine = eval(compiled);
-                 console.error("MACHINE = ", machine);
-                 return machine;
-             }
-             return compile();
-         })();
-        </script>
-        <script>
-         window.LP5.modStateMachine = (function(){
-             function compileStateMachine(src) {
-                 const lines            = src.split(/\r?\n/);
-                 const output           = [];
-                 const definedStates    = new Set();
-                 const referencedStates = new Set();
-                 const compiledStates   = [];
-                 const preamble         = [];
-
-                 let currentState       = null;
-                 let currentBody        = [];
-                 let openBlock          = false;
-                 let seenFirstState     = false;
-
-                 function flushOpenBlock() {
-                     if (openBlock) {
-                         currentBody.push('  }');
-                         openBlock = false;
-                     }
-                 }
-
-                 function flushState() {
-                     if (!currentState) return;
-                     if (definedStates.has(currentState)) {
-                         throw new Error(`Duplicate state: ${currentState}`);
-                     }
-
-                     definedStates.add(currentState);
-                     output.push(`  function ${currentState}(event) {`);
-                     output.push(...currentBody.map(line => '    ' + line));
-                     output.push(`  }`);
-                     compiledStates.push(currentState);
-                     currentState = null;
-                     currentBody = [];
-                     openBlock = false;
-                 }
-
-                 for (const rawLine of lines) {
-                     if (!seenFirstState && rawLine.trim().startsWith('state ')) {
-                         seenFirstState = true;
-                     }
-
-                     if (!seenFirstState) {
-                         preamble.push(rawLine);
-                         continue;
-                     }
-                     const line = rawLine.trim();
-                     if (line === '') continue;
-
-                     const leadingSpace = rawLine.match(/^\s*/)[0].length;
-
-                     if (line.startsWith('state ')) {
-                         flushOpenBlock();
-                         flushState();
-
-                         const stateMatch = /^state\s+(\w+)/.exec(line);
-                         if (!stateMatch) {
-                             throw new Error(`Malformed state declaration: ${rawLine}`);
-                         }
-                         currentState = stateMatch[1];
-                         continue;
-                     }
-                     if (!currentState)
-                         throw new Error(`Code found outside of any state: ${rawLine}`);
-
-                     const onMatch = /^\s*on\s+(\*|\w+)/.exec(rawLine);
-                     if (onMatch) {
-                         flushOpenBlock();
-                         const ev = onMatch[1];
-                         if (ev === '*') {
-                             currentBody.push(`{`);
-                         } else {
-                             currentBody.push(`if (event.type === '${ev}') {`);
-                         }
-                         openBlock = true;
-                         continue;
-                     }
-
-                     const arrowMatch = /^\s*->\s+(\w+)/.exec(rawLine);
-                     if (arrowMatch) {
-                         const target = arrowMatch[1];
-                         referencedStates.add(target);
-                         currentBody.push(`return '${target}';`);
-                         continue;
-                     }
-
-                     currentBody.push(rawLine);
-                 }
-
-                 flushOpenBlock();
-                 flushState();
-
-                 const unreachable = [...definedStates].filter((s, i) => i > 0 && !referencedStates.has(s));
-                 const undefinedTargets = [...referencedStates].filter(s => !definedStates.has(s));
-
-                 if (unreachable.length > 0)
-                     console.error(`Unreachable state(s): ${unreachable.join(', ')}`);
-                 if (undefinedTargets.length > 0)
-                     console.error(`-> to undefined state(s): ${undefinedTargets.join(', ')}`);
-
-                 output.push(`  return { ${compiledStates.join(', ')} };`);
-                 return ['(() => {', ...preamble, ...output, '})()'].join('\n');
-             }
-             
-             function compile(){
-                 const machineSource = document.getElementById('lp5StateMachine').textContent;
-                 console.error("machine source", machineSource);
-                 const compiled = compileStateMachine(machineSource);
-                 console.error("compiled machine", compiled);
-                 const machine = eval(compiled);
-                 return machine;
-             }
-             return {compile};
-         })();
         </script>
         <script>
          window.LP5.eggGlobals = {
@@ -493,13 +326,11 @@ state home
              model:          null,
              scopedEval:     null,
          };
-         //console.error("eggGlobals ", window.LP5.eggGlobals);
          window.LP5.popup  = {};
          window.LP5.test   = function(){
              document.body.setAttribute("data-test-ran", "yes");
              console.error("TEST!!!"); return true; }
 
-         console.error("LP5 is ", LP5);
          const originalAssert = console.assert;
          console.assert = function(condition, message, ...optionalParams) {
              if (!condition) {
@@ -591,6 +422,7 @@ state home
                  Object.setPrototypeOf(egg.namedNodes, autoNamedNodes);
              }
              #bindEvents(egg){
+                 console.error("#bindEvents egg=", egg);
                  const walk = (node) => {
                      if (node.nodeType !== Node.ELEMENT_NODE) return;
                      for (const attr of node.attributes) {
@@ -944,7 +776,7 @@ state home
                      }
                  }
                  #contextMenuHandler(event){
-                     console.error("contextMenuHandler!!!!!", event);
+                     console.error("TreeView contextMenuHandler!!!!!", event);
                  }
                  #clickHandler(event){
                      event.preventDefault();
@@ -1216,6 +1048,11 @@ state home
                  left: 50%;
                  transform: translate(-50%, -50%);
              }
+             dialog {
+                 border: 2px solid #a0a0a0;
+                 border-radius: 12px; /* Slightly rounded corners */
+                 box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2); /* Soft shadow */
+             }
             </style>
             <dialog>
                 <slot></slot>
@@ -1225,9 +1062,7 @@ state home
              const globals      = containerEgg.globals;
 
              function getTemplate(node){
-                 console.error("getTemplate, node= ", node);
                  const templates = node.querySelectorAll(':scope > template');
-                 console.error(node);
                  console.assert(templates.length === 1,
                                 `<${node.tagName.toLowerCase()}> must contain exactly one direct child <template>`, templates.length);
                  return templates[0];
@@ -1238,22 +1073,18 @@ state home
                  #content;
                  constructor(){
                      super();
+                     // we need a clone for this instance
                      this.#egg    = containerEgg.clone();
                      this.#dialog = this.#egg.namedNodes.dialog;
                      const contentNodes = this.#egg.namedNodes.slot.assignedNodes();
-                     console.error("constructor of ", this, contentNodes, contentNodes.length);
+                     // our content is also an egg!
                      const t = getTemplate(this);
-                     console.error("the egg!", LP5.Egg);
                      const contentEgg = LP5.Egg.instance(t);
 //                     this.#content = globals.scopedEval(contentEgg.script.textContent, "foo", globals);
-                     console.error("contentEgg is", t, contentEgg);
                      const shadow = this.attachShadow({mode:'open',delegatesFocus:true});
-
                      shadow.append(contentEgg.style);
                      shadow.append(this.#egg.style);
                      
-                     console.error("t.nodes", contentEgg.children);
-
                      shadow.append(this.#dialog);
                      this.#egg.namedNodes.slot.replaceWith(
                          ... contentEgg.children
@@ -1261,12 +1092,12 @@ state home
                  }
                  connectedCallback(){
                      const contentNodes = this.#egg.namedNodes.slot.assignedNodes();
-                     console.error("connectedCallback of ", this, contentNodes, contentNodes.length);
+                     console.error("lp5-dialog connectedCallback of ", this, contentNodes, contentNodes.length);
 
-                     console.error("child2", this.childNodes);
+                     console.error("lp5-dialog child2", this.childNodes);
                  }
                  show(){
-                     console.error("Show!!!", this.#dialog);
+                     console.error("lp5-dialog Show!!!", this.#dialog);
                      this.#dialog.show();
                  }
                  render(){
@@ -1695,6 +1526,101 @@ state home
                 </script>
             </template>
         </lp5-dialog>
+        <lp5-dialog data-popup="lp5-selectorcreate">
+            <template>
+                <style>
+                 .dialog-content {
+                     max-width: 400px;
+                     padding: 0rem;
+                     margin: auto;
+                     text-align: center;
+                 }
+
+                 .dialog-content h2 {
+                     margin: 0.5rem;
+                     margin-top: 0rem;
+                     font-size: 1.25rem;
+                 }
+
+                 .dialog-content p {
+                     margin-bottom: 1.5rem;
+                     color: #555;
+                 }
+
+                 .dialog-buttons {
+                     display: flex;
+                     justify-content: center;
+                     gap: 1rem;
+                     margin-top: .5rem;
+                 }
+
+                 .dialog-buttons button {
+                     padding: 0.6rem 1.2rem;
+                     font-size: 1rem;
+                     border: 1px solid #888;
+                     border-radius: 4px;
+                     background: #f5f5f5;
+                     cursor: pointer;
+                 }
+
+                 .dialog-buttons button:hover {
+                     background: #e0e0e0;
+                 }
+
+                 .dialog-buttons button:focus {
+                     outline: 2px solid #4a90e2;
+                 }
+
+                 @media (max-width: 360px) {
+                     .dialog-buttons {
+                         flex-direction: column;
+                         gap: 0.75rem;
+                     }
+                 }
+                 ::backdrop {
+                     background-image: linear-gradient(
+                         45deg,
+                         magenta,
+                         rebeccapurple,
+                         dodgerblue,
+                         green
+                     );
+                     opacity: 0.75;
+                 }
+                </style>
+                <div class="dialog-content">
+                    <h2>Select or Create a Project</h2>
+                    <div class="dialog-buttons">
+                        <button autofocus @click="clickSelect">
+                            Select
+                        </button>
+                        <button @click="clickCreate">
+                            Create
+                        </button>
+                    </div>
+                </div>
+                <script>
+                 const egg                   = this;
+                 const {publish}             = window.LP5.controller;
+
+                 console.error("SelectParentDialog code!");
+                 function render(){
+                     console.error("SelectOrCreate render!!!!!!");
+                 };
+                 render();
+                 function clickSelect(event){
+                     console.error("clickSelect******************");
+                     publish('lp5SelectProject');
+                 }
+                 function clickCreate(event){
+                     publish('lp5CreateProject');
+                 }
+
+                 return  { render, clickSelect, clickCreate };
+                </script>
+            </template>
+        </lp5-dialog>
+
         <template data-name="PickOrCreateProject">
             <div>
                 <dialog id="PickOrCreateProject">
@@ -2842,7 +2768,7 @@ state home
                                      if(targets)
                                          for(const target of targets){
                                              (this.referencedBy[target] ??= []).
-                                     push(article);
+                                          push(article);
                                          }
                                  }
                              }
@@ -3658,10 +3584,9 @@ state home
                          }
                      };
                  }
-                 console.error("machine=", controller.state, LP5.stateMachine[controller.state]);
-                 let nextState = LP5.stateMachine[controller.state](event);
-                 if(!(nextState in LP5.stateMachine))
-                     console.error("Unknown state: ", nextState);
+                 if(!window.LP5.views)
+                     console.error("views not defined!!!!!!");
+                 let nextState = window.LP5.modStateMachine.send(event);
                  console.error("nextState = ", nextState);
                  //                 if(nextState !== controller.state)
                  //                     machine[nextState]('@enter', event);
@@ -3933,36 +3858,7 @@ state home
                  console.log("<<<<<<<<<<<<<<<<<<<<<<<<<exit controller: ", controller.state);
              }
 
-             [
-                 'lp5AsyncComplete',
-                 'cancel',
-                 'change',
-                 'click',
-                 //                 'close',
-                 'closeDialog',
-                 'contextmenu',
-                 'command',
-                 'DataCloneError',
-                 // 'lp5-treeview:select',
-                 'lp5ArticleContext',
-                 'lp5DialogSave',
-                 'lp5DialogCancel',
-                 'lp5NavSelect',
-                 'lp5SelectParentDir',
-                 'lp5UsePreviousParentDir',
-                 'error',
-                 'hashchange',
-                 'input',
-                 'keydown',
-                 'load',
-                 //                 'mousemove',
-                 'reload',
-                 'saveArticle',
-                 'selectProject',
-                 'SelectArticle',
-                 'SyntaxError',
-                 'unhandledrejection',
-             ].forEach(e=>window.addEventListener(
+             window.LP5.events.forEach(e=>window.addEventListener(
                  e,
                  controller,
                  true));
@@ -4275,6 +4171,8 @@ state home
                  }
 
                  eventPublish(eventName, eventDetail){
+                     console.assert(window.LP5.events.has(eventName),
+                                    `${eventName}: not a defined event`);
                      let iView = this;
                      while(iView.parentView)
                          iView = iView.parentView;
@@ -4694,7 +4592,7 @@ state home
                  for(const article of model.tocOrder){
                      if(article.code){
                          (articlesFromName[article.getCodeName()] ??= []).
-                                          push(article);
+                               push(article);
                          const name = article.getCodeName();
                          for(const item of article.codeParsed){
                              //                             console.log(`'${name}' '${item}'`, name, item);
@@ -4912,7 +4810,142 @@ state home
              }
              controller.model = model;
          }();
-         window.LP5.stateMachine = window.LP5.modStateMachine.compile();
+         //         window.LP5.stateMachine = window.LP5.modStateMachine.compile();
+        </script>
+        <script>
+         window.LP5.modStateMachine = (function(){
+             function compileStateMachine(src) {
+                 const {unindent}       = window.LP5.modString;
+                 const lines            = src.split(/\r?\n/);
+                 const preamble         = [];
+                 const definedStates    = new Set();
+                 const referencedStates = new Set();
+                 const stateBodies      = {};
+                 let currentState       = null;
+                 let currentBody        = [];
+                 let seenFirstState     = false;
+                 let openBlock          = false;
+
+                 function flushOpenBlock() {
+                     if (openBlock) {
+                         currentBody.push('        }');
+                         openBlock = false;
+                     }
+                 }
+                 function flushState() {
+                     if (!currentState) return;
+                     if (definedStates.has(currentState))
+                         throw new Error(`Duplicate state: ${currentState}`);
+                     definedStates.add(currentState);
+                     stateBodies[currentState] = currentBody.slice();
+                     currentState = null;
+                     currentBody = [];
+                     openBlock = false;
+                 }
+                 for (const rawLine of lines) {
+                     if (!seenFirstState && rawLine.trim().startsWith('state ')) {
+                         seenFirstState = true;
+                     }
+                     if (!seenFirstState) {
+                         preamble.push(rawLine);
+                         continue;
+                     }
+                     const trimmed = rawLine.trim();
+                     if (trimmed === '') continue;
+                     if (trimmed.startsWith('state ')) {
+                         flushOpenBlock();
+                         flushState();
+                         currentState = trimmed.match(/^state\s+(\w+)/)[1];
+                         continue;
+                     }
+                     if (!currentState)
+                         throw new Error(`Code found outside of any state: ${rawLine}`);
+                     const onMatch = /^\s*on\s+(\*|\w+)/.exec(rawLine);
+                     if (onMatch) {
+                         flushOpenBlock();
+                         const ev = onMatch[1];
+                         currentBody.push(ev === '*'
+                                        ? '        {'
+                                        : `        if (event.type === '${ev}') {`);
+                         openBlock = true;
+                         continue;
+                     }
+                     const arrowMatch = /^\s*->\s*(\*|\w+)/.exec(rawLine);
+                     if (arrowMatch) {
+                         const target = arrowMatch[1];
+                         if (target === '*') {
+                             // "-> *" means wait for next event
+                             currentBody.push('        event = yield state;');
+                         } else {
+                             referencedStates.add(target);
+                             currentBody.push(`        { state = '${target}'; break; }`);
+                         }
+                         continue;
+                     }
+
+                     currentBody.push('        ' + rawLine);
+                 }
+
+                 flushOpenBlock();
+                 flushState();
+
+                 // Warn about unreachable and undefined states
+                 const unreachable = [...definedStates].filter((s, i) => i > 0 && !referencedStates.has(s));
+                 const undefinedTargets = [...referencedStates].filter(s => !definedStates.has(s));
+                 if (unreachable.length > 0)
+                     console.error(`Unreachable state(s): ${unreachable.join(', ')}`);
+                 if (undefinedTargets.length > 0)
+                     console.error(`-> to undefined state(s): ${undefinedTargets.join(', ')}`);
+                 // Build the generator function
+                 const output = [];
+                 output.push('(() => {');
+                 output.push(`  let state = '${[...definedStates][0]}';`);
+                 output.push('  function* machine() {');
+                 //                 output.push('yield;');
+                 output.push(unindent(preamble.join('\n'), 4));
+//                 output.push(...preamble);
+                 output.push('    let event = null;');
+                 output.push('    while (true) {');
+                 output.push('      console.warn("state, event=",state,event);');
+                 output.push('      event = yield state;');
+                 output.push('      switch (state) {');
+
+                 for (const [state, body] of Object.entries(stateBodies)) {
+                     output.push(`        case '${state}':`);
+                     output.push('          {');
+                     output.push(...body);
+                     output.push('          }');
+                     output.push('          break;');
+                 }
+                 output.push('      default: console.error("unknown state:", state)');
+                 output.push('      }');
+                 output.push('    }');
+                 output.push('  }');
+                 output.push('  const gen = machine();');
+                 output.push('  function send(event){');
+                 output.push('    console.error("send ", event);');
+                 output.push('    gen.next(event); return state;');
+                 output.push('}');
+                 output.push('  send();');
+                 output.push('  return {');
+                 output.push('    send(event) { console.error("send ", event); gen.next(event); return state;},');
+                 //                 output.push('    currentState() { return state; }');
+                 output.push('  };');
+                 output.push('})()');
+
+                 return output.join('\n');
+             }
+             function compile(){
+                 const machineSource = document.getElementById('lp5StateMachine').textContent;
+                 console.error("machine source", machineSource);
+                 const compiled = compileStateMachine(machineSource);
+                 console.error("compiled machine", compiled);
+                 const machine = eval(compiled);
+                 console.error("MACHINE = ", machine);
+                 return machine;
+             }
+             return compile();
+         })();
         </script>
     </body>
 </html>
