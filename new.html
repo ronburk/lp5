@@ -4818,7 +4818,7 @@ state home
              function insertCode(startState, preamble, states){
                  const result =
 `
-(() => {
+//(() => {
 //# sourceURL=stateMachine
 let state = '${startState}';
 function* machine() {
@@ -4842,7 +4842,7 @@ send();
 return {
     send
   };
-})()
+//})()
 `;
                  return result;
              }
@@ -4968,127 +4968,6 @@ return {
                  console.error("sourceIndent = ", sourceIndent);
                  parse(lines, pass2);
                  return insertCode(startState, preamble, states);
-             }
-             function compileStateMachine2(src) {
-                 const {unindent}       = window.LP5.modString;
-                 const lines            = src.split(/\r?\n/);
-                 const preamble         = [];
-                 const definedStates    = new Set();
-                 const referencedStates = new Set();
-                 const stateBodies      = {};
-                 let currentState       = null;
-                 let currentBody        = [];
-                 let seenFirstState     = false;
-                 let openBlock          = false;
-
-                 function flushOpenBlock() {
-                     if (openBlock) {
-                         currentBody.push('        }');
-                         openBlock = false;
-                     }
-                 }
-                 function flushState() {
-                     if (!currentState) return;
-                     if (definedStates.has(currentState))
-                         throw new Error(`Duplicate state: ${currentState}`);
-                     definedStates.add(currentState);
-                     stateBodies[currentState] = currentBody.slice();
-                     currentState = null;
-                     currentBody = [];
-                     openBlock = false;
-                 }
-                 for (const rawLine of lines) {
-                     if (!seenFirstState && rawLine.trim().startsWith('state ')) {
-                         seenFirstState = true;
-                     }
-                     if (!seenFirstState) {
-                         preamble.push(rawLine);
-                         continue;
-                     }
-                     const trimmed = rawLine.trim();
-                     if (trimmed === '') continue;
-                     if (trimmed.startsWith('state ')) {
-                         flushOpenBlock();
-                         flushState();
-                         currentState = trimmed.match(/^state\s+(\w+)/)[1];
-                         continue;
-                     }
-                     if (!currentState)
-                         throw new Error(`Code found outside of any state: ${rawLine}`);
-                     const onMatch = /^\s*on\s+(\*|\w+)/.exec(rawLine);
-                     if (onMatch) {
-                         flushOpenBlock();
-                         const ev = onMatch[1];
-                         currentBody.push(ev === '*'
-                                        ? '        {'
-                                        : `        if (event.type === '${ev}') {`);
-                         openBlock = true;
-                         continue;
-                     }
-                     const arrowMatch = /^\s*->\s*(\*|\w+)/.exec(rawLine);
-                     if (arrowMatch) {
-                         const target = arrowMatch[1];
-                         if (target === '*') {
-                             // "-> *" means wait for next event
-                             currentBody.push('        event = yield state;');
-                         } else {
-                             referencedStates.add(target);
-                             currentBody.push(`        { state = '${target}'; break; }`);
-                         }
-                         continue;
-                     }
-
-                     currentBody.push('        ' + rawLine);
-                 }
-
-                 flushOpenBlock();
-                 flushState();
-
-                 // Warn about unreachable and undefined states
-                 const unreachable = [...definedStates].filter((s, i) => i > 0 && !referencedStates.has(s));
-                 const undefinedTargets = [...referencedStates].filter(s => !definedStates.has(s));
-                 if (unreachable.length > 0)
-                     console.error(`Unreachable state(s): ${unreachable.join(', ')}`);
-                 if (undefinedTargets.length > 0)
-                     console.error(`-> to undefined state(s): ${undefinedTargets.join(', ')}`);
-                 // Build the generator function
-                 const output = [];
-                 output.push('(() => {');
-                 output.push(`  let state = '${[...definedStates][0]}';`);
-                 output.push('  function* machine() {');
-                 //                 output.push('yield;');
-                 output.push(unindent(preamble.join('\n'), 4));
-//                 output.push(...preamble);
-                 output.push('    let event = null;');
-                 output.push('    while (true) {');
-                 output.push('      console.warn("state, event=",state,event);');
-                 output.push('      event = yield state;');
-                 output.push('      switch (state) {');
-
-                 for (const [state, body] of Object.entries(stateBodies)) {
-                     output.push(`        case '${state}':`);
-                     output.push('          {');
-                     output.push(...body);
-                     output.push('          }');
-                     output.push('          break;');
-                 }
-                 output.push('      default: console.error("unknown state:", state)');
-                 output.push('      }');
-                 output.push('    }');
-                 output.push('  }');
-                 output.push('  const gen = machine();');
-                 output.push('  function send(event){');
-                 output.push('    console.error("send ", event);');
-                 output.push('    gen.next(event); return state;');
-                 output.push('}');
-                 output.push('  send();');
-                 output.push('  return {');
-                 output.push('    send(event) { console.error("send ", event); gen.next(event); return state;},');
-                 //                 output.push('    currentState() { return state; }');
-                 output.push('  };');
-                 output.push('})()');
-
-                 return output.join('\n');
              }
              function compile(){
                  const machineSource = document.getElementById('lp5StateMachine').textContent;
