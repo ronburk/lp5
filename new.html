@@ -87,7 +87,7 @@ state home
 
         <script>
          "use strict";
-         
+
          window.LP5 = {
          };
          window.LP5.events = new Set( [
@@ -153,7 +153,7 @@ state home
              function getIndent(line){
                  let indent = -1;
                  line = line.replace(/\s+$/,'');
-                 if(line.length)
+                 if(line.length > 0)
                      indent = line.search(/\S|$/);
                  return indent;
              }
@@ -4814,7 +4814,162 @@ state home
         </script>
         <script>
          window.LP5.modStateMachine = (function(){
+
+             function insertCode(startState, preamble, states){
+                 const result =
+`
+(() => {
+//# sourceURL=stateMachine
+let state = '${startState}';
+function* machine() {
+    ${preamble.join('\n')}
+    let event = null;
+    while (true) {
+        console.warn("state, event=",state,event);
+        event = yield state;
+        switch (state) {
+${states}
+        default: console.error("unknown state:", state);
+        }
+    }
+}
+const gen = machine();
+function send(event){
+    console.error("send ", event);
+    gen.next(event); return state;
+}
+send();
+return {
+    send
+  };
+})()
+`;
+                 return result;
+             }
+
+             const definedStates    = new Set();
+             const referencedStates = new Set();
+             let   sourceIndent     = Infinity;
+             const preamble         = [];
+             let   states           = "";
+             let   startState       = null;
+             function columnOfTarget(line) {
+                 const arrow = line.indexOf('->');
+                 if (arrow === -1) return -1;      // no arrow
+                 let i = arrow + 2;     // just after the ‘->’
+                 while (i < line.length && line[i] === ' ') i++;
+                 return i; // this is the column where “*” or your identifier starts
+             }
+
+             function indent(indent, more){
+                 return ' '.repeat(indent) + more;
+             }
+             function stripIndent(s){
+                 let result = s;
+                 if(s.startsWith(' '.repeat(sourceIndent)))
+                     result = s.slice(sourceIndent);
+                 return result;
+             }
+             const pass1 = {
+                 doState(line, stateName) {definedStates.add(stateName); },
+                 doGoto(line, targetState) {referencedStates.add(targetState);},
+                 doOther(line) {
+                     const indent = window.LP5.modString.getIndent(line);
+                     if (indent >= 0)
+                         sourceIndent = Math.min(sourceIndent, indent);
+                 }
+             };
+             const pass2 = {
+                 firstState: null,
+                 firstEvent: true,
+                 closeEvent(){
+                     if(!this.firstEvent)
+                         states += indent(16, `}\n`);
+                 },
+                 closeState(){
+                     states += indent(12, `}\n`);
+                     states += indent(12, `break;\n`);
+                 },
+                 doPreamble(line) {
+                     line = stripIndent(line);
+                     preamble.push(indent(4,line));
+                 },
+                 doState(line, stateName) {
+                     if(this.firstEvent !== true)
+                         this.closeEvent();
+                     this.firstEvent = true;
+                     if(this.firstState !== null)
+                         this.closeState();
+                     else
+                         this.firstState = stateName;
+                     states += indent(8, `case '${stateName}': {\n`);
+                 },
+                 doOnEvent(line, eventName) {
+                     let elseMaybe  = this.firstEvent ? "" :"else ";
+                     let matchEvent = 'true';
+                     if(eventName !== '*')
+                         matchEvent = `event.type === '${eventName}'`;
+                     this.closeEvent();
+                     states += indent(12,`${elseMaybe}if(${matchEvent}) {\n`);
+                     this.firstEvent = false;
+                 },
+                 doGoto(line, targetState) {
+                     let column = columnOfTarget(line) - sourceIndent;
+                     if(column < 0) column = 0;
+                     let text = ""
+                     if(targetState === "*")
+                         text = `event = yield state\n`;
+                     else
+                         text = `{state = '${targetState}'; break; }\n`;
+                     states += indent(column + 12, text);
+                 },
+                 doOther(line) {
+                     let thisIndent = 4;
+                     if(!this.firstEvent)
+                         thisIndent += 4;
+                     states += indent(thisIndent,line) + "\n";
+                 },
+                 doEof(){
+                     this.closeEvent();
+                     this.closeState();
+                 }
+             };
+
+             function parse(lines, actions) {
+                 const stateRegex = /^\s*state\s+(\w+)/;
+                 const onRegex    = /^\s*on\s+(\*|\w+)/;
+                 const gotoRegex  = /^\s*->\s*(\*|\w+)/;
+
+                 startState = null
+                 for (let i = 0; i < lines.length; i++) {
+                     const line = lines[i];
+                     let match;
+
+                     if (match = stateRegex.exec(line)) {
+                         if(startState === null)
+                             startState = match[1];
+                         actions.doState?.(line, match[1]);
+                     } else if (match = onRegex.exec(line)) {
+                         actions.doOnEvent?.(line, match[1]);
+                     } else if (match = gotoRegex.exec(line)) {
+                         actions.doGoto?.(line, match[1], i);
+                     } else if(startState === null) {
+                         actions.doPreamble?.(line, i);
+                     } else {
+                         actions.doOther?.(line, i);
+                     }
+                 }
+                 actions.doEof?.();
+             }
+
              function compileStateMachine(src) {
+                 const lines            = src.split(/\r?\n/);
+                 parse(lines, pass1);
+                 console.error("sourceIndent = ", sourceIndent);
+                 parse(lines, pass2);
+                 return insertCode(startState, preamble, states);
+             }
+             function compileStateMachine2(src) {
                  const {unindent}       = window.LP5.modString;
                  const lines            = src.split(/\r?\n/);
                  const preamble         = [];
@@ -4940,9 +5095,13 @@ state home
                  console.error("machine source", machineSource);
                  const compiled = compileStateMachine(machineSource);
                  console.error("compiled machine", compiled);
-                 const machine = eval(compiled);
+                 // const machine = eval(compiled);
+                 LP5.controller.script     = compiled;
+                 LP5.controller.scriptName = "stateMachineCode";
+                 const machine             = new Function(compiled);
+                 LP5.controller.script     = null;
                  console.error("MACHINE = ", machine);
-                 return machine;
+                 return machine();
              }
              return compile();
          })();
