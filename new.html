@@ -35,8 +35,7 @@ state load
 
 state selectOrCreateProject
     on  lp5SelectProject
-        // The picker must be invoked while the click still has user activation.
-        const selection = window.LP5.modFileSystem.showDirectoryPicker();
+        const selection = event.detail;
         asyncSchedule(() => selection);
     ->  awaitProjectPicker
     on  lp5CreateProject
@@ -44,9 +43,13 @@ state selectOrCreateProject
 
 state awaitProjectPicker
     on  lp5AsyncComplete
-        if(!event.detail)
+        const {handle, error} = event.detail;
+        if(error) {
+            console.error('Directory picker failed:', error);
+            views.dialog.shadowRoot.querySelector('[data-name="selectionError"]').textContent =
+                `Could not select project: ${error.name}: ${error.message}`;
     ->      selectOrCreateProject
-        const handle = event.detail;
+        }
         console.assert(handle.kind === 'directory');
         model.projects[handle.name] = {dirHandle: handle};
         asyncSchedule(model.openProject.bind(model), handle.name);
@@ -103,15 +106,7 @@ state home
          ]);
              window.LP5.modFileSystem = (function(){
                  async function showDirectoryPicker(){
-                 let handle  = null;
-                 try {
-                     handle  = await window.showDirectoryPicker({mode:'readwrite'});
-                 } catch(error) {
-                     if(error.name != "AbortError"){
-                         console.error("Unexpected error:", error);
-                     }
-                 }
-                 return handle;
+                 return window.showDirectoryPicker({mode:'readwrite'});
              }
              async function scanDir(parentHandle, match) {
                  const result = {};
@@ -1581,6 +1576,7 @@ state home
                             Create
                         </button>
                     </div>
+                    <p data-name="selectionError" role="alert"></p>
                 </div>
                 <script>
                  const egg                   = this;
@@ -1592,8 +1588,10 @@ state home
                  };
                  render();
                  function clickSelect(event){
-                     console.error("clickSelect******************");
-                     publish('lp5SelectProject');
+                     egg.namedNodes.selectionError.textContent = '';
+                     const selection = window.LP5.modFileSystem.showDirectoryPicker()
+                         .then(handle => ({handle}), error => ({error}));
+                     publish('lp5SelectProject', selection);
                  }
                  function clickCreate(event){
                      publish('lp5CreateProject');
