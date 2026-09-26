@@ -27,59 +27,38 @@
 <script type="text/state-machine" id="lp5StateMachine">
         const {asyncSchedule} = window.LP5.modSchedule;
         const {views, model}  = window.LP5;
-state   load
-        const {loadPreviousHandle} = window.LP5.modStorage;
+state load
         views.loadTemplates();
         views.change('home');
-        // if we have previous dir handle, fetch it
-        asyncSchedule(loadPreviousHandle);
-    ->  * 
-        if(event.detail !== null) // if no previous handle
-    ->      home
         views.popup('lp5-selectorcreate');
     ->  selectOrCreateProject
 
-state   selectOrCreateProject
-        const {showDirectoryPicker} = window.LP5.modFileSystem;
+state selectOrCreateProject
     on  lp5SelectProject
-        asyncSchedule(showDirectoryPicker);
-    ->*
-        if(event.detail)
-    ->      loadProject
+        // The picker must be invoked while the click still has user activation.
+        const selection = window.LP5.modFileSystem.showDirectoryPicker();
+        asyncSchedule(() => selection);
+    ->  awaitProjectPicker
     on  lp5CreateProject
         views.popup('lp5-createproject');
 
-state   awaitDirHandleLoad
+state awaitProjectPicker
     on  lp5AsyncComplete
+        if(!event.detail)
+    ->      selectOrCreateProject
         const handle = event.detail;
-        console.assert(handle == null || handle instanceof FileSystemDirectoryHandle);
-        window.LP5.model.dirParentHandle = handle;
-        asyncSchedule(() => model.scanForProjects());
-    ->*
-        console.error("got async complete?", event);
-    ->  awaitScanForProjects
-        views.popup('lp5-selectparent');
-    ->  selectParent;
+        console.assert(handle.kind === 'directory');
+        model.projects[handle.name] = {dirHandle: handle};
+        asyncSchedule(model.openProject.bind(model), handle.name);
+    ->  awaitProjectLoad
 
-state   awaitScanForProjects
+state awaitProjectLoad
     on  lp5AsyncComplete
-    ->  awaitScanForProjects
-
-state   selectParent
-    on  lp5SelectParentDir
-        asyncSchedule(window.LP5.modFileSystem.showDirectoryPicker)
-    ->  awaitDirectoryPicker
-    on  lp5UsePreviousParentDir
-        const {model} = window.LP5;
-        asyncSchedule(model.openProject.bind(model), "??");
+        model.updateDerivedState();
+        views.close();
+        views.render();
     ->  home
-    on  *
-    ->  selectParent
-state awaitDirectoryPicker
-    on  lp5AsyncComplete
-        if(event.detail === null)
-    ->      awaitDirectoryPicker
-        console.assert(event.detail instanceof FileSystemDirectoryHandle);
+
 state home
     on  *
     ->  home
@@ -1099,6 +1078,10 @@ state home
                  show(){
                      console.error("lp5-dialog Show!!!", this.#dialog);
                      this.#dialog.show();
+                 }
+                 close(){
+                     this.#dialog.close();
+                     this.remove();
                  }
                  render(){
                  }
@@ -4270,7 +4253,7 @@ state home
                          return scriptNode;
                      }
 
-                     let templates = rootElement.querySelectorAll(':scope > template');
+                     let templates = rootElement.querySelectorAll(parentView ? 'template' : ':scope > template');
                      //                     console.log(`${templates.length} templates in document`);
                      window.MyTemplates = {};
 
