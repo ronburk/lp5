@@ -106,7 +106,7 @@ state home
          ]);
              window.LP5.modFileSystem = (function(){
                  async function showDirectoryPicker(){
-                 return window.showDirectoryPicker({mode:'readwrite'});
+                 return window.showDirectoryPicker({mode:'read'});
              }
              async function scanDir(parentHandle, match) {
                  const result = {};
