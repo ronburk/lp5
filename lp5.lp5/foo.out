@@ -1,0 +1,32 @@
+
+<!doctype html>
+<!-- a comment   -->
+<html lang="en">
+    <head>
+        <meta charset="utf-8" >
+        <title>lp5</title>
+        <style>
+            
+            div.epigraph  {
+                display: flex;
+                justify-content: flex-end;
+                flex-flow: wrap;
+            }
+            div.epigraph > div {
+                max-width: 27em;
+            }
+            div.epigraph  hr { width:100%; display:none;}
+            
+                    
+            stuff;
+            
+                    
+        </style>
+    </head>
+    <body>
+        <script>
+        </script>
+    </body>
+</html>
+
+        
