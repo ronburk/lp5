@@ -1,12 +1,12 @@
 # lp5 Agent Instructions
 
-Before making changes, check for an existing lp5 checkout. If there is no usable checkout, clone the public repository:
+Use the existing agent-specific lp5 checkout; an extra Git worktree is unnecessary when that checkout is isolated. If there is no usable checkout, clone the public repository:
 
 ```sh
 git clone https://github.com/ronburk/lp5.git lp5
 ```
 
-Preserve unrelated local changes. Verify the checkout's branch and commit against GitHub before editing. Use the GitHub connector for remote writes when available.
+Before editing, fetch from GitHub and verify the checkout's branch and base commit. Preserve unrelated local changes and use a task-specific branch. Before merging a PR, fetch again; if `main` has advanced, update the branch and rerun relevant checks. Merge only when the PR is conflict-free. Use the GitHub connector for remote writes when available.
 
 ## Install xsltproc
 
