@@ -37,6 +37,13 @@ apt-get -o APT::Sandbox::User=root \
 
 ## Article terminology and format
 
-An **article** is one `.lp5` file. Its XML document has a `<template>` root. An article contains sections such as `<explanation>` and `<code>`; `<heading>` (article title), `<name>` (code-section name), and `<children>` (links to child articles using `<li id="…lp5">`) are metadata or structure, not sections.
+An **article** is one `.lp5` file. Each file is an XML document with one `<template>` root. The root may contain at most one each of these direct children, in any order:
 
-In `<code>`, CDATA holds literal code and `<lp5- ref="…"/>` marks a code reference. The older `<script>` code-section format still appears in some articles. No separate convention for HTML formatting inside code has been established.
+- `<children>` (optional): contains child-article links as `<li id="name.lp5">`.
+- `<heading>` (optional): the article's display title.
+- `<lp5-explanation>` (optional): the article's explanatory HTML/XML content. Inline HTML `<code>` elements here are ordinary inline code.
+- `<lp5-code>` (optional): one code fragment, containing exactly one `<name>` and one `<code>` child.
+
+When `<lp5-code>` is present, `<name>` is required but may be empty; an empty name denotes an unnamed/root fragment. `<code>` is required and may be empty. Its children must be CDATA sections containing literal code or XML elements whose names start with `lp5-` (for example, `<lp5- ref="name">`) representing code directives/references. Ordinary literal code belongs in CDATA; whitespace between child nodes is formatting whitespace.
+
+The `<lp5-code>` wrapper distinguishes the code fragment from inline `<code>` markup in the explanation. If an article has no code fragment, omit `<lp5-code>` rather than writing an empty one.
