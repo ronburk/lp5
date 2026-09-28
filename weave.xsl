@@ -6,15 +6,16 @@
        xsltproc -o weave.xml weave.xsl lp5.lp5/lp5.lp5
 
      The result is an index for source-navigation tools, not tangled output.
-     Each article is emitted in preorder. Article IDs are filenames, and
-     fragments are listed separately so callers can find definitions by name.
+     Each article is emitted in preorder, with the root article first. Article
+     IDs are filenames, and code sections are listed separately so callers can
+     find definitions by name.
      Code text and lp5-* reference
      elements retain their original order and content.
 
      The input file is the root article. Its directory is the base for
      document() lookups, so no directory parameter is needed. This first pass
      uses this repository's convention that the root article is lp5.lp5 and
-     the root chunk is unnamed.
+     the root bundle is unnamed.
 
      Article validation is imported from tangle.xsl so both transforms apply
      the same on-disk format rules to each article that exists. Missing child
@@ -39,19 +40,19 @@
         </xsl:call-template>
 
         <lp5-weave version="1">
-            <!-- Identify both the starting article and the chunk tangle begins. -->
-            <root article="lp5.lp5" chunk=""/>
-
-            <!-- Store article contents and direct-child relationships in one list. -->
+            <!-- Article order is preorder, so the first article is the root. -->
+            <xsl:text>&#10;  </xsl:text>
             <articles>
                 <xsl:call-template name="emit-articles">
                     <xsl:with-param name="document" select="."/>
                     <xsl:with-param name="location" select="'lp5.lp5'"/>
                     <xsl:with-param name="visited" select="'|'"/>
                 </xsl:call-template>
+                <xsl:text>&#10;  </xsl:text>
             </articles>
 
-            <!-- Build a lookup list from canonical fragment names to article files. -->
+            <!-- Build a lookup list from bundle names to their code sections. -->
+            <xsl:text>&#10;  </xsl:text>
             <chunks>
                 <xsl:call-template name="index-chunks">
                     <xsl:with-param name="document" select="."/>
@@ -59,7 +60,9 @@
                     <xsl:with-param name="visited" select="'|'"/>
                 </xsl:call-template>
             </chunks>
+            <xsl:text>&#10;</xsl:text>
         </lp5-weave>
+        <xsl:text>&#10;</xsl:text>
     </xsl:template>
 
     <!--
@@ -112,17 +115,22 @@
         <xsl:param name="visited"/>
 
         <xsl:if test="not(contains($visited, concat('|', $location, '|')))" >
+            <xsl:text>&#10;    </xsl:text>
             <article file="{$location}">
-                <!-- Preserve article data and the distinction between inline code
-                     in explanations and the separately wrapped code fragment. -->
-                <xsl:copy-of select="$document/template/heading"/>
-                <xsl:copy-of select="$document/template/section[@data-lp5-kind='explanation']"/>
-                <xsl:copy-of select="$document/template/section[@data-lp5-kind='code']"/>
+                <!-- Preserve source order, leaving each section's contents intact. -->
+                <xsl:for-each select="$document/template/heading |
+                        $document/template/section[@data-lp5-kind='explanation'] |
+                        $document/template/section[@data-lp5-kind='code']">
+                    <xsl:text>&#10;      </xsl:text>
+                    <xsl:copy-of select="."/>
+                </xsl:for-each>
 
                 <!-- Child IDs are filenames relative to the article directory. -->
+                <xsl:text>&#10;      </xsl:text>
                 <children>
                     <xsl:for-each select="$document/template/children/li">
                         <xsl:variable name="child-document" select="document(string(@id), .)"/>
+                        <xsl:text>&#10;        </xsl:text>
                         <child>
                             <xsl:attribute name="file"><xsl:value-of select="@id"/></xsl:attribute>
                             <xsl:attribute name="status">
@@ -133,7 +141,11 @@
                             </xsl:attribute>
                         </child>
                     </xsl:for-each>
+                    <xsl:if test="$document/template/children/li">
+                        <xsl:text>&#10;      </xsl:text>
+                    </xsl:if>
                 </children>
+                <xsl:text>&#10;    </xsl:text>
             </article>
 
             <!-- Visit child articles in the exact order given by <children>. -->
