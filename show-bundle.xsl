@@ -31,10 +31,17 @@
         <bundle name="{$canonical-name}">
             <xsl:for-each select="$definitions">
                 <!-- Keep the existing article element name and its content. -->
+                <xsl:text>&#10;  </xsl:text>
                 <lp5-code article="{../@file}">
-                    <xsl:copy-of select="node()"/>
+                    <!-- Format the section metadata, but copy code unchanged. -->
+                    <xsl:text>&#10;    </xsl:text>
+                    <xsl:copy-of select="name"/>
+                    <xsl:text>&#10;    </xsl:text>
+                    <xsl:copy-of select="code"/>
+                    <xsl:text>&#10;  </xsl:text>
                 </lp5-code>
             </xsl:for-each>
+            <xsl:text>&#10;</xsl:text>
         </bundle>
     </xsl:template>
 </xsl:stylesheet>
