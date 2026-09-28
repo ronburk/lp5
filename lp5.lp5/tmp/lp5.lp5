@@ -1,15 +1,18 @@
 <template>
-    <ul>
+    <children>
         <li id="1.lp5"/>
-        <li id ="3.lp5"/>
+        <li id="3.lp5"/>
         <li id="4.lp5"/>
         <li id="2.lp5"/>
-    </ul>
-    <section>
-        <h2>lp5 - decompositional explanatory programming.</h2>
+    </children>
+    <heading>lp5 - decompositional explanatory programming.</heading>
+    <lp5-explanation>
         <div>
         </div>
+    </lp5-explanation>
+    <lp5-code>
+        <name/>
         <code><![CDATA[
         ]]></code>
-    </section>
+    </lp5-code>
 </template>

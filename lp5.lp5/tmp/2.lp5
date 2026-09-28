@@ -1,6 +1,6 @@
 <template>
-    <section>
-        <h2><a name="#2.lp5"> Appendix I: Literate Programming</a></h2>
+    <heading><a name="#2.lp5"> Appendix I: Literate Programming</a></heading>
+    <lp5-explanation>
         <div class="epigraph">
             <div>
             Nothing about WEB is really new; I have simply combined a
@@ -8,7 +8,7 @@
             </div>
             <hr/>
             <div>
-            &#8211;Donald Knuth, p. 130, "Literate Programming"
+            –Donald Knuth, p. 130, "Literate Programming"
             </div>
         </div>
         <div>
@@ -73,7 +73,7 @@
                 subfunctions merely because it becomes physically long
                 rather than because it lacks cohesion or is not understandable.
                 With all Literate Programming tools for any languages they target,
-                this is completely unnecessary&#8212;one breaks functions
+                this is completely unnecessary—one breaks functions
                 down textually, and only breaks them down structurally
                 when that actually makes sense for the structure of the code.
             </p>
@@ -185,11 +185,11 @@
                     order in which it was written.
                 </blockquote>
                 But I do not want to learn the various parts of
-                a good-sized program&#8212;I want to learn just
+                a good-sized program—I want to learn just
                 the bits I need to know to do my work,
                 be it finding/fixing a bug, adding a new feature,
                 or whatever.
-                And in the order that saves me the most time&#8212;hypertext
+                And in the order that saves me the most time—hypertext
                 order, in other words, jumping around to get
                 to the information I need at that instant in time.
             </p>
@@ -211,7 +211,7 @@
                 different needs,
                 making it easy to dive into exactly the area of
                 the topic you were interested in at the moment.
-                Knuth's Literate Programming provides tools&#8212;what
+                Knuth's Literate Programming provides tools—what
                 authors can produce with those tools is as varied
                 as the authors themselves.
             </p>
@@ -235,5 +235,5 @@
             </p>
 
         </div>
-    </section>
+    </lp5-explanation>
 </template>

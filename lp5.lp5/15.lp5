@@ -1,6 +1,9 @@
-<template>    <explanation>some text
-</explanation>
-    <name>CSS <i>declarations</i></name>
-    <script>stuff;
-</script>
+<template>
+    <lp5-explanation>some text
+</lp5-explanation>
+    <lp5-code>
+        <name>CSS <i>declarations</i></name>
+        <code><![CDATA[stuff;
+]]></code>
+    </lp5-code>
 </template>

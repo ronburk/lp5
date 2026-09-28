@@ -1,7 +1,6 @@
-
 <template>
-    <heading>Overview</heading>    
-    <explanation>
+    <heading>Overview</heading>
+    <lp5-explanation>
         <div>
             <p>
                 lp5 is a browser-based text editor and preprocessor
@@ -18,7 +17,7 @@
                 <li>contains the code</li>
                 <li>generates "normal" files containing the code</li>
             </ul>
-            <p></p>
+            <p/>
             <p>
                 What is this <q>different style</q> of programming that
                 lp5 lets you explore?
@@ -117,7 +116,7 @@
                     so we eschew that language here.
                 </li>
             </ul>
-            <p></p>
+            <p/>
             <p>
                 An lp5 program consists of a series of
                 <q>articles,</q>
@@ -179,9 +178,10 @@
             </p>
 
         </div>
-
-    </explanation>
-    <name></name>
-    <script type="text/plain">
-    </script>
+    </lp5-explanation>
+    <lp5-code>
+        <name/>
+        <code><![CDATA[
+    ]]></code>
+    </lp5-code>
 </template>

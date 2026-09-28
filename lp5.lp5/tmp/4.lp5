@@ -1,6 +1,6 @@
 <template>
-    <section>
-        <h2>Outermost Code</h2>
+    <heading>Outermost Code</heading>
+    <lp5-explanation>
         <p>
             Note that this code section has no name,
             and recall the lp5 code generation algorithm:
@@ -17,16 +17,17 @@
         </p>
         <p>
             Note also that the code here (and this paragraph!)
-            contain the dreaded <code>&lt;/script></code>&#8212;the
+            contain the dreaded <code>&lt;/script&gt;</code>—the
             one character sequence that must not appear inside of
-            a <code>&lt;script></code> element,
-            and lp5 keeps code inside a <code>&lt;script></code> element
+            a <code>&lt;script&gt;</code> element,
+            and lp5 keeps code inside a <code>&lt;script&gt;</code> element
             when it's not being displayed.
             In both situations (as you can see if you edit this article),
-            the solution is to write <code>&amp;lt;/script></code>.
+            the solution is to write <code>&amp;lt;/script&gt;</code>.
         </p>
-    </section>
-    <section>
+    </lp5-explanation>
+    <lp5-code>
+        <name/>
         <code><![CDATA[
             <!doctype html>
             <html lang="en">
@@ -40,5 +41,5 @@
                 </body>
             </html>
         ]]></code>
-    </section>
+    </lp5-code>
 </template>

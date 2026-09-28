@@ -1,13 +1,8 @@
 <template>
-    
-    <section>
-        <h2></h2>
+    <lp5-code>
+        <name/>
+        <code><![CDATA[
 
-    </section>
-    <section>
-        <h2></h2>
-        <script type="text/plain">
-
-        </script>
-    </section>
+        ]]></code>
+    </lp5-code>
 </template>

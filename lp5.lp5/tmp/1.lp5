@@ -1,6 +1,6 @@
 <template>
-    <section>
-        <h2>Overview</h2>
+    <heading>Overview</heading>
+    <lp5-explanation>
         <div>
             <p>
                 lp5 is a browser-based text editor and preprocessor
@@ -87,7 +87,7 @@
                             It is easier to write only a program,
                             because the programmer can settle for correct
                             and efficient code even if it is hard to
-                            understand. &#8212;Martin Ruckert,
+                            understand. —Martin Ruckert,
                             <a href="https://www.google.com/books/edition/Understanding_MP3/MN34-91z6qAC?hl=en&amp;gbpv=1&amp;pg=PT7&amp;printsec=frontcover">Understanding MP3</a>
                         </blockquote>
                         We might speculate that lp5 facilitates
@@ -179,5 +179,5 @@
             </p>
 
         </div>
-    </section>
+    </lp5-explanation>
 </template>

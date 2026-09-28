@@ -1,7 +1,8 @@
 <template>
     <heading>We style epigraphs to have a horizontal rule.</heading>
-    <name>Global CSS declarations</name>
-    <script type="text/plain">
+    <lp5-code>
+        <name>Global CSS declarations</name>
+        <code><![CDATA[
      div.epigraph  {
          display: flex;
          justify-content: flex-end;
@@ -11,5 +12,6 @@
          max-width: 27em;
      }
      div.epigraph  hr { width:100%; display:none;}
-    </script>
+    ]]></code>
+    </lp5-code>
 </template>
