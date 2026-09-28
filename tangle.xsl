@@ -4,11 +4,78 @@
 
     <xsl:output method="html" encoding="UTF-8" omit-xml-declaration="yes"/>
 
+    <!-- Pass the root article's path for file paths in script warnings. -->
+    <xsl:param name="root-location" select="'input article'"/>
+
     <xsl:template match="/">
         <xsl:call-template name="emit-document">
             <xsl:with-param name="document" select="."/>
             <xsl:with-param name="root" select="."/>
         </xsl:call-template>
+        <xsl:call-template name="warn-about-scripts">
+            <xsl:with-param name="document" select="."/>
+            <xsl:with-param name="location" select="$root-location"/>
+            <xsl:with-param name="visited" select="'|'"/>
+        </xsl:call-template>
+    </xsl:template>
+
+    <xsl:template name="warn-about-scripts">
+        <xsl:param name="document"/>
+        <xsl:param name="location"/>
+        <xsl:param name="visited"/>
+
+        <xsl:variable name="document-id" select="generate-id($document)"/>
+        <xsl:if test="not(contains($visited, concat('|', $document-id, '|')))">
+            <xsl:for-each select="$document//script">
+                <xsl:message>
+                    <xsl:text>Warning: found &lt;script&gt; element in article '</xsl:text>
+                    <xsl:value-of select="$location"/>
+                    <xsl:text>'. xsltproc may not parse script contents as intended.</xsl:text>
+                </xsl:message>
+            </xsl:for-each>
+
+            <xsl:for-each select="$document/*/children/li">
+                <xsl:variable name="article-directory">
+                    <xsl:call-template name="article-directory">
+                        <xsl:with-param name="path" select="$location"/>
+                    </xsl:call-template>
+                </xsl:variable>
+                <xsl:variable name="child-location">
+                    <xsl:if test="string-length(string($article-directory))">
+                        <xsl:value-of select="$article-directory"/>
+                        <xsl:text>/</xsl:text>
+                    </xsl:if>
+                    <xsl:value-of select="@id"/>
+                </xsl:variable>
+                <xsl:variable name="child" select="document(string(@id), .)"/>
+                <xsl:call-template name="warn-about-scripts">
+                    <xsl:with-param name="document" select="$child"/>
+                    <xsl:with-param name="location" select="string($child-location)"/>
+                    <xsl:with-param name="visited"
+                        select="concat($visited, $document-id, '|')"/>
+                </xsl:call-template>
+            </xsl:for-each>
+        </xsl:if>
+    </xsl:template>
+
+    <xsl:template name="article-directory">
+        <xsl:param name="path"/>
+
+        <xsl:if test="contains($path, '/')">
+            <xsl:variable name="after-first-slash" select="substring-after($path, '/')"/>
+            <xsl:choose>
+                <xsl:when test="contains($after-first-slash, '/')">
+                    <xsl:value-of select="substring-before($path, '/')"/>
+                    <xsl:text>/</xsl:text>
+                    <xsl:call-template name="article-directory">
+                        <xsl:with-param name="path" select="$after-first-slash"/>
+                    </xsl:call-template>
+                </xsl:when>
+                <xsl:otherwise>
+                    <xsl:value-of select="substring-before($path, '/')"/>
+                </xsl:otherwise>
+            </xsl:choose>
+        </xsl:if>
     </xsl:template>
 
     <xsl:template name="emit-document">
