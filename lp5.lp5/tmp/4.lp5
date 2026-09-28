@@ -17,7 +17,7 @@
         </p>
         <p>
             Note also that the code here (and this paragraph!)
-            contain the dreaded <code>&lt;/script></code>&mdash;the
+            contain the dreaded <code>&lt;/script></code>&#8212;the
             one character sequence that must not appear inside of
             a <code>&lt;script></code> element,
             and lp5 keeps code inside a <code>&lt;script></code> element
@@ -27,7 +27,7 @@
         </p>
     </section>
     <section>
-        <script type="text/plain">
+        <code><![CDATA[
             <!doctype html>
             <html lang="en">
                 <head>
@@ -39,6 +39,6 @@
                     </@<span>script@</span>>
                 </body>
             </html>
-        </script>
+        ]]></code>
     </section>
 </template>
