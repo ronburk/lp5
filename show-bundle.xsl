@@ -6,7 +6,7 @@
      parameter and choosing the result filename with xsltproc's output option.
 
      The output contains only matching code sections, in article/weave order.
-     Each bundle member is the original lp5-code element, with an article
+     Each bundle member is the original code section, with an article
      attribute added to identify its source. Explanations are excluded. An
      empty bundle means no matching code sections were found.
 -->
@@ -26,20 +26,20 @@
 
         <xsl:variable name="canonical-name" select="normalize-space($code_name)"/>
         <xsl:variable name="definitions"
-            select="/lp5-weave/articles/article/lp5-code[normalize-space(name) = $canonical-name]"/>
+            select="/lp5-weave/articles/article/section[@data-lp5-kind = 'code'][normalize-space(name) = $canonical-name]"/>
 
         <bundle name="{$canonical-name}">
             <xsl:for-each select="$definitions">
-                <!-- Keep the existing article element name and its content. -->
+                <!-- Preserve the on-disk code-section representation. -->
                 <xsl:text>&#10;  </xsl:text>
-                <lp5-code article="{../@file}">
+                <section data-lp5-kind="code" article="{../@file}">
                     <!-- Format the section metadata, but copy code unchanged. -->
                     <xsl:text>&#10;    </xsl:text>
                     <xsl:copy-of select="name"/>
                     <xsl:text>&#10;    </xsl:text>
                     <xsl:copy-of select="code"/>
                     <xsl:text>&#10;  </xsl:text>
-                </lp5-code>
+                </section>
             </xsl:for-each>
             <xsl:text>&#10;</xsl:text>
         </bundle>

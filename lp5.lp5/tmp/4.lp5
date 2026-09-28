@@ -1,6 +1,6 @@
 <template>
     <heading>Outermost Code</heading>
-    <lp5-explanation>
+    <section data-lp5-kind="explanation">
         <p>
             Note that this code section has no name,
             and recall the lp5 code generation algorithm:
@@ -25,8 +25,8 @@
             In both situations (as you can see if you edit this article),
             the solution is to write <code>&amp;lt;/script&gt;</code>.
         </p>
-    </lp5-explanation>
-    <lp5-code>
+    </section>
+    <section data-lp5-kind="code">
         <name/>
         <code><![CDATA[
             <!doctype html>
@@ -41,5 +41,5 @@
                 </body>
             </html>
         ]]></code>
-    </lp5-code>
+    </section>
 </template>

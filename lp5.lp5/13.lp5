@@ -1,8 +1,8 @@
 <template>
-    <lp5-code>
+    <section data-lp5-kind="code">
         <name/>
         <code><![CDATA[
 
         ]]></code>
-    </lp5-code>
+    </section>
 </template>

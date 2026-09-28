@@ -75,14 +75,13 @@
             </xsl:message>
         </xsl:if>
 
-        <xsl:if test="$document/template/*[not(self::children or self::heading or
-                self::lp5-explanation or self::lp5-code)]">
+        <xsl:if test="$document/template/*[not(self::children or self::heading or self::section)]">
             <xsl:message terminate="yes">
                 <xsl:text>Invalid article '</xsl:text>
                 <xsl:value-of select="$location"/>
                 <xsl:text>': unexpected direct child &lt;</xsl:text>
                 <xsl:value-of select="name($document/template/*[not(self::children or
-                        self::heading or self::lp5-explanation or self::lp5-code)][1])"/>
+                        self::heading or self::section)][1])"/>
                 <xsl:text>&gt; of &lt;template&gt;.</xsl:text>
             </xsl:message>
         </xsl:if>
@@ -97,12 +96,21 @@
 
         <xsl:if test="count($document/template/children) &gt; 1 or
                 count($document/template/heading) &gt; 1 or
-                count($document/template/lp5-explanation) &gt; 1 or
-                count($document/template/lp5-code) &gt; 1">
+                count($document/template/section[@data-lp5-kind = 'explanation']) &gt; 1 or
+                count($document/template/section[@data-lp5-kind = 'code']) &gt; 1">
             <xsl:message terminate="yes">
                 <xsl:text>Invalid article '</xsl:text>
                 <xsl:value-of select="$location"/>
                 <xsl:text>': each permitted direct child of &lt;template&gt; may appear at most once.</xsl:text>
+            </xsl:message>
+        </xsl:if>
+
+        <xsl:if test="$document/template/section[not(@data-lp5-kind = 'explanation' or
+                @data-lp5-kind = 'code')]">
+            <xsl:message terminate="yes">
+                <xsl:text>Invalid article '</xsl:text>
+                <xsl:value-of select="$location"/>
+                <xsl:text>': &lt;section&gt; must have data-lp5-kind="explanation" or "code".</xsl:text>
             </xsl:message>
         </xsl:if>
 
@@ -120,19 +128,19 @@
             </xsl:message>
         </xsl:if>
 
-        <xsl:if test="$document/template/lp5-code and
-                (count($document/template/lp5-code/name) != 1 or
-                 count($document/template/lp5-code/code) != 1 or
-                 $document/template/lp5-code/text()[normalize-space()] or
-                 $document/template/lp5-code/*[not(self::name or self::code)])">
+        <xsl:if test="$document/template/section[@data-lp5-kind = 'code'] and
+                (count($document/template/section[@data-lp5-kind = 'code']/name) != 1 or
+                 count($document/template/section[@data-lp5-kind = 'code']/code) != 1 or
+                 $document/template/section[@data-lp5-kind = 'code']/text()[normalize-space()] or
+                 $document/template/section[@data-lp5-kind = 'code']/*[not(self::name or self::code)])">
             <xsl:message terminate="yes">
                 <xsl:text>Invalid article '</xsl:text>
                 <xsl:value-of select="$location"/>
-                <xsl:text>': &lt;lp5-code&gt; must contain exactly one &lt;name&gt; and one &lt;code&gt;.</xsl:text>
+                <xsl:text>': code section must contain exactly one &lt;name&gt; and one &lt;code&gt;.</xsl:text>
             </xsl:message>
         </xsl:if>
 
-        <xsl:if test="$document/template/lp5-code/code/node()[self::*[not(starts-with(name(), 'lp5-'))] or self::comment() or self::processing-instruction()]">
+        <xsl:if test="$document/template/section[@data-lp5-kind = 'code']/code/node()[self::*[not(starts-with(name(), 'lp5-'))] or self::comment() or self::processing-instruction()]">
             <xsl:message terminate="yes">
                 <xsl:text>Invalid article '</xsl:text>
                 <xsl:value-of select="$location"/>
@@ -204,7 +212,7 @@
         <xsl:param name="document"/>
         <xsl:param name="root"/>
 
-        <xsl:for-each select="$document/template/lp5-code[not(normalize-space(name))]/code">
+        <xsl:for-each select="$document/template/section[@data-lp5-kind = 'code'][not(normalize-space(name))]/code">
             <xsl:apply-templates select="node()" mode="emit-code">
                 <xsl:with-param name="root" select="$root"/>
                 <xsl:with-param name="stack" select="'|'"/>
@@ -293,7 +301,7 @@
         <xsl:param name="document"/>
         <xsl:param name="name"/>
 
-        <xsl:for-each select="$document/template/lp5-code[normalize-space(name) = $name]">
+        <xsl:for-each select="$document/template/section[@data-lp5-kind = 'code'][normalize-space(name) = $name]">
             <xsl:text>x</xsl:text>
         </xsl:for-each>
         <xsl:for-each select="$document/template/children/li">
@@ -311,7 +319,7 @@
         <xsl:param name="name"/>
         <xsl:param name="stack"/>
 
-        <xsl:for-each select="$document/template/lp5-code[normalize-space(name) = $name]/code">
+        <xsl:for-each select="$document/template/section[@data-lp5-kind = 'code'][normalize-space(name) = $name]/code">
             <xsl:apply-templates select="node()" mode="emit-code">
                 <xsl:with-param name="root" select="$root"/>
                 <xsl:with-param name="stack" select="$stack"/>

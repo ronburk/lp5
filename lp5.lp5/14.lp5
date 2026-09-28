@@ -1,6 +1,6 @@
 <template>
     <heading>We style epigraphs to have a horizontal rule.</heading>
-    <lp5-code>
+    <section data-lp5-kind="code">
         <name>Global CSS declarations</name>
         <code><![CDATA[
      div.epigraph  {
@@ -13,5 +13,5 @@
      }
      div.epigraph  hr { width:100%; display:none;}
     ]]></code>
-    </lp5-code>
+    </section>
 </template>
