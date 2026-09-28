@@ -6,9 +6,9 @@
             Nothing about WEB is really new; I have simply combined a
             bunch of ideas that have been in the air for a long time.
             </div>
-            <hr>
+            <hr/>
             <div>
-            &ndash;Donald Knuth, p. 130, "Literate Programming"
+            &#8211;Donald Knuth, p. 130, "Literate Programming"
             </div>
         </div>
         <div>
@@ -73,7 +73,7 @@
                 subfunctions merely because it becomes physically long
                 rather than because it lacks cohesion or is not understandable.
                 With all Literate Programming tools for any languages they target,
-                this is completely unnecessary&mdash;one breaks functions
+                this is completely unnecessary&#8212;one breaks functions
                 down textually, and only breaks them down structurally
                 when that actually makes sense for the structure of the code.
             </p>
@@ -185,11 +185,11 @@
                     order in which it was written.
                 </blockquote>
                 But I do not want to learn the various parts of
-                a good-sized program&mdash;I want to learn just
+                a good-sized program&#8212;I want to learn just
                 the bits I need to know to do my work,
                 be it finding/fixing a bug, adding a new feature,
                 or whatever.
-                And in the order that saves me the most time&mdash;hypertext
+                And in the order that saves me the most time&#8212;hypertext
                 order, in other words, jumping around to get
                 to the information I need at that instant in time.
             </p>
@@ -202,7 +202,7 @@
                     to quite different styles.
                 </q>
                 When Martin Ruckert published
-                <a href="https://www.google.com/books/edition/Understanding_MP3/MN34-91z6qAC?hl=en&gbpv=1&pg=PT7&printsec=frontcover">Understanding MP3</a>,
+                <a href="https://www.google.com/books/edition/Understanding_MP3/MN34-91z6qAC?hl=en&amp;gbpv=1&amp;pg=PT7&amp;printsec=frontcover">Understanding MP3</a>,
                 a Literate Program that explains the ubiquitous
                 audio coding format,
                 there were wonderful pictures, expositions, rationales,
@@ -211,7 +211,7 @@
                 different needs,
                 making it easy to dive into exactly the area of
                 the topic you were interested in at the moment.
-                Knuth's Literate Programming provides tools&mdash;what
+                Knuth's Literate Programming provides tools&#8212;what
                 authors can produce with those tools is as varied
                 as the authors themselves.
             </p>

@@ -14,33 +14,28 @@
     its very own lonely little code section).
 </p>
 <p>
-    Note also that the code here (and this paragraph!)
-    contain the dreaded <code>&lt;/script&gt;</code>—the
-    one character sequence that must not appear inside of
-    a <code>&lt;script&gt;</code> element,
-    and lp5 keeps code inside a <code>&lt;script&gt;</code> element
-    when it's not being displayed.
-    In both situations (as you can see if you edit this article),
-    the solution is to write <code>&amp;lt;/script&gt;</code>.
+    The code here contains an HTML <code>&lt;script&gt;</code>
+    element and its closing <code>&lt;/script&gt;</code> tag.
+    CDATA keeps those tags as literal code in this XML chunk.
 </p>
 </explanation>
-    <script><!doctype html>
+    <code><![CDATA[<!doctype html>
 <!-- lp5.html <>  -->
 <html lang="en">
 <head>
     <meta charset="utf-8" >
     <title>lp5</title>
     <style>
-        <lp5- ref="Global CSS declarations"/>
+        ]]><lp5- ref="Global CSS declarations"/><![CDATA[
     </style>
     <script>
         (function () {
-            <lp5- ref="Outermost scope code"/>
+            ]]><lp5- ref="Outermost scope code"/><![CDATA[
         )();
-    <lp5-endscript/>
+    </script>
 </head>
 <body>
 </body>
 </html>
-</script>
+]]></code>
 </template>

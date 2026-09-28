@@ -12,7 +12,7 @@
         </div>
     </section>
     <section>
-        <script type="text/plain">
+        <code><![CDATA[
             <!doctype html>
             <html lang="en">
                 <head>
@@ -20,6 +20,6 @@
                 <body>
                 </body>
             </html>
-        </script>
+        ]]></code>
     </section>
 </template>
