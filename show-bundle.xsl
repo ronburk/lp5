@@ -43,5 +43,6 @@
             </xsl:for-each>
             <xsl:text>&#10;</xsl:text>
         </bundle>
+        <xsl:text>&#10;</xsl:text>
     </xsl:template>
 </xsl:stylesheet>
