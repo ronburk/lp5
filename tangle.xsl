@@ -53,12 +53,23 @@
                     <xsl:value-of select="@id"/>
                 </xsl:variable>
                 <xsl:variable name="child" select="document(string(@id), .)"/>
-                <xsl:call-template name="validate-article-tree">
-                    <xsl:with-param name="document" select="$child"/>
-                    <xsl:with-param name="location" select="string($child-location)"/>
-                    <xsl:with-param name="visited"
-                        select="concat($visited, $document-id, '|')"/>
-                </xsl:call-template>
+                <xsl:choose>
+                    <xsl:when test="$child/*">
+                        <xsl:call-template name="validate-article-tree">
+                            <xsl:with-param name="document" select="$child"/>
+                            <xsl:with-param name="location" select="string($child-location)"/>
+                            <xsl:with-param name="visited"
+                                select="concat($visited, $document-id, '|')"/>
+                        </xsl:call-template>
+                    </xsl:when>
+                    <xsl:otherwise>
+                        <xsl:message>
+                            <xsl:text>Warning: linked article '</xsl:text>
+                            <xsl:value-of select="$child-location"/>
+                            <xsl:text>' is unavailable; skipping it.</xsl:text>
+                        </xsl:message>
+                    </xsl:otherwise>
+                </xsl:choose>
             </xsl:for-each>
         </xsl:if>
     </xsl:template>
