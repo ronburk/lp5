@@ -7,8 +7,8 @@
     <!-- XPath 1.0 cannot distinguish CDATA sections from ordinary text nodes;
          the validator can check the XML tree shape, not the lexical CDATA form. -->
 
-    <!-- Pass the root article's path for file paths in script warnings. -->
-    <xsl:param name="root-location" select="'input article'"/>
+    <!-- Override when tangling a root article outside the project convention. -->
+    <xsl:param name="root-location" select="'lp5.lp5/lp5.lp5'"/>
 
     <xsl:template match="/">
         <xsl:call-template name="validate-article-tree">
@@ -19,6 +19,7 @@
         <xsl:call-template name="emit-document">
             <xsl:with-param name="document" select="."/>
             <xsl:with-param name="root" select="."/>
+            <xsl:with-param name="location" select="$root-location"/>
         </xsl:call-template>
         <xsl:call-template name="warn-about-scripts">
             <xsl:with-param name="document" select="."/>
@@ -222,6 +223,7 @@
     <xsl:template name="emit-document">
         <xsl:param name="document"/>
         <xsl:param name="root"/>
+        <xsl:param name="location"/>
 
         <xsl:for-each select="$document/template/section[@data-lp5-kind = 'code'][not(normalize-space(name))]/code">
             <xsl:apply-templates select="node()" mode="emit-code">
@@ -231,11 +233,41 @@
         </xsl:for-each>
 
         <xsl:for-each select="$document/template/children/li">
+            <xsl:variable name="article-directory">
+                <xsl:call-template name="article-directory">
+                    <xsl:with-param name="path" select="$location"/>
+                </xsl:call-template>
+            </xsl:variable>
+            <xsl:variable name="child-location">
+                <xsl:if test="string-length(string($article-directory))">
+                    <xsl:value-of select="$article-directory"/>
+                    <xsl:text>/</xsl:text>
+                </xsl:if>
+                <xsl:value-of select="@id"/>
+            </xsl:variable>
             <xsl:variable name="child" select="document(string(@id), .)"/>
-            <xsl:call-template name="emit-document">
-                <xsl:with-param name="document" select="$child"/>
-                <xsl:with-param name="root" select="$root"/>
-            </xsl:call-template>
+            <xsl:choose>
+                <xsl:when test="$child/*">
+                    <xsl:call-template name="emit-document">
+                        <xsl:with-param name="document" select="$child"/>
+                        <xsl:with-param name="root" select="$root"/>
+                        <xsl:with-param name="location" select="string($child-location)"/>
+                    </xsl:call-template>
+                </xsl:when>
+                <xsl:otherwise>
+                    <!-- Include an intentional JavaScript syntax error in the HTML. -->
+                    <script>
+                        <xsl:attribute name="data-lp5-error">
+                            <xsl:text>Missing article '</xsl:text>
+                            <xsl:value-of select="$child-location"/>
+                            <xsl:text>' linked from '</xsl:text>
+                            <xsl:value-of select="$location"/>
+                            <xsl:text>'.</xsl:text>
+                        </xsl:attribute>
+                        <xsl:text>const lp5_missing_article = ;</xsl:text>
+                    </script>
+                </xsl:otherwise>
+            </xsl:choose>
         </xsl:for-each>
     </xsl:template>
 
