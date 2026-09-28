@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+     add-article.xsl - add one article to a parent's child list.
+
+     Run from the project root, with weave.xml generated from the current
+     project. articles_dir is relative to weave.xml and has no trailing slash;
+     article_file names the temporary XML article to add.
+
+     The result is the updated parent article. The generated child filename is
+     reported on stderr as "new-article-id: ..."; copy article_file to that
+     path, then replace the original parent with the result. Re-run weave.xsl
+     after adding one or more articles. Run additions serially: checking for an
+     available filename and creating it are separate steps. Candidate probes
+     may warn when a file does not exist; xsltproc continues and selects it.
+-->
+<xsl:stylesheet version="1.0"
+    xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+
+    <xsl:import href="tangle.xsl"/>
+
+    <xsl:output method="xml" encoding="UTF-8" indent="no"/>
+
+    <xsl:param name="parent_id" select="'__PARENT_ID_REQUIRED__'"/>
+    <xsl:param name="before_child_id" select="''"/>
+    <xsl:param name="articles_dir" select="'__ARTICLES_DIR_REQUIRED__'"/>
+    <xsl:param name="article_file" select="'__ARTICLE_FILE_REQUIRED__'"/>
+
+    <xsl:template match="/">
+        <xsl:if test="$parent_id = '__PARENT_ID_REQUIRED__' or
+                $articles_dir = '__ARTICLES_DIR_REQUIRED__' or
+                $article_file = '__ARTICLE_FILE_REQUIRED__'">
+            <xsl:message terminate="yes">add-article.xsl requires parent_id, articles_dir, and article_file parameters.</xsl:message>
+        </xsl:if>
+
+        <xsl:variable name="parent"
+            select="/lp5-weave/articles/article[@file = $parent_id]"/>
+        <xsl:if test="count($parent) != 1">
+            <xsl:message terminate="yes">parent_id must identify exactly one article in weave.xml.</xsl:message>
+        </xsl:if>
+
+        <xsl:if test="string-length($before_child_id) and
+                count($parent/children/child[@file = $before_child_id]) != 1">
+            <xsl:message terminate="yes">before_child_id must identify exactly one direct child of parent_id.</xsl:message>
+        </xsl:if>
+
+        <xsl:variable name="new-article" select="document($article_file, /)"/>
+        <xsl:call-template name="validate-article">
+            <xsl:with-param name="document" select="$new-article"/>
+            <xsl:with-param name="location" select="$article_file"/>
+        </xsl:call-template>
+
+        <xsl:variable name="new-filename">
+            <xsl:call-template name="new-article-filename">
+                <xsl:with-param name="articles-dir" select="$articles_dir"/>
+            </xsl:call-template>
+        </xsl:variable>
+
+        <xsl:message>
+            <xsl:text>new-article-id: </xsl:text>
+            <xsl:value-of select="$new-filename"/>
+        </xsl:message>
+
+        <template>
+            <xsl:text>&#10;    </xsl:text>
+            <children>
+                <xsl:if test="not(string-length($before_child_id))">
+                    <xsl:text>&#10;        </xsl:text>
+                    <li id="{$new-filename}"/>
+                </xsl:if>
+                <xsl:for-each select="$parent/children/child">
+                    <xsl:if test="@file = $before_child_id">
+                        <xsl:text>&#10;        </xsl:text>
+                        <li id="{$new-filename}"/>
+                    </xsl:if>
+                    <xsl:text>&#10;        </xsl:text>
+                    <li id="{@file}"/>
+                </xsl:for-each>
+                <xsl:text>&#10;    </xsl:text>
+            </children>
+
+            <xsl:for-each select="$parent/heading | $parent/section">
+                <xsl:text>&#10;    </xsl:text>
+                <xsl:apply-templates select="." mode="copy-parent"/>
+            </xsl:for-each>
+            <xsl:text>&#10;</xsl:text>
+        </template>
+        <xsl:text>&#10;</xsl:text>
+    </xsl:template>
+
+    <!--
+         weave.xml's code is text, regardless of whether its source was CDATA.
+         Re-emit text inside code sections as CDATA so the result is a valid
+         source article. Explanation markup, including inline <code>, is copied
+         normally.
+    -->
+    <xsl:template match="@*|node()" mode="copy-parent">
+        <xsl:copy>
+            <xsl:apply-templates select="@*|node()" mode="copy-parent"/>
+        </xsl:copy>
+    </xsl:template>
+
+    <xsl:template match="code[parent::section[@data-lp5-kind = 'code']]"
+                  mode="copy-parent">
+        <xsl:copy>
+            <xsl:apply-templates select="node()" mode="copy-code"/>
+        </xsl:copy>
+    </xsl:template>
+
+    <xsl:template match="text()" mode="copy-code">
+        <xsl:text disable-output-escaping="yes">&lt;![CDATA[</xsl:text>
+        <xsl:call-template name="emit-cdata-text">
+            <xsl:with-param name="text" select="."/>
+        </xsl:call-template>
+        <xsl:text disable-output-escaping="yes">]]&gt;</xsl:text>
+    </xsl:template>
+
+    <xsl:template match="*" mode="copy-code">
+        <xsl:copy-of select="."/>
+    </xsl:template>
+
+    <!-- Split CDATA terminators so arbitrary code text remains well-formed. -->
+    <xsl:template name="emit-cdata-text">
+        <xsl:param name="text"/>
+        <xsl:choose>
+            <xsl:when test="contains($text, ']]&gt;')">
+                <xsl:value-of select="substring-before($text, ']]&gt;')"
+                              disable-output-escaping="yes"/>
+                <xsl:text disable-output-escaping="yes">]]]]&gt;&lt;![CDATA[&gt;</xsl:text>
+                <xsl:call-template name="emit-cdata-text">
+                    <xsl:with-param name="text" select="substring-after($text, ']]&gt;')"/>
+                </xsl:call-template>
+            </xsl:when>
+            <xsl:otherwise>
+                <xsl:value-of select="$text" disable-output-escaping="yes"/>
+            </xsl:otherwise>
+        </xsl:choose>
+    </xsl:template>
+
+    <!-- Called with weave.xml as the source. Returns a basename such as 19.lp5. -->
+    <xsl:template name="new-article-filename">
+        <xsl:param name="articles-dir"/>
+
+        <!-- Select the largest numeric article filename from the weave. -->
+        <xsl:variable name="max-id">
+            <xsl:for-each select="/lp5-weave/articles/article[
+                substring-after(@file, '.lp5') = '' and
+                string-length(substring-before(@file, '.lp5')) &gt; 0 and
+                translate(substring-before(@file, '.lp5'), '0123456789', '') = '']">
+                <xsl:sort select="number(substring-before(@file, '.lp5'))"
+                          data-type="number" order="descending"/>
+                <xsl:if test="position() = 1">
+                    <xsl:value-of select="number(substring-before(@file, '.lp5'))"/>
+                </xsl:if>
+            </xsl:for-each>
+        </xsl:variable>
+
+        <xsl:call-template name="try-article-filename">
+            <xsl:with-param name="articles-dir" select="$articles-dir"/>
+            <xsl:with-param name="candidate"
+                select="number(concat('0', string($max-id))) + 1"/>
+        </xsl:call-template>
+    </xsl:template>
+
+    <!--
+         Skip candidates that already resolve to an article file. This assumes
+         existing .lp5 files are well-formed XML; malformed files may look
+         unavailable to document(). XSLT 1.0 numbers also have finite integer
+         precision, so extremely large numeric IDs are outside this algorithm's
+         range.
+    -->
+    <xsl:template name="try-article-filename">
+        <xsl:param name="articles-dir"/>
+        <xsl:param name="candidate"/>
+
+        <xsl:variable name="filename" select="concat($candidate, '.lp5')"/>
+        <xsl:variable name="existing"
+            select="document(concat($articles-dir, '/', $filename), /)"/>
+
+        <xsl:choose>
+            <xsl:when test="$existing/*">
+                <xsl:call-template name="try-article-filename">
+                    <xsl:with-param name="articles-dir" select="$articles-dir"/>
+                    <xsl:with-param name="candidate" select="$candidate + 1"/>
+                </xsl:call-template>
+            </xsl:when>
+            <xsl:otherwise>
+                <xsl:value-of select="$filename"/>
+            </xsl:otherwise>
+        </xsl:choose>
+    </xsl:template>
+
+</xsl:stylesheet>
