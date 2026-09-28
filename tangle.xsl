@@ -83,8 +83,8 @@
             </xsl:call-template>
         </xsl:variable>
         <xsl:if test="not(string-length(string($matches)))">
-            <xsl:message terminate="yes">
-                <xsl:text>No code fragment named '</xsl:text>
+            <xsl:message>
+                <xsl:text>Skipping unresolved code fragment reference '</xsl:text>
                 <xsl:value-of select="$name"/>
                 <xsl:text>'.</xsl:text>
             </xsl:message>
