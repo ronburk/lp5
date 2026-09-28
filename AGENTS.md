@@ -34,3 +34,9 @@ apt-get -o APT::Sandbox::User=root \
     -o Dir::Cache::archives=/tmp/apt-cache/archives \
     install -y xsltproc
 ```
+
+## Article terminology and format
+
+An **article** is one `.lp5` file. Its XML document has a `<template>` root. An article contains sections such as `<explanation>` and `<code>`; `<heading>` (article title), `<name>` (code-section name), and `<children>` (links to child articles using `<li id="…lp5">`) are metadata or structure, not sections.
+
+In `<code>`, CDATA holds literal code and `<lp5- ref="…"/>` marks a code reference. The older `<script>` code-section format still appears in some articles. No separate convention for HTML formatting inside code has been established.
