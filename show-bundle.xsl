@@ -25,19 +25,20 @@
         </xsl:if>
 
         <xsl:variable name="canonical-name" select="normalize-space($code_name)"/>
-        <xsl:variable name="definitions"
-            select="/lp5-weave/articles/article/section[@data-lp5-kind = 'code'][normalize-space(name) = $canonical-name]"/>
+        <xsl:variable name="bundle"
+            select="/lp5-weave/bundles/bundle[@name = $canonical-name]"/>
 
         <bundle name="{$canonical-name}">
-            <xsl:for-each select="$definitions">
+            <xsl:for-each select="$bundle/section">
                 <!-- Preserve the on-disk code-section representation. -->
                 <xsl:text>&#10;  </xsl:text>
-                <section data-lp5-kind="code" article="{../@file}">
+                <xsl:variable name="article-file" select="@article"/>
+                <section data-lp5-kind="code" article="{$article-file}">
                     <!-- Format the section metadata, but copy code unchanged. -->
                     <xsl:text>&#10;    </xsl:text>
-                    <xsl:copy-of select="name"/>
+                    <xsl:copy-of select="/lp5-weave/articles/article[@file = $article-file]/section[@data-lp5-kind = 'code'][normalize-space(name) = $canonical-name]/name"/>
                     <xsl:text>&#10;    </xsl:text>
-                    <xsl:copy-of select="code"/>
+                    <xsl:copy-of select="/lp5-weave/articles/article[@file = $article-file]/section[@data-lp5-kind = 'code'][normalize-space(name) = $canonical-name]/code"/>
                     <xsl:text>&#10;  </xsl:text>
                 </section>
             </xsl:for-each>
