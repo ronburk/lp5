@@ -35,6 +35,20 @@ apt-get -o APT::Sandbox::User=root \
     install -y xsltproc
 ```
 
+## Build the HTML program
+
+The main program is generated from the root article `lp5.lp5/lp5.lp5` by
+`tangle.xsl`. Run this command from the repository root:
+
+```sh
+xsltproc -o lp5.html tangle.xsl lp5.lp5/lp5.lp5
+```
+
+The transform follows each `<children>` link and assembles the unnamed code
+sections, recursively expanding named code references. It validates articles
+as it reads them. `weave.xsl` generates the separate `weave.xml` source index;
+it does not build the HTML program.
+
 ## Article terminology and format
 
 An **article** is one `.lp5` file. Each file is an XML document with one `<template>` root. The root may contain at most one each of these direct children, in any order:
