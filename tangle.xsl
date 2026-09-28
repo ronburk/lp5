@@ -255,17 +255,13 @@
                     </xsl:call-template>
                 </xsl:when>
                 <xsl:otherwise>
-                    <!-- Include an intentional JavaScript syntax error in the HTML. -->
-                    <script>
-                        <xsl:attribute name="data-lp5-error">
-                            <xsl:text>Missing article '</xsl:text>
-                            <xsl:value-of select="$child-location"/>
-                            <xsl:text>' linked from '</xsl:text>
-                            <xsl:value-of select="$location"/>
-                            <xsl:text>'.</xsl:text>
-                        </xsl:attribute>
-                        <xsl:text>const lp5_missing_article = ;</xsl:text>
-                    </script>
+                    <xsl:text>&#10;[[ERROR: MISSING ARTICLE '</xsl:text>
+                    <xsl:value-of select="translate($child-location,
+                            'abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ')"/>
+                    <xsl:text>' REFERENCED FROM '</xsl:text>
+                    <xsl:value-of select="translate($location,
+                            'abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ')"/>
+                    <xsl:text>']]&#10;</xsl:text>
                 </xsl:otherwise>
             </xsl:choose>
         </xsl:for-each>
