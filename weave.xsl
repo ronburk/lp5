@@ -2,18 +2,19 @@
 <!--
      weave.xsl - make one XML snapshot of an lp5 article tree.
 
-     Example (run from the repository root, supplying the root location):
-       xsltproc [string parameters] weave.xsl lp5.lp5/lp5.lp5 > weave.xml
+     Example (run from the repository root):
+       xsltproc -o weave.xml weave.xsl lp5.lp5/lp5.lp5
 
      The result is an index for source-navigation tools, not tangled output.
-     Each article is emitted in preorder. Child links use paths relative to
-     the supplied root location, and fragments are listed separately so
-     callers can find definitions by name. Code text and lp5-* reference
+     Each article is emitted in preorder. Article IDs are filenames, and
+     fragments are listed separately so callers can find definitions by name.
+     Code text and lp5-* reference
      elements retain their original order and content.
 
-     Set root-location to the same root-relative path as the input article;
-     it becomes the article ID in the result. For this repository's root use
-     lp5.lp5/lp5.lp5. The root chunk defaults to the unnamed chunk.
+     The input file is the root article. Its directory is the base for
+     document() lookups, so no directory parameter is needed. This first pass
+     uses this repository's convention that the root article is lp5.lp5 and
+     the root chunk is unnamed.
 
      Article validation is imported from tangle.xsl so both transforms apply
      the same on-disk format rules to each article that exists. Missing child
@@ -29,29 +30,23 @@
     <!-- Do not pretty-print: serializer-inserted whitespace could alter code. -->
     <xsl:output method="xml" encoding="UTF-8" indent="no"/>
 
-    <!-- Supply the root article path to give every record a stable file ID. -->
-    <xsl:param name="root-location" select="'input article'"/>
-
-    <!-- The empty string identifies the unnamed chunk used as the tangle root. -->
-    <xsl:param name="root-chunk" select="''"/>
-
     <xsl:template match="/">
         <!-- Fail before writing the index if any reachable article is invalid. -->
         <xsl:call-template name="validate-weave-tree">
             <xsl:with-param name="document" select="."/>
-            <xsl:with-param name="location" select="$root-location"/>
+            <xsl:with-param name="location" select="'lp5.lp5'"/>
             <xsl:with-param name="visited" select="'|'"/>
         </xsl:call-template>
 
         <lp5-weave version="1">
             <!-- Identify both the starting article and the chunk tangle begins. -->
-            <root article="{$root-location}" chunk="{$root-chunk}"/>
+            <root article="lp5.lp5" chunk=""/>
 
             <!-- Store article contents and direct-child relationships in one list. -->
             <articles>
                 <xsl:call-template name="emit-articles">
                     <xsl:with-param name="document" select="."/>
-                    <xsl:with-param name="location" select="$root-location"/>
+                    <xsl:with-param name="location" select="'lp5.lp5'"/>
                     <xsl:with-param name="visited" select="'|'"/>
                 </xsl:call-template>
             </articles>
@@ -60,7 +55,7 @@
             <chunks>
                 <xsl:call-template name="index-chunks">
                     <xsl:with-param name="document" select="."/>
-                    <xsl:with-param name="location" select="$root-location"/>
+                    <xsl:with-param name="location" select="'lp5.lp5'"/>
                     <xsl:with-param name="visited" select="'|'"/>
                 </xsl:call-template>
             </chunks>
@@ -83,18 +78,7 @@
                 <xsl:with-param name="location" select="$location"/>
             </xsl:call-template>
             <xsl:for-each select="$document/template/children/li">
-                <xsl:variable name="directory">
-                    <xsl:call-template name="article-directory">
-                        <xsl:with-param name="path" select="$location"/>
-                    </xsl:call-template>
-                </xsl:variable>
-                <xsl:variable name="child-location">
-                    <xsl:if test="string-length(string($directory))">
-                        <xsl:value-of select="$directory"/>
-                        <xsl:text>/</xsl:text>
-                    </xsl:if>
-                    <xsl:value-of select="@id"/>
-                </xsl:variable>
+                <xsl:variable name="child-location" select="string(@id)"/>
                 <xsl:variable name="child-document" select="document(string(@id), .)"/>
                 <xsl:choose>
                     <xsl:when test="$child-document/*">
@@ -135,23 +119,12 @@
                 <xsl:copy-of select="$document/template/lp5-explanation"/>
                 <xsl:copy-of select="$document/template/lp5-code"/>
 
-                <!-- Resolve child IDs to root-relative paths for unambiguous lookup. -->
+                <!-- Child IDs are filenames relative to the article directory. -->
                 <children>
                     <xsl:for-each select="$document/template/children/li">
-                        <xsl:variable name="directory">
-                            <xsl:call-template name="article-directory">
-                                <xsl:with-param name="path" select="$location"/>
-                            </xsl:call-template>
-                        </xsl:variable>
                         <xsl:variable name="child-document" select="document(string(@id), .)"/>
                         <child>
-                            <xsl:attribute name="file">
-                                <xsl:if test="string-length(string($directory))">
-                                    <xsl:value-of select="$directory"/>
-                                    <xsl:text>/</xsl:text>
-                                </xsl:if>
-                                <xsl:value-of select="@id"/>
-                            </xsl:attribute>
+                            <xsl:attribute name="file"><xsl:value-of select="@id"/></xsl:attribute>
                             <xsl:attribute name="status">
                                 <xsl:choose>
                                     <xsl:when test="$child-document/*">available</xsl:when>
@@ -165,18 +138,7 @@
 
             <!-- Visit child articles in the exact order given by <children>. -->
             <xsl:for-each select="$document/template/children/li">
-                <xsl:variable name="directory">
-                    <xsl:call-template name="article-directory">
-                        <xsl:with-param name="path" select="$location"/>
-                    </xsl:call-template>
-                </xsl:variable>
-                <xsl:variable name="child-location">
-                    <xsl:if test="string-length(string($directory))">
-                        <xsl:value-of select="$directory"/>
-                        <xsl:text>/</xsl:text>
-                    </xsl:if>
-                    <xsl:value-of select="@id"/>
-                </xsl:variable>
+                <xsl:variable name="child-location" select="string(@id)"/>
                 <xsl:variable name="child-document" select="document(string(@id), .)"/>
                 <xsl:if test="$child-document/*">
                     <xsl:call-template name="emit-articles">
@@ -206,18 +168,7 @@
 
             <!-- Recursively preserve the source tree's child order. -->
             <xsl:for-each select="$document/template/children/li">
-                <xsl:variable name="directory">
-                    <xsl:call-template name="article-directory">
-                        <xsl:with-param name="path" select="$location"/>
-                    </xsl:call-template>
-                </xsl:variable>
-                <xsl:variable name="child-location">
-                    <xsl:if test="string-length(string($directory))">
-                        <xsl:value-of select="$directory"/>
-                        <xsl:text>/</xsl:text>
-                    </xsl:if>
-                    <xsl:value-of select="@id"/>
-                </xsl:variable>
+                <xsl:variable name="child-location" select="string(@id)"/>
                 <xsl:variable name="child-document" select="document(string(@id), .)"/>
                 <xsl:if test="$child-document/*">
                     <xsl:call-template name="index-chunks">
