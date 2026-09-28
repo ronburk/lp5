@@ -1,6 +1,6 @@
 <template>
     <heading>Appendix I: Literate Programming</heading>
-    <explanation>
+    <lp5-explanation>
         <div class="epigraph">
             <div>
                 Nothing about WEB is really new; I have simply combined a
@@ -221,7 +221,7 @@
             And in the order that saves me the most time—hypertext
             order, in other words, jumping around to get
             to the information I need at that instant in time.
-            <p></p>
+            <p/>
             <p>
                 However, do not reject all novels just because you
                 did not care for one author's book.
@@ -264,5 +264,5 @@
             </p>
 
         </div>
-    </explanation>
+    </lp5-explanation>
 </template>

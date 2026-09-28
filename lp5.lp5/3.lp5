@@ -1,12 +1,12 @@
 <template>
     <children>
-        <li id="10.lp5"></li>
+        <li id="10.lp5"/>
     </children>
     <heading>lp5: The Program</heading>
-    <explanation>
+    <lp5-explanation>
         The bulk of the lp5 source can be divided
         into two main pieces:
         templates (modular HTML/CSS/JavaScript for UI)
         and the main code (JavaScript).
-    </explanation>
+    </lp5-explanation>
 </template>

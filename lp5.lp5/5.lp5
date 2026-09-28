@@ -1,15 +1,9 @@
-
 <template>
-    
-    <section>
-        <h2>New Empty Article</h2>
+    <heading>New Empty Article</heading>
+    <lp5-code>
+        <name/>
+        <code><![CDATA[
 
-    </section>
-    <section>
-        <h2></h2>
-        <script type="text/plain">
-
-        </script>
-    </section>
+        ]]></code>
+    </lp5-code>
 </template>
-                     

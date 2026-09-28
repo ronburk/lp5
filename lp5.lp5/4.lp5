@@ -1,5 +1,7 @@
-<template>    <heading>Outermost Code</heading>
-    <explanation><p>
+<template>
+    <heading>Outermost Code</heading>
+    <lp5-explanation>
+        <p>
     Note that this code section has no name,
     and recall the lp5 code generation algorithm:
     it first gathers, in order, all the unnamed
@@ -13,13 +15,15 @@
     (unless you want to give <code>doctype</code>
     its very own lonely little code section).
 </p>
-<p>
+        <p>
     The code here contains an HTML <code>&lt;script&gt;</code>
     element and its closing <code>&lt;/script&gt;</code> tag.
     CDATA keeps those tags as literal code in this XML chunk.
 </p>
-</explanation>
-    <code><![CDATA[<!doctype html>
+    </lp5-explanation>
+    <lp5-code>
+        <name/>
+        <code><![CDATA[<!doctype html>
 <!-- lp5.html <>  -->
 <html lang="en">
 <head>
@@ -38,4 +42,5 @@
 </body>
 </html>
 ]]></code>
+    </lp5-code>
 </template>

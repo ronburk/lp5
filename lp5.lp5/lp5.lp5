@@ -1,10 +1,11 @@
-<template>    <children>
-        <li id="1.lp5"></li>
-        <li id="3.lp5"></li>
-        <li id="4.lp5"></li>
-        <li id="14.lp5"></li>
-        <li id="15.lp5"></li>
-        <li id="2.lp5"></li>
+<template>
+    <children>
+        <li id="1.lp5"/>
+        <li id="3.lp5"/>
+        <li id="4.lp5"/>
+        <li id="14.lp5"/>
+        <li id="15.lp5"/>
+        <li id="2.lp5"/>
     </children>
     <heading>lp5 - Explain, Decompose, Connect</heading>
 </template>
