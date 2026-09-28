@@ -7,8 +7,8 @@
 
      The result is an index for source-navigation tools, not tangled output.
      Each article is emitted in preorder, with the root article first. Article
-     IDs are filenames, and code sections are listed separately so callers can
-     find definitions by name.
+     IDs are filenames, and code sections are grouped by bundle name so
+     callers can find each bundle.
      Code text and lp5-* reference
      elements retain their original order and content.
 
@@ -22,7 +22,9 @@
      articles remain explicit unresolved links in the index.
 -->
 <xsl:stylesheet version="1.0"
-    xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+    xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
+    xmlns:exsl="http://exslt.org/common"
+    extension-element-prefixes="exsl">
 
     <!-- Reuse the shared article validator and path helper from the tangle. -->
     <xsl:import href="tangle.xsl"/>
@@ -42,24 +44,37 @@
         <lp5-weave version="1">
             <!-- Article order is preorder, so the first article is the root. -->
             <xsl:text>&#10;  </xsl:text>
-            <articles>
-                <xsl:call-template name="emit-articles">
-                    <xsl:with-param name="document" select="."/>
-                    <xsl:with-param name="location" select="'lp5.lp5'"/>
-                    <xsl:with-param name="visited" select="'|'"/>
-                </xsl:call-template>
-                <xsl:text>&#10;  </xsl:text>
-            </articles>
+            <xsl:variable name="article-records">
+                <articles>
+                    <xsl:call-template name="emit-articles">
+                        <xsl:with-param name="document" select="."/>
+                        <xsl:with-param name="location" select="'lp5.lp5'"/>
+                        <xsl:with-param name="visited" select="'|'"/>
+                    </xsl:call-template>
+                    <xsl:text>&#10;  </xsl:text>
+                </articles>
+            </xsl:variable>
+            <xsl:copy-of select="exsl:node-set($article-records)/articles"/>
 
             <!-- Build a lookup list from bundle names to their code sections. -->
             <xsl:text>&#10;  </xsl:text>
-            <chunks>
-                <xsl:call-template name="index-chunks">
-                    <xsl:with-param name="document" select="."/>
-                    <xsl:with-param name="location" select="'lp5.lp5'"/>
-                    <xsl:with-param name="visited" select="'|'"/>
-                </xsl:call-template>
-            </chunks>
+            <bundles>
+                <!-- EXSLT node-set lets XSLT 1.0 group the emitted records. -->
+                <xsl:for-each select="exsl:node-set($article-records)/articles/article/section[@data-lp5-kind='code']">
+                    <xsl:variable name="bundle-name" select="normalize-space(name)"/>
+                    <xsl:if test="not(preceding::section[@data-lp5-kind='code'][normalize-space(name) = $bundle-name])">
+                        <xsl:text>&#10;    </xsl:text>
+                        <bundle name="{$bundle-name}">
+                            <xsl:for-each select="exsl:node-set($article-records)/articles/article/section[@data-lp5-kind='code'][normalize-space(name) = $bundle-name]">
+                                <xsl:text>&#10;      </xsl:text>
+                                <section article="{../@file}"/>
+                            </xsl:for-each>
+                            <xsl:text>&#10;    </xsl:text>
+                        </bundle>
+                    </xsl:if>
+                </xsl:for-each>
+                <xsl:text>&#10;  </xsl:text>
+            </bundles>
             <xsl:text>&#10;</xsl:text>
         </lp5-weave>
         <xsl:text>&#10;</xsl:text>
@@ -164,34 +179,5 @@
         </xsl:if>
     </xsl:template>
 
-    <!--
-         Emit one lookup entry per code fragment. normalize-space(name) matches
-         tangle.xsl's name comparison; an empty name identifies an unnamed chunk.
-    -->
-    <xsl:template name="index-chunks">
-        <xsl:param name="document"/>
-        <xsl:param name="location"/>
-        <xsl:param name="visited"/>
-
-        <xsl:if test="not(contains($visited, concat('|', $location, '|')))" >
-            <xsl:for-each select="$document/template/section[@data-lp5-kind='code']">
-                <chunk article="{$location}" name="{normalize-space(name)}"/>
-            </xsl:for-each>
-
-            <!-- Recursively preserve the source tree's child order. -->
-            <xsl:for-each select="$document/template/children/li">
-                <xsl:variable name="child-location" select="string(@id)"/>
-                <xsl:variable name="child-document" select="document(string(@id), .)"/>
-                <xsl:if test="$child-document/*">
-                    <xsl:call-template name="index-chunks">
-                        <xsl:with-param name="document" select="$child-document"/>
-                        <xsl:with-param name="location" select="string($child-location)"/>
-                        <xsl:with-param name="visited"
-                            select="concat($visited, $location, '|')"/>
-                    </xsl:call-template>
-                </xsl:if>
-            </xsl:for-each>
-        </xsl:if>
-    </xsl:template>
 
 </xsl:stylesheet>
