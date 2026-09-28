@@ -1336,13 +1336,13 @@ state home
                  const {articleTitle, docText, codeText, codeName } = namedNodes;
                  let title = sectionGetTitle(article);
                  articleTitle.value = title ;
-                 let explain = article.sections?.explanation?.innerHTML;
+                 let explain = article.sections?.['lp5-explanation']?.innerHTML;
                  if(explain)
                      docText.value = article.unindentCode(explain);
                  let value = "";
                  codeName.value = article.getCodeName();
                  codeText.value = article.unindentCode(
-                     article.sections?.script?.innerHTML);
+                     article.codeNode?.textContent);
              }
 
              class EditArticle extends LP5Element {
@@ -1423,18 +1423,18 @@ state home
 
                  articleTitle.value = title;
                  let value = "";
-                 docText.value = article.sections?.explanation.innerHTML;
-                 console.log(article.sections.explanation, docText.value);
+                 docText.value = article.sections['lp5-explanation']?.innerHTML || "";
+                 console.log(article.sections['lp5-explanation'], docText.value);
                  
                  //                 if(article.sections.explanation){
-                 //                     value = article.sections.explanation.innerHTML;
+                 //                     value = article.sections['lp5-explanation']?.innerHTML;
                  //                     value = value.replace(/^\s*<h2[^<]+[^>]+>/,'');
                  //                     docText.value = Article.unindentCode(value);
                  //                 }
                  if(article.codeSectionNode){
-                     value = article.scriptNode.childNodes[0].textContent;
+                     value = article.codeNode.textContent;
                      codeText.value = Article2.unindentCode(value);
-                     codeName.value = article.codeNameNode.innerHTML;
+                     codeName.value = article.codeNameNode.textContent;
                  }
              }
              function respond(iView, event){
@@ -2149,7 +2149,7 @@ state home
                          }
                          function renderExplanation(article){
                              let result = "";
-                             let explanation = article.sections.explanation;
+                             let explanation = article.sections['lp5-explanation'];
                              if(explanation){
                                  result = `<section>${explanation.innerHTML}</section>`;
                              }
@@ -2797,43 +2797,57 @@ state home
                  }
                  Article2 = class {
                      static articles = Articles;
-                     #checkChildren(children){
-                         children?.childNodes.forEach(child => {
-                             if (child.nodeType === Node.ELEMENT_NODE && child.tagName !== 'LI') {
-                                 console.assert(false, `First non-<li> node:`, child);
-                                 return;  // Exit the loop after the first invalid node
-                             }
-                         });
-                     }
-                     #checkSections(){
-                         const expected = {children, heading, explanation, name, script};
-                         const surprise = Object.keys(sections).
-                                                 filter(key => !(key in expected));
-                         console.assert(surprise.length = 0, surprise, this);
-                     }
-                     #hasNoNonWhitespaceTextChildren(node) {
-                         for (let child of node.childNodes) 
-                             // Check if the child is a text node and not just whitespace
-                             if (child.nodeType === Node.TEXT_NODE && child.textContent.trim() !== '') 
-                                 return false;  // Found a non-whitespace text node
-                         return true;  // No non-whitespace text nodes found
-                     }
-
                      #fromString(articleString){
-                         let html = new DOMParser().parseFromString(articleString, 'text/html');
-                         console.log(this, html);
-                         assert(html);
-                         this.template = html.querySelector('template');
-                         assert(this.template, html);
-                         assert(this.template.parentNode.nodeName == 'HEAD', html);
-                         assert(this.template.parentNode.childElementCount == 1, html);
-                         let content = this.template.content;
-                         console.assert(this.#hasNoNonWhitespaceTextChildren(content));
+                         const xml = new DOMParser().parseFromString(articleString, 'application/xml');
+                         const parserError = xml.querySelector('parsererror');
+                         assert(!parserError, `Invalid article XML: ${parserError?.textContent || ''}`);
+                         this.template = xml.documentElement;
+                         assert(this.template?.tagName === 'template', 'Article root must be <template>');
 
-                         Array.from(content.children).forEach(child => {
-                             this.sections[child.nodeName.toLowerCase()] = child;
-                         });
-                         this.#checkChildren(this.sections.children);
+                         const allowed = new Set(['children', 'heading', 'lp5-explanation', 'lp5-code']);
+                         for(const child of this.template.children){
+                             assert(allowed.has(child.tagName), `Unexpected <${child.tagName}> child of <template>`);
+                             assert(!this.sections[child.tagName], `Duplicate <${child.tagName}> in <template>`);
+                             this.sections[child.tagName] = child;
+                         }
+                         const children = this.sections.children;
+                         if(children){
+                             for(const child of children.childNodes){
+                                 if(child.nodeType === Node.TEXT_NODE && child.textContent.trim())
+                                     assert(false, '<children> may contain only <li> elements and whitespace');
+                                 if(child.nodeType === Node.ELEMENT_NODE)
+                                     assert(child.tagName === 'li', '<children> may contain only <li> elements');
+                             }
+                             for(const li of children.children)
+                                 assert(li.hasAttribute('id'), 'Each child <li> must have an id');
+                         }
+                         const codeSection = this.sections['lp5-code'];
+                         if(codeSection){
+                             for(const child of codeSection.childNodes)
+                                 if(child.nodeType === Node.ELEMENT_NODE)
+                                     assert(child.tagName === 'name' || child.tagName === 'code',
+                                            '<lp5-code> may contain only <name> and <code>');
+                             const codeChildren = Array.from(codeSection.children);
+                             assert(codeChildren.length === 2 && codeChildren[0].tagName === 'name' &&
+                                    codeChildren[1].tagName === 'code',
+                                    '<lp5-code> must contain exactly <name> followed by <code>');
+                             for(const child of codeSection.childNodes)
+                                 if(child.nodeType === Node.TEXT_NODE)
+                                     assert(!child.textContent.trim(), '<lp5-code> may contain only <name> and <code>');
+                             this.codeNameNode = codeChildren[0];
+                             this.codeNode = codeChildren[1];
+                             this.codeSectionNode = codeSection;
+                             for(const node of this.codeNode.childNodes){
+                                 if(node.nodeType === Node.TEXT_NODE)
+                                     assert(!node.textContent.trim(), '<lp5-code><code> literal content must be in CDATA');
+                                 else if(node.nodeType === Node.ELEMENT_NODE)
+                                     assert(node.tagName.startsWith('lp5-'),
+                                            'Code elements must have names beginning with lp5-');
+                                 else
+                                     assert(node.nodeType === Node.CDATA_SECTION_NODE,
+                                            'Code content must be CDATA or lp5-* elements');
+                             }
+                         }
                      }
                      escapeHTML(text) {
                          let result = "";
@@ -2849,19 +2863,26 @@ state home
                          this.URL          = URL;
                          this.sections     = {};
                          this.template     = null;
+                         this.codeSectionNode = null;
+                         this.codeNameNode = null;
+                         this.codeNode = null;
                          if(!articleString)
                              ; // ??? articleString = blankTemplate
                          this.#fromString(articleString);
                          this.escapedScript = null;
-                         if(this.sections.script){
-                             let text = trimLines(this.sections.script.innerText);
-                             if(text)
-                                 this.escapedScript = this.escapeHTML(text)
+                         if(this.codeNode){
+                             let serialized = '';
+                             for(const node of this.codeNode.childNodes){
+                                 if(node.nodeType === Node.CDATA_SECTION_NODE)
+                                     serialized += this.escapeHTML(node.textContent);
+                                 else if(node.nodeType === Node.ELEMENT_NODE)
+                                     serialized += this.escapeHTML(new XMLSerializer().serializeToString(node));
+                             }
+                             this.escapedScript = trimLines(serialized);
                          }
-                         //this.codeParsed = parseCode(this.escapedScript);
-                         this.codeParsed = parseCode(this.unindentCode(this.escapedScript));
-                         //                         this.code = this.sections.script?.innerText.trim() || null;
-                         this.name = this.sections.name?.innerText.trim() || null;
+                         this.codeParsed = parseCode(this.escapedScript);
+                         this.name = this.codeSectionNode ?
+                                     this.codeNameNode.textContent.trim().replace(/\s+/g, ' ').trim() : null;
                          this.childrenIDs = [];
                          this.childCount  = 0;
                          let children = this.sections.children;
@@ -2905,10 +2926,8 @@ state home
                      // null if no code, else empty string means "unnamed"
                      getCodeName(){
                          let result = null;
-                         if(this.sections.script){
-                             result = this.sections?.name?.innerText.trim() || '';
-                             result = result.replace(/\s+/g, ' ').trim();
-                         }
+                         if(this.codeSectionNode)
+                             result = this.name;
                          return result;
                      }
                      unindentCode(text){
@@ -2937,18 +2956,7 @@ state home
                          return result;
                      }
                      toString(){
-                         const sectionNames = [
-                             "children", "heading", "explanation", "name", "script" ];
-                         function tag(obj, name) {
-                             return obj[name] ?
-                                    `    <${name}>${obj[name].innerHTML}</${name}>\n`
-                                  : "";
-                         }
-                         let articleString = "<template>";
-                         for(const name of sectionNames)
-                             articleString += tag(this.sections, name);
-                         articleString += "</template>";
-                         return articleString;
+                         return new XMLSerializer().serializeToString(this.template);
                      }
                      createSerial(docTitle="", docText="", codeTitle="", codeText=""){
                          let children = this.section?.children.outerHTML || ""
