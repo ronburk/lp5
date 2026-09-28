@@ -1336,13 +1336,13 @@ state home
                  const {articleTitle, docText, codeText, codeName } = namedNodes;
                  let title = sectionGetTitle(article);
                  articleTitle.value = title ;
-                 let explain = article.sections?.['lp5-explanation']?.innerHTML;
+                 let explain = article.sections?.explanation?.innerHTML;
                  if(explain)
                      docText.value = article.unindentCode(explain);
                  let value = "";
                  codeName.value = article.getCodeName();
                  codeText.value = article.unindentCode(
-                     article.codeNode?.textContent);
+                     Article2.codeEditorText(article.codeNode));
              }
 
              class EditArticle extends LP5Element {
@@ -1383,7 +1383,8 @@ state home
                          heading     : articleTitle.value,
                          explanation : docText.value,
                          name        : codeName.value,
-                         script      : codeText.value
+                         code        : codeText.value,
+                         hasCode     : Boolean(this.#article.codeSectionNode)
                      }
                      return this.#article.createRevision(sectionStrings);
                  }
@@ -1423,17 +1424,17 @@ state home
 
                  articleTitle.value = title;
                  let value = "";
-                 docText.value = article.sections['lp5-explanation']?.innerHTML || "";
-                 console.log(article.sections['lp5-explanation'], docText.value);
+                 docText.value = article.sections.explanation?.innerHTML || "";
+                 console.log(article.sections.explanation, docText.value);
                  
                  //                 if(article.sections.explanation){
-                 //                     value = article.sections['lp5-explanation']?.innerHTML;
+                 //                     value = article.sections.explanation?.innerHTML;
                  //                     value = value.replace(/^\s*<h2[^<]+[^>]+>/,'');
                  //                     docText.value = Article.unindentCode(value);
                  //                 }
                  if(article.codeSectionNode){
-                     value = article.codeNode.textContent;
-                     codeText.value = Article2.unindentCode(value);
+                     value = Article2.codeEditorText(article.codeNode);
+                     codeText.value = article.unindentCode(value);
                      codeName.value = article.codeNameNode.textContent;
                  }
              }
@@ -2149,7 +2150,7 @@ state home
                          }
                          function renderExplanation(article){
                              let result = "";
-                             let explanation = article.sections['lp5-explanation'];
+                             let explanation = article.sections.explanation;
                              if(explanation){
                                  result = `<section>${explanation.innerHTML}</section>`;
                              }
@@ -2795,8 +2796,54 @@ state home
                          return new Article2(URL, parent, text);
                      }
                  }
-                 Article2 = class {
+             Article2 = class {
                      static articles = Articles;
+                     static xmlText(text){
+                         return String(text ?? '').replace(/&/g, '&amp;').
+                                                replace(/</g, '&lt;').
+                                                replace(/>/g, '&gt;');
+                     }
+                     static cdata(text){
+                         return `<![CDATA[${String(text).replace(/\]\]>/g, ']]]]><![CDATA[>')}]]>`;
+                     }
+                     static codeTextXML(text){
+                         text = String(text ?? '');
+                         const result = [];
+                         const directive = /<lp5-(?:\s+ref\s*=\s*(?:"[^"]*"|'[^']*')|endscript\s*)\/>/g;
+                         let start = 0;
+                         for(const match of String(text ?? '').matchAll(directive)){
+                             const raw = match[0];
+                             const at = match.index;
+                             if(at > start)
+                                 result.push(this.cdata(text.slice(start, at)));
+                             const xml = new DOMParser().parseFromString(`<root>${raw}</root>`, 'application/xml');
+                             const node = xml.documentElement.firstElementChild;
+                             if(!xml.querySelector('parsererror') && node?.tagName.startsWith('lp5-'))
+                                 result.push(new XMLSerializer().serializeToString(node));
+                             else
+                                 result.push(this.cdata(raw));
+                             start = at + raw.length;
+                         }
+                         if(start < String(text ?? '').length)
+                             result.push(this.cdata(String(text).slice(start)));
+                         return result.length ? result.join('') : '<![CDATA[]]>';
+                     }
+                     static codeSectionXML(name, text){
+                         return `<section data-lp5-kind="code"><name>${this.xmlText(name)}</name>` +
+                                `<code>${this.codeTextXML(text)}</code></section>`;
+                     }
+                     static codeEditorText(codeNode){
+                         if(!codeNode)
+                             return '';
+                         let result = '';
+                         for(const node of codeNode.childNodes){
+                             if(node.nodeType === Node.CDATA_SECTION_NODE)
+                                 result += node.textContent;
+                             else if(node.nodeType === Node.ELEMENT_NODE)
+                                 result += new XMLSerializer().serializeToString(node);
+                         }
+                         return result;
+                     }
                      #fromString(articleString){
                          const xml = new DOMParser().parseFromString(articleString, 'application/xml');
                          const parserError = xml.querySelector('parsererror');
@@ -2804,11 +2851,19 @@ state home
                          this.template = xml.documentElement;
                          assert(this.template?.tagName === 'template', 'Article root must be <template>');
 
-                         const allowed = new Set(['children', 'heading', 'lp5-explanation', 'lp5-code']);
+                         const allowed = new Set(['children', 'heading', 'section']);
                          for(const child of this.template.children){
                              assert(allowed.has(child.tagName), `Unexpected <${child.tagName}> child of <template>`);
-                             assert(!this.sections[child.tagName], `Duplicate <${child.tagName}> in <template>`);
-                             this.sections[child.tagName] = child;
+                             if(child.tagName === 'section'){
+                                 const kind = child.getAttribute('data-lp5-kind');
+                                 assert(kind === 'explanation' || kind === 'code',
+                                        `Invalid section data-lp5-kind '${kind}'`);
+                                 assert(!this.sections[kind], `Duplicate ${kind} section in <template>`);
+                                 this.sections[kind] = child;
+                             } else {
+                                 assert(!this.sections[child.tagName], `Duplicate <${child.tagName}> in <template>`);
+                                 this.sections[child.tagName] = child;
+                             }
                          }
                          const children = this.sections.children;
                          if(children){
@@ -2821,25 +2876,26 @@ state home
                              for(const li of children.children)
                                  assert(li.hasAttribute('id'), 'Each child <li> must have an id');
                          }
-                         const codeSection = this.sections['lp5-code'];
+                         const codeSection = this.sections.code;
                          if(codeSection){
                              for(const child of codeSection.childNodes)
                                  if(child.nodeType === Node.ELEMENT_NODE)
                                      assert(child.tagName === 'name' || child.tagName === 'code',
-                                            '<lp5-code> may contain only <name> and <code>');
+                                            'A code section may contain only <name> and <code>');
                              const codeChildren = Array.from(codeSection.children);
-                             assert(codeChildren.length === 2 && codeChildren[0].tagName === 'name' &&
-                                    codeChildren[1].tagName === 'code',
-                                    '<lp5-code> must contain exactly <name> followed by <code>');
+                             assert(codeChildren.length === 2 &&
+                                    codeChildren.filter(child => child.tagName === 'name').length === 1 &&
+                                    codeChildren.filter(child => child.tagName === 'code').length === 1,
+                                    'A code section must contain exactly one <name> and one <code>');
                              for(const child of codeSection.childNodes)
                                  if(child.nodeType === Node.TEXT_NODE)
-                                     assert(!child.textContent.trim(), '<lp5-code> may contain only <name> and <code>');
-                             this.codeNameNode = codeChildren[0];
-                             this.codeNode = codeChildren[1];
+                                     assert(!child.textContent.trim(), 'A code section may contain only <name> and <code>');
+                             this.codeNameNode = codeChildren.find(child => child.tagName === 'name');
+                             this.codeNode = codeChildren.find(child => child.tagName === 'code');
                              this.codeSectionNode = codeSection;
                              for(const node of this.codeNode.childNodes){
                                  if(node.nodeType === Node.TEXT_NODE)
-                                     assert(!node.textContent.trim(), '<lp5-code><code> literal content must be in CDATA');
+                                     assert(!node.textContent.trim(), '<code> literal content must be in CDATA');
                                  else if(node.nodeType === Node.ELEMENT_NODE)
                                      assert(node.tagName.startsWith('lp5-'),
                                             'Code elements must have names beginning with lp5-');
@@ -2902,18 +2958,16 @@ state home
                      }
                      // pass in object containing revised contents of sections
                      createRevision(sectionStrings){
-                         const sectionNames = [
-                             "children", "heading", "explanation", "name", "script" ];
-                         function tag(obj, name) {
-                             if(obj[name])
-                                 return `    <${name}>${obj[name]}</${name}>\n`;
-                             else
-                                 return "";
-                         }
-                         let articleString = "<template>";
-                         for(const name of sectionNames)
-                             articleString += tag(sectionStrings, name);
-                         articleString += "</template>";
+                         let articleString = '<template>';
+                         if(sectionStrings.children)
+                             articleString += `<children>${sectionStrings.children}</children>`;
+                         if(sectionStrings.heading)
+                             articleString += `<heading>${Article2.xmlText(sectionStrings.heading)}</heading>`;
+                         if(sectionStrings.explanation)
+                             articleString += `<section data-lp5-kind="explanation">${sectionStrings.explanation}</section>`;
+                         if(sectionStrings.hasCode || sectionStrings.name || sectionStrings.code)
+                             articleString += Article2.codeSectionXML(sectionStrings.name, sectionStrings.code);
+                         articleString += '</template>';
                          return new Article2(this.URL, this.parentURL, articleString);
                      }
                      clone(){
@@ -2959,23 +3013,14 @@ state home
                          return new XMLSerializer().serializeToString(this.template);
                      }
                      createSerial(docTitle="", docText="", codeTitle="", codeText=""){
-                         let children = this.section?.children.outerHTML || ""
-                         if(children)
-                             children = "    " + children + "\n";
-                         let endScript = "<" + "/script";
-                         let serial = `
-            <template>
-                ${children}<heading>${docTitle}</heading>
-                <explanation>
-                    ${docText}
-                </explanation>
-                <name>${codeTitle}</name>
-                <script type="text/plain">
-                 ${codeText}
-                 ${endScript}
-                 </template>
-                         `;
-                         return serial;
+                         return this.createRevision({
+                             children: this.sections.children?.innerHTML,
+                             heading: docTitle,
+                             explanation: docText,
+                             name: codeTitle,
+                             code: codeText,
+                             hasCode: Boolean(this.codeSectionNode)
+                         }).toString();
                      }
 
                  }
@@ -3131,28 +3176,18 @@ state home
                                  a.codeNameNode.innerHTML, a.codeTextNode.innerHTML
                              );
                          } else {
-                             let startScript='<'+'script type="text/plain">';
-                             let endScript='<' + '/script>';
                              let ulSerial = "";
                              if(ulNode && ulNode.innerHTML){
-                                 ulSerial = ulNode.outerHTML;
+                                 ulSerial = `<children>${ulNode.innerHTML}</children>`;
                              }
-                             let serial = `
-                 <template>
-                 ${ulSerial}
-                 <section>
-                 <h2>${docTitle}</h2>
-                 ${docText}
-                 </section>
-                 <section>
-                 <h2>${codeTitle}</h2>
-                 ${startScript}
-                 ${codeText}
-                 ${endScript}
-                 </section>
-                 </template>
-                             `;
-                             return serial;
+                             let serial = '<template>' + ulSerial;
+                             if(docTitle)
+                                 serial += `<heading>${Article2.xmlText(docTitle)}</heading>`;
+                             if(docText)
+                                 serial += `<section data-lp5-kind="explanation">${docText}</section>`;
+                             if(codeTitle || codeText)
+                                 serial += Article2.codeSectionXML(codeTitle, codeText);
+                             return serial + '</template>';
                          }
                      }
                      unindentCode(text){
@@ -4745,7 +4780,7 @@ state home
                      text = `
 <template>
     <heading>"URL": FAILED LOAD: ERROR</heading>
-    <lp5-explanation>
+    <section data-lp5-kind="explanation">
         <div style="background-color: #ffcccc; border: 2px solid #ffcc00; padding: 10px; margin: 10px 0; font-family: sans-serif;">
            <p>
 <span style="font-size: 24px;">&#9888;</span>MSG
@@ -4754,12 +4789,12 @@ state home
             The parent that linked to 'URL' was 'PARENTURL'.
         </p>
        </div>
-    </lp5-explanation>
+    </section>
 </template>`;
-                     text = text.replace(/URL/, articleText.url);
-                     text = text.replace(/PARENTURL/, parent.URL);
-                     text = text.replace(/ERROR/, articleText.error.name);
-                     text = text.replace(/MSG/, articleText.error.message);
+                     text = text.replace(/URL/, Article2.xmlText(articleText.url));
+                     text = text.replace(/PARENTURL/, Article2.xmlText(parent.URL));
+                     text = text.replace(/ERROR/, Article2.xmlText(articleText.error.name));
+                     text = text.replace(/MSG/, Article2.xmlText(articleText.error.message));
                  }
                  //                 let result = this.articles.fromSerial(parent, filename, text);
                  let result = Articles.create(filename, parent, text);

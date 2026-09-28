@@ -1,6 +1,6 @@
 <template>
     <heading>lp5: The Program</heading>
-    <lp5-explanation>
+    <section data-lp5-kind="explanation">
         <div>
             <p>
                 lp5 is written in <q>vanilla</q> HTML5.
@@ -10,8 +10,8 @@
                 machine that isn't connected to the internet.
             </p>
         </div>
-    </lp5-explanation>
-    <lp5-code>
+    </section>
+    <section data-lp5-kind="code">
         <name/>
         <code><![CDATA[
             <!doctype html>
@@ -22,5 +22,5 @@
                 </body>
             </html>
         ]]></code>
-    </lp5-code>
+    </section>
 </template>

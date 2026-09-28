@@ -6,13 +6,13 @@
         <li id="2.lp5"/>
     </children>
     <heading>lp5 - decompositional explanatory programming.</heading>
-    <lp5-explanation>
+    <section data-lp5-kind="explanation">
         <div>
         </div>
-    </lp5-explanation>
-    <lp5-code>
+    </section>
+    <section data-lp5-kind="code">
         <name/>
         <code><![CDATA[
         ]]></code>
-    </lp5-code>
+    </section>
 </template>

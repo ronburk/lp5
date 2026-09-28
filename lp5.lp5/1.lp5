@@ -1,6 +1,6 @@
 <template>
     <heading>Overview</heading>
-    <lp5-explanation>
+    <section data-lp5-kind="explanation">
         <div>
             <p>
                 lp5 is a browser-based text editor and preprocessor
@@ -178,10 +178,10 @@
             </p>
 
         </div>
-    </lp5-explanation>
-    <lp5-code>
+    </section>
+    <section data-lp5-kind="code">
         <name/>
         <code><![CDATA[
     ]]></code>
-    </lp5-code>
+    </section>
 </template>

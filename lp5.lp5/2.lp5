@@ -1,6 +1,6 @@
 <template>
     <heading>Appendix I: Literate Programming</heading>
-    <lp5-explanation>
+    <section data-lp5-kind="explanation">
         <div class="epigraph">
             <div>
                 Nothing about WEB is really new; I have simply combined a
@@ -264,5 +264,5 @@
             </p>
 
         </div>
-    </lp5-explanation>
+    </section>
 </template>

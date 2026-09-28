@@ -41,11 +41,11 @@ An **article** is one `.lp5` file. Each file is an XML document with one `<templ
 
 - `<children>` (optional): contains child-article links as `<li id="name.lp5">`.
 - `<heading>` (optional): the article's display title.
-- `<lp5-explanation>` (optional): the article's explanatory HTML/XML content. Inline HTML `<code>` elements here are ordinary inline code.
-- `<lp5-code>` (optional): one code fragment, containing exactly one `<name>` and one `<code>` child.
+- `<section data-lp5-kind="explanation">` (optional): the article's explanatory HTML/XML content. Inline HTML `<code>` elements here are ordinary inline code.
+- `<section data-lp5-kind="code">` (optional): one code section containing exactly one `<name>` and one `<code>` child.
 
-When `<lp5-code>` is present, `<name>` is required but may be empty; an empty name denotes an unnamed/root fragment. `<code>` is required and may be empty. Its children must be CDATA sections containing literal code or XML elements whose names start with `lp5-` (for example, `<lp5- ref="name">`) representing code directives/references. Ordinary literal code belongs in CDATA; whitespace between child nodes is formatting whitespace.
+Each kind of `<section>` may appear at most once in an article, and no other `data-lp5-kind` values are allowed. In a code section, `<name>` is required but may be empty; an empty name denotes an unnamed/root fragment. `<code>` is required and may be empty. Its children must be CDATA sections containing literal code or XML elements whose names start with `lp5-` (for example, `<lp5- ref="name">`) representing code directives/references. Ordinary literal code belongs in CDATA; whitespace between child nodes is formatting whitespace.
 
-The `<lp5-code>` wrapper distinguishes the code fragment from inline `<code>` markup in the explanation. If an article has no code fragment, omit `<lp5-code>` rather than writing an empty one.
+The `data-lp5-kind` attribute distinguishes the explanation and code sections, and distinguishes both from inline HTML `<code>` markup in the explanation. If an article has no code fragment, omit the code section rather than writing an empty one.
 
 A **bundle** is the ordered set of code sections that share the same `<name>` value.

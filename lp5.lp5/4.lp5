@@ -1,6 +1,6 @@
 <template>
     <heading>Outermost Code</heading>
-    <lp5-explanation>
+    <section data-lp5-kind="explanation">
         <p>
     Note that this code section has no name,
     and recall the lp5 code generation algorithm:
@@ -20,8 +20,8 @@
     element and its closing <code>&lt;/script&gt;</code> tag.
     CDATA keeps those tags as literal code in this XML chunk.
 </p>
-    </lp5-explanation>
-    <lp5-code>
+    </section>
+    <section data-lp5-kind="code">
         <name/>
         <code><![CDATA[<!doctype html>
 <!-- lp5.html <>  -->
@@ -42,5 +42,5 @@
 </body>
 </html>
 ]]></code>
-    </lp5-code>
+    </section>
 </template>

@@ -116,8 +116,8 @@
                 <!-- Preserve article data and the distinction between inline code
                      in explanations and the separately wrapped code fragment. -->
                 <xsl:copy-of select="$document/template/heading"/>
-                <xsl:copy-of select="$document/template/lp5-explanation"/>
-                <xsl:copy-of select="$document/template/lp5-code"/>
+                <xsl:copy-of select="$document/template/section[@data-lp5-kind='explanation']"/>
+                <xsl:copy-of select="$document/template/section[@data-lp5-kind='code']"/>
 
                 <!-- Child IDs are filenames relative to the article directory. -->
                 <children>
@@ -162,7 +162,7 @@
         <xsl:param name="visited"/>
 
         <xsl:if test="not(contains($visited, concat('|', $location, '|')))" >
-            <xsl:for-each select="$document/template/lp5-code">
+            <xsl:for-each select="$document/template/section[@data-lp5-kind='code']">
                 <chunk article="{$location}" name="{normalize-space(name)}"/>
             </xsl:for-each>
 
