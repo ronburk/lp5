@@ -6,10 +6,9 @@
      parameter and choosing the result filename with xsltproc's output option.
 
      The output contains only matching code sections, in article/weave order.
-     Each definition retains its article filename and ordered code content.
-     A references list records each lp5-* reference's target name and whether
-     that target has a definition in the weave. Explanations are intentionally
-     excluded. A bundle with no definitions is still returned with found="no".
+     Each bundle member is the original lp5-code element, with an article
+     attribute added to identify its source. Explanations are excluded. An
+     empty bundle means no matching code sections were found.
 -->
 <xsl:stylesheet version="1.0"
     xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
@@ -30,33 +29,11 @@
             select="/lp5-weave/articles/article/lp5-code[normalize-space(name) = $canonical-name]"/>
 
         <bundle name="{$canonical-name}">
-            <xsl:attribute name="found">
-                <xsl:choose>
-                    <xsl:when test="$definitions">yes</xsl:when>
-                    <xsl:otherwise>no</xsl:otherwise>
-                </xsl:choose>
-            </xsl:attribute>
-
             <xsl:for-each select="$definitions">
-                <definition article="{../@file}">
-                    <code>
-                        <!-- Keep code nodes in source order, including references. -->
-                        <xsl:copy-of select="code/node()"/>
-                    </code>
-                    <references>
-                        <xsl:for-each select="code//*[starts-with(name(), 'lp5-')]">
-                            <xsl:variable name="reference-name" select="normalize-space(@ref)"/>
-                            <reference name="{$reference-name}">
-                                <xsl:attribute name="defined">
-                                    <xsl:choose>
-                                        <xsl:when test="/lp5-weave/chunks/chunk[@name = $reference-name]">yes</xsl:when>
-                                        <xsl:otherwise>no</xsl:otherwise>
-                                    </xsl:choose>
-                                </xsl:attribute>
-                            </reference>
-                        </xsl:for-each>
-                    </references>
-                </definition>
+                <!-- Keep the existing article element name and its content. -->
+                <lp5-code article="{../@file}">
+                    <xsl:copy-of select="node()"/>
+                </lp5-code>
             </xsl:for-each>
         </bundle>
     </xsl:template>
