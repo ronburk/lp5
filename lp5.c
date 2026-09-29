@@ -10,7 +10,6 @@
 #include <libxslt/transform.h>
 #include <libxslt/variables.h>
 #include <libxslt/xsltutils.h>
-#include <libxslt/variables.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -251,21 +250,10 @@ static int finish_output(int status)
     return status;
 }
 
-static int command_stub(xsltStylesheetPtr stylesheet, int argc, char *argv[])
-{
-    int i;
-
-    (void) stylesheet;
-    if (open_output_file() != 0) {
-        return 1;
-    }
-    fprintf(output_stream(), "command %s:\n", argv[0]);
-    fprintf(output_stream(), "LP5Source: %s\n", LP5Source);
-    for (i = 0; i < argc; ++i) {
-        fprintf(output_stream(), "  argv[%d]: %s\n", i, argv[i]);
-    }
-    return 0;
-}
+struct xslt_parameter {
+    const char *name;
+    const char *value;
+};
 
 static char *input_directory(const char *filename)
 {
@@ -300,7 +288,7 @@ static char *input_directory(const char *filename)
 }
 
 static int transform_file(xsltStylesheetPtr stylesheet, const char *filename,
-        const char *directory)
+        const struct xslt_parameter *parameters, size_t parameter_count)
 {
     xmlDocPtr document;
     xmlDocPtr result;
@@ -314,14 +302,29 @@ static int transform_file(xsltStylesheetPtr stylesheet, const char *filename,
     }
 
     context = xsltNewTransformContext(stylesheet, document);
-    if (context == NULL || xsltQuoteOneUserParam(context,
-            BAD_CAST "source-directory", BAD_CAST directory) != 0) {
-        fprintf(stderr, "lp5: cannot initialize weave source directory\n");
-        if (context != NULL) {
-            xsltFreeTransformContext(context);
-        }
+    if (context == NULL) {
+        fprintf(stderr, "lp5: cannot create transformation context\n");
         xmlFreeDoc(document);
         return 1;
+    }
+    if (parameter_count > 0 && parameters == NULL) {
+        fprintf(stderr, "lp5: invalid stylesheet parameters\n");
+        xsltFreeTransformContext(context);
+        xmlFreeDoc(document);
+        return 1;
+    }
+    {
+        size_t i;
+        for (i = 0; i < parameter_count; ++i) {
+            if (xsltQuoteOneUserParam(context, BAD_CAST parameters[i].name,
+                    BAD_CAST parameters[i].value) != 0) {
+                fprintf(stderr, "lp5: cannot set stylesheet parameter '%s'\n",
+                    parameters[i].name);
+                xsltFreeTransformContext(context);
+                xmlFreeDoc(document);
+                return 1;
+            }
+        }
     }
     result = xsltApplyStylesheetUser(stylesheet, document, NULL, NULL, NULL,
         context);
@@ -341,59 +344,45 @@ static int transform_file(xsltStylesheetPtr stylesheet, const char *filename,
     return status;
 }
 
+static int consume_output_option(int argc, char *argv[], int *argument)
+{
+    while (*argument < argc && strcmp(argv[*argument], "-o") == 0) {
+        if (*argument + 1 >= argc) {
+            fprintf(stderr, "lp5: -o requires an output file\n");
+            return 1;
+        }
+        if (LP5OutputName != NULL &&
+                strcmp(LP5OutputName, argv[*argument + 1]) != 0) {
+            fprintf(stderr, "lp5: output file specified more than once\n");
+            return 1;
+        }
+        LP5OutputName = argv[*argument + 1];
+        *argument += 2;
+    }
+    return 0;
+}
+
 static int command_tangle(xsltStylesheetPtr stylesheet, int argc, char *argv[])
 {
     static const char default_input[] = "lp5.lp5/lp5.lp5";
     const char *input_filename = default_input;
-    xmlDocPtr document;
-    xmlDocPtr result;
-    xsltTransformContextPtr context;
-    int status = 0;
+    struct xslt_parameter parameter;
+    int first_argument = 1;
 
-    if (argc > 2) {
+    if (consume_output_option(argc, argv, &first_argument) != 0) {
+        return 1;
+    }
+    if (argc - first_argument > 1) {
         fprintf(stderr, "Usage: lp5 [-o output-file] tangle [xml-file]\n");
         return 1;
     }
-    if (argc == 2) {
-        input_filename = argv[1];
+    if (first_argument < argc) {
+        input_filename = argv[first_argument];
     }
 
-    document = xmlReadFile(input_filename, NULL, XML_PARSE_NONET);
-    if (document == NULL) {
-        fprintf(stderr, "lp5: cannot load XML file '%s'\n", input_filename);
-        return 1;
-    }
-
-    context = xsltNewTransformContext(stylesheet, document);
-    if (context == NULL) {
-        fprintf(stderr, "lp5: cannot create transformation context\n");
-        xmlFreeDoc(document);
-        return 1;
-    }
-    if (xsltQuoteOneUserParam(context, BAD_CAST "root-location",
-            BAD_CAST input_filename) != 0) {
-        fprintf(stderr, "lp5: cannot set root article location\n");
-        xsltFreeTransformContext(context);
-        xmlFreeDoc(document);
-        return 1;
-    }
-
-    result = xsltApplyStylesheetUser(stylesheet, document, NULL, NULL, NULL,
-        context);
-    xsltFreeTransformContext(context);
-    if (result == NULL) {
-        fprintf(stderr, "lp5: tangling failed\n");
-        status = 1;
-    } else {
-        if (open_output_file() != 0 ||
-                xsltSaveResultToFile(output_stream(), result, stylesheet) < 0) {
-            fprintf(stderr, "lp5: could not write tangle result\n");
-            status = 1;
-        }
-        xmlFreeDoc(result);
-    }
-    xmlFreeDoc(document);
-    return status;
+    parameter.name = "root-location";
+    parameter.value = input_filename;
+    return transform_file(stylesheet, input_filename, &parameter, 1);
 }
 
 static char *weave_default_input(void)
@@ -424,22 +413,8 @@ static int command_weave(xsltStylesheetPtr stylesheet, int argc, char *argv[])
     int first_argument = 1;
     int status;
 
-    while (first_argument < argc) {
-        if (strcmp(argv[first_argument], "-o") == 0) {
-            if (first_argument + 1 >= argc) {
-                fprintf(stderr, "Usage: lp5 [-s source-dir] weave [-o output-file] [xml-file]\n");
-                return 1;
-            }
-            if (LP5OutputName != NULL &&
-                    strcmp(LP5OutputName, argv[first_argument + 1]) != 0) {
-                fprintf(stderr, "lp5: output file specified more than once\n");
-                return 1;
-            }
-            LP5OutputName = argv[first_argument + 1];
-            first_argument += 2;
-        } else {
-            break;
-        }
+    if (consume_output_option(argc, argv, &first_argument) != 0) {
+        return 1;
     }
 
     if (first_argument + 1 < argc) {
@@ -463,17 +438,70 @@ static int command_weave(xsltStylesheetPtr stylesheet, int argc, char *argv[])
         free(default_input);
         return 1;
     }
-    status = transform_file(stylesheet, input_filename, directory);
+    {
+        struct xslt_parameter parameter;
+        parameter.name = "source-directory";
+        parameter.value = directory;
+        status = transform_file(stylesheet, input_filename, &parameter, 1);
+    }
     free(directory);
     free(default_input);
     return status;
 }
 
+static int command_add_article(xsltStylesheetPtr stylesheet, int argc,
+        char *argv[])
+{
+    struct xslt_parameter parameters[4];
+    int first_argument = 1;
+    int argument_count;
+
+    if (consume_output_option(argc, argv, &first_argument) != 0) {
+        return 1;
+    }
+    argument_count = argc - first_argument;
+    if (argument_count < 3 || argument_count > 4) {
+        fprintf(stderr,
+            "Usage: lp5 add-article [-o output-file] <weave.xml> <parent-id> <article-file> [before-child-id]\n");
+        return 1;
+    }
+
+    parameters[0].name = "parent_id";
+    parameters[0].value = argv[first_argument + 1];
+    parameters[1].name = "before_child_id";
+    parameters[1].value = argument_count == 4 ? argv[first_argument + 3] : "";
+    parameters[2].name = "articles_dir";
+    parameters[2].value = LP5Source;
+    parameters[3].name = "article_file";
+    parameters[3].value = argv[first_argument + 2];
+    return transform_file(stylesheet, argv[first_argument], parameters, 4);
+}
+
+static int command_show_bundle(xsltStylesheetPtr stylesheet, int argc,
+        char *argv[])
+{
+    struct xslt_parameter parameter;
+    int first_argument = 1;
+
+    if (consume_output_option(argc, argv, &first_argument) != 0) {
+        return 1;
+    }
+    if (argc - first_argument != 2) {
+        fprintf(stderr,
+            "Usage: lp5 show-bundle [-o output-file] <weave.xml> <code-name>\n");
+        return 1;
+    }
+
+    parameter.name = "code_name";
+    parameter.value = argv[first_argument + 1];
+    return transform_file(stylesheet, argv[first_argument], &parameter, 1);
+}
+
 static const struct command_entry commands[] = {
     {"tangle", command_tangle},
     {"weave", command_weave},
-    {"add-article", command_stub},
-    {"show-bundle", command_stub}
+    {"add-article", command_add_article},
+    {"show-bundle", command_show_bundle}
 };
 
 static int ends_with(const char *text, const char *suffix)
@@ -625,7 +653,11 @@ int main(int argc, char *argv[])
             fprintf(stderr, "lp5: out of memory\n");
             status = 1;
         } else {
-            status = transform_file(stylesheet, argv[first_argument + 1], directory);
+            struct xslt_parameter parameter;
+            parameter.name = "source-directory";
+            parameter.value = directory;
+            status = transform_file(stylesheet, argv[first_argument + 1],
+                &parameter, 1);
             free(directory);
         }
     }
