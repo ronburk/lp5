@@ -2556,7 +2556,7 @@ state home
                  }
                  *[Symbol.iterator](){ yield* this.#ranges; }
              }
-             window.LP5.modProjectIO = (() => {
+             function createProductionProjectIO(){
                  const {get, put} = window.LP5.modIndexedDB;
                  const PARENT_KEY = "handle";
                  const PREVIOUS_PROJECT_KEY = "lp5PreviousHandle";
@@ -2698,7 +2698,92 @@ state home
                      open_project,
                      load_previous_project
                  };
-             })();
+             }
+
+             // Test mode is opt-in through ?test=1. Its project store uses HTTP
+             // fixture reads and in-memory writes; production remains the default.
+             function createTestProjectIO(){
+                 const PROJECT_NAME = "lp5-test-project.lp5";
+                 const FIXTURE_URL = new URL(
+                     "test-fixtures/lp5-test-project.lp5/", location.href);
+                 const fixtureNames = new Set([
+                     PROJECT_NAME,
+                     "0.lp5",
+                     "1.lp5"
+                 ]);
+                 const writes = new Map();
+                 const failedRead = new URL(location.href).searchParams.get("fail");
+                 const state = {
+                     lastGeneratedOutput: null,
+                     lastParent: "lp5-test-parent",
+                     writes
+                 };
+
+                 class TestProjectStore {
+                     async read(name){
+                         if(writes.has(name))
+                             return writes.get(name);
+                         if(name === failedRead)
+                             throw new Error(`Controlled fixture read failure: ${name}`);
+                         if(!fixtureNames.has(name))
+                             throw new Error(`Test fixture file not found: ${name}`);
+                         const response = await fetch(new URL(
+                             encodeURIComponent(name), FIXTURE_URL));
+                         if(!response.ok)
+                             throw new Error(`Fixture read failed (${response.status}): ${name}`);
+                         return await response.text();
+                     }
+                     async write(name, text){
+                         writes.set(name, String(text));
+                         if(name === "lp5.html")
+                             state.lastGeneratedOutput = String(text);
+                         return true;
+                     }
+                     async create_unique_article(pattern, startingNumber){
+                         let number = Number(startingNumber) || 0;
+                         for(let tries = 0; tries < 99; ++tries){
+                             const name = pattern.replace(/%d/, ++number);
+                             if(fixtureNames.has(name) || writes.has(name))
+                                 continue;
+                             writes.set(name, "");
+                             fixtureNames.add(name);
+                             return name;
+                         }
+                         return null;
+                     }
+                 }
+
+                 async function pick_parent_directory(){ return PROJECT_NAME; }
+                 async function load_previous_parent(){ return state.lastParent; }
+                 async function save_parent(){ return state.lastParent; }
+                 async function list_projects(){ return [PROJECT_NAME]; }
+                 async function open_project(name){
+                     if(name !== PROJECT_NAME)
+                         throw new Error(`Test project not found: ${name}`);
+                     return new TestProjectStore();
+                 }
+                 async function load_previous_project(){ return null; }
+
+                 // Public only in explicit test mode, to support deterministic
+                 // browser assertions without adding test hooks to production.
+                 window.LP5.testProjectIO = state;
+                 const controls = document.createElement("script");
+                 controls.src = new URL("test/project_io_controls.js", location.href);
+                 document.head.append(controls);
+                 return {
+                     pick_parent_directory,
+                     load_previous_parent,
+                     save_parent,
+                     list_projects,
+                     open_project,
+                     load_previous_project
+                 };
+             }
+
+             window.LP5.modProjectIO =
+                 new URL(location.href).searchParams.get("test") === "1"
+                     ? createTestProjectIO()
+                     : createProductionProjectIO();
              window.Articles = null;
              let Article  = null;
              let Article2  = null;
