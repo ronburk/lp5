@@ -27,6 +27,14 @@
 <script type="text/state-machine" id="lp5StateMachine">
         const {asyncSchedule} = window.LP5.modSchedule;
         const {views, model}  = window.LP5;
+        function openArticleEditor(url){
+            const article = model.articleFromURL(url);
+            if(!article)
+                throw new Error(`Article not found: ${url}`);
+            const editor = document.createElement('lp5-editarticle');
+            editor.setArticle(article);
+            document.body.append(editor);
+        }
 state load
         views.loadTemplates();
         views.change('home');
@@ -61,8 +69,43 @@ state awaitProjectLoad
     ->  home
 
 state home
-    on  *
-    ->  home
+    on  click
+        if(event.ctrlKey && event.shiftKey) {
+            const articleNode = event.composedPath().find((node, index, path) =>
+                node.tagName === 'ARTICLE'
+                && index + 1 < path.length
+                && path[index + 1].id === 'LP5-Source');
+            if(articleNode) {
+                event.preventDefault();
+                openArticleEditor(articleNode.id);
+                -> editingArticle
+            }
+        }
+    -> home
+
+    on  lp5EditArticle
+        openArticleEditor(event.detail);
+    -> editingArticle
+
+state editingArticle
+    on  lp5DialogSave
+        const editor = event.detail;
+        const revision = editor.getArticleRevision();
+        asyncSchedule(async () => {
+            await model.storeResource2(revision.URL, revision.toString());
+            await model.openProject(model.projectName);
+            model.updateDerivedState();
+            views.render();
+            editor.closeEditor();
+        });
+    -> awaitArticleSave
+    on  lp5DialogCancel
+        event.detail.closeEditor();
+    -> home
+
+state awaitArticleSave
+    on  lp5AsyncComplete
+    -> home
         </script>
 
         <script>
@@ -85,6 +128,7 @@ state home
              'lp5CreateProject',
              'lp5DialogSave',
              'lp5DialogCancel',
+             'lp5EditArticle',
              'lp5NavSelect',
              'lp5SelectProject',
              'error',
@@ -1276,6 +1320,7 @@ state home
             </dialog>
             <script>
              const {deferEvent} = require('controller');
+             const Article2 = require('Article2');
              function sectionGetTitle(article){
                  let result = article.sections?.heading?.innerText;
                  if(!result)
@@ -1298,28 +1343,39 @@ state home
 
              class EditArticle extends LP5Element {
                  constructor(){
-                     super(require('template'));
+                     super();
                      this.template = new LP5Element.TemplateInstance();
+                     this.attachShadow({mode:'open',delegatesFocus:true})
+                         .append(this.template.nodes);
                      this.addListeners();
                  }
                  connectedCallback(){
                      super.connectedCallback();
-                     renderDialog(this.#article, this.namedNodes);
-                     this.namedNodes.dialog.showModal();
+                     renderDialog(this.#article, this.template.namedNodes);
+                     this.template.namedNodes.dialog.showModal();
                  }
                  disconnectedCallback(){
                      this.#article = null;
                  }
                  addListeners(){
-                     const {save, cancel} = this.template.namedNodes;
+                     const {dialog, save, cancel} = this.template.namedNodes;
                      save.addEventListener('click', ()=>this.saveClick());
                      cancel.addEventListener('click', ()=>this.cancelClick());
+                     dialog.addEventListener('cancel', event=>{
+                         event.preventDefault();
+                         this.cancelClick();
+                     });
                  }
                  saveClick(){
-                     deferEvent(this, "lp5DialogSave");
+                     deferEvent(document, "lp5DialogSave", {detail:this});
                  }
                  cancelClick(){
-                     deferEvent(this, "lp5DialogCancel");
+                     deferEvent(document, "lp5DialogCancel", {detail:this});
+                 }
+                 closeEditor(){
+                     if(this.template.namedNodes.dialog.open)
+                         this.template.namedNodes.dialog.close();
+                     this.remove();
                  }
                  #article = null;
                  setArticle(article){
@@ -1328,7 +1384,7 @@ state home
                      this.#article = article;
                  }
                  getArticleRevision(){
-                     const {articleTitle, docText, codeName, codeText}=this.namedNodes;
+                     const {articleTitle, docText, codeName, codeText}=this.template.namedNodes;
                      let sectionStrings = {
                          children    : this.#article.sections.children?.innerHTML,
                          heading     : articleTitle.value,
@@ -1340,7 +1396,7 @@ state home
                      return this.#article.createRevision(sectionStrings);
                  }
                  getArticleSerial(){
-                     const {articleTitle, docText, codeName, codeText}=this.namedNodes;
+                     const {articleTitle, docText, codeName, codeText}=this.template.namedNodes;
                      return this.#article.createSerial(
                          articleTitle.value, docText.value,
                          codeName.value, codeText.value);
@@ -3583,13 +3639,7 @@ state home
 
                              let target = path[0];
                              console.log(target, articleNode);
-                             if(articleNode && event.ctrlKey && event.shiftKey){
-                                 console.log("views.push Edit Section ", articleNode);
-                                 this.dialog = document.createElement("lp5-editarticle");
-                                 this.dialog.setArticle(Articles.fromURL(articleNode.id));
-                                 document.body.appendChild(this.dialog);
-                                 controller.state = 'EditingSection';
-                             }else if(target.id == 'LP5-Menu-Reload'){
+                             if(target.id == 'LP5-Menu-Reload'){
                                  controller.state = 'openProject';
                                  asyncSchedule(model.openProject.bind(model), model.rootTOC.URL);
                              }else if(target.id == 'LP5-Menu-Test'){
@@ -4090,6 +4140,7 @@ state home
                                  LP5Element: getBaseClass(t),
                                  controller,
                                  model,
+                                 Article2,
                              };
                              t.remove();
                              const script = extractScript(t);
@@ -4364,6 +4415,7 @@ state home
              model.projectName     = null;
              model.urlToResource    = null;
              model.articles         = new Articles();
+             model.articleFromURL   = URL => Articles.fromURL(URL);
              model.rootTOC          = null;
              model.anchorNameToNode = new Map();
              model.updateDerivedState = function(){
