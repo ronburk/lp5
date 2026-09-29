@@ -1,10 +1,14 @@
 # lp5 Agent Instructions
 
-Use the existing agent-specific lp5 checkout; an extra Git worktree is unnecessary when that checkout is isolated. If there is no usable checkout, clone the public repository:
+Each agent must use its own private clone of lp5. Never search for or reuse a
+checkout, worktree, or branch created by another agent, even if it appears
+clean. If you do not already have your own clone, create one:
 
 ```sh
 git clone https://github.com/ronburk/lp5.git lp5
 ```
+
+An extra Git worktree is unnecessary when your private clone is isolated.
 
 Before editing, fetch from GitHub and verify the checkout's branch and base commit. Preserve unrelated local changes and use a task-specific branch. Before merging a PR, fetch again; if `main` has advanced, update the branch and rerun relevant checks. Merge only when the PR is conflict-free. Use the GitHub connector for remote writes when available.
 
