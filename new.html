@@ -1291,15 +1291,32 @@ state awaitArticleSave
              textarea { display: table-cell; vertical-align: text-top; width: 100%;}
              .col1 { display: table-column; }
              .col2 { display: table-column; }
+             .dialog-header {
+                 display: flex;
+                 align-items: center;
+                 justify-content: space-between;
+                 gap: 1em;
+                 margin-bottom: .5em;
+             }
+             .dialog-actions { display: flex; gap: .5em; }
+             .dialog-header button { display: inline-block; }
+             .article-filename {
+                 font-family: monospace;
+                 font-weight: bold;
+                 text-align: right;
+             }
             </style>
             <dialog data-id="dialog">
+                <div class="dialog-header">
+                    <div class="dialog-actions">
+                        <button data-id="save">Save</button>
+                        <button data-id="cancel">Cancel</button>
+                    </div>
+                    <span data-id="articleFilename" class="article-filename"></span>
+                </div>
                 <div class="table">
                     <div class="col1"></div>
                     <div class="col2"></div>
-                    <p>
-                        <button data-id="save">Save</button>
-                        <button data-id="cancel">Cancel</button>
-                    </p>
                     <p>
                         <label>title:</label>
                         <input data-id="articleTitle" type="text">
@@ -1333,7 +1350,8 @@ state awaitArticleSave
              }
 
              function renderDialog(article, namedNodes){
-                 const {articleTitle, docText, keywordText, codeText, codeName } = namedNodes;
+                 const {articleTitle, articleFilename, docText, keywordText, codeText, codeName } = namedNodes;
+                 articleFilename.textContent = String(article.URL).split(/[\\/]/).pop();
                  let title = sectionGetTitle(article);
                  articleTitle.value = title ;
                  let explain = article.sections?.explanation?.innerHTML;
