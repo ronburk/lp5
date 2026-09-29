@@ -64,3 +64,26 @@ Each permitted direct child may appear at most once in an article. Each kind of 
 The `data-lp5-kind` attribute distinguishes the explanation and code sections, and distinguishes both from inline HTML `<code>` markup in the explanation. If an article has no code fragment, omit the code section rather than writing an empty one.
 
 A **bundle** is the ordered set of code sections that share the same `<name>` value.
+
+### Cloud-browser testing in OpenAI Work
+
+In OpenAI Work, cloud Chrome may reject `file://` URLs and may have
+`showDirectoryPicker` undefined. This is an environment limitation, not
+evidence that browser testing is unavailable.
+
+Use the provided `sites-preview` runner and CUA browser:
+
+1. Keep the checkout beneath `/workspace`.
+2. Provide a `dev` script or `.openai/hosting.json`.
+3. Run `sites-preview start "$PWD"` and open the returned
+   `http://terminal.local:...` URL.
+4. Exercise the visible UI through CUA.
+
+For applications using native file I/O, add an explicit test adapter selected
+before startup (for example, via a query parameter). The page evaluator is
+read-only and cannot install a shim after the application starts.
+
+If preview setup fails, first check `command -v sites-preview`, the checkout
+location, the project startup configuration, and the exact runner error.
+Native picker behavior, real disk permissions, and IndexedDB persistence
+remain separate tests.
