@@ -855,9 +855,9 @@ static int save_result_with_source_map(xmlDocPtr result,
 
 static int transform_file(xsltStylesheetPtr stylesheet, const char *filename,
         const struct xslt_parameter *parameters, size_t parameter_count,
-        const char *source_map_filename, const char *source_map_marker_name)
+        xmlDocPtr document, const char *source_map_filename,
+        const char *source_map_marker_name)
 {
-    xmlDocPtr document;
     xmlDocPtr result;
     xsltTransformContextPtr context;
     int status = 0;
@@ -865,7 +865,9 @@ static int transform_file(xsltStylesheetPtr stylesheet, const char *filename,
     if (source_map_filename != NULL) {
         clear_source_map_sources();
     }
-    document = xmlReadFile(filename, NULL, XML_PARSE_NONET);
+    if (document == NULL) {
+        document = xmlReadFile(filename, NULL, XML_PARSE_NONET);
+    }
     if (document == NULL) {
         fprintf(stderr, "lp5: cannot load XML file '%s'\n", filename);
         if (source_map_filename != NULL) {
@@ -979,15 +981,71 @@ static int remove_global_options(int *argc, char *argv[])
     return 0;
 }
 
+static void usage_tangle(void)
+{
+    fprintf(stderr,
+        "Usage: lp5 tangle [root-article]\n"
+        "  Tangle an LP5 project starting from its root article.\n"
+        "  Output goes to standard output unless -o <file> is specified.\n"
+        "  Use -m <file> to write an ECMA-426 source map.\n");
+    exit(1);
+}
+
+static xmlDocPtr read_tangle_root_article(const char *filename)
+{
+    xmlDocPtr document = xmlReadFile(filename, NULL, XML_PARSE_NONET);
+    xmlNodePtr root;
+
+    if (document == NULL) {
+        fprintf(stderr,
+            "lp5: cannot read tangle input '%s' as an LP5 root article.\n",
+            filename);
+        usage_tangle();
+    }
+    root = xmlDocGetRootElement(document);
+    if (root == NULL) {
+        fprintf(stderr,
+            "lp5: tangle input '%s' is not an LP5 root article: "
+            "found no document element; expected <template>.\n",
+            filename);
+        xmlFreeDoc(document);
+        usage_tangle();
+    }
+    if (xmlStrcmp(root->name, BAD_CAST "template") != 0 || root->ns != NULL) {
+        if (root->ns != NULL && root->ns->prefix != NULL) {
+            fprintf(stderr,
+                "lp5: tangle input '%s' is not an LP5 root article: "
+                "found <%s:%s>; expected <template>.\n",
+                filename, (const char *) root->ns->prefix,
+                (const char *) root->name);
+        } else if (root->ns != NULL && root->ns->href != NULL) {
+            fprintf(stderr,
+                "lp5: tangle input '%s' is not an LP5 root article: "
+                "found <%s> in namespace '%s'; expected unqualified <template>.\n",
+                filename, (const char *) root->name,
+                (const char *) root->ns->href);
+        } else {
+            fprintf(stderr,
+                "lp5: tangle input '%s' is not an LP5 root article: "
+                "found <%s>; expected <template>. Use -o to name the generated output.\n",
+                filename, (const char *) root->name);
+        }
+        xmlFreeDoc(document);
+        usage_tangle();
+    }
+    return document;
+}
+
 static int command_tangle(xsltStylesheetPtr stylesheet, int argc, char *argv[])
 {
     static const char default_input[] = "lp5.lp5/lp5.lp5";
     const char *input_filename = default_input;
     struct xslt_parameter parameters[3];
+    xmlDocPtr document;
 
     if (argc > 2) {
-        fprintf(stderr, "Usage: lp5 tangle [xml-file]\n");
-        return 1;
+        fprintf(stderr, "lp5: tangle accepts at most one root-article argument.\n");
+        usage_tangle();
     }
     if (argc == 2) {
         input_filename = argv[1];
@@ -998,6 +1056,7 @@ static int command_tangle(xsltStylesheetPtr stylesheet, int argc, char *argv[])
         fprintf(stderr, "lp5: source map and generated output must use different files\n");
         return 1;
     }
+    document = read_tangle_root_article(input_filename);
     parameters[0].name = "root-location";
     parameters[0].value = input_filename;
     parameters[1].name = "source-map-enabled";
@@ -1016,7 +1075,7 @@ static int command_tangle(xsltStylesheetPtr stylesheet, int argc, char *argv[])
             marker_name_parameter = marker_name;
         }
         return transform_file(stylesheet, input_filename, parameters,
-            parameter_count, LP5MapName, marker_name_parameter);
+            parameter_count, document, LP5MapName, marker_name_parameter);
     }
 }
 
@@ -1073,7 +1132,7 @@ static int command_weave(xsltStylesheetPtr stylesheet, int argc, char *argv[])
         parameter.name = "source-directory";
         parameter.value = directory;
         status = transform_file(stylesheet, input_filename, &parameter, 1,
-            NULL, NULL);
+            NULL, NULL, NULL);
     }
     free(directory);
     free(default_input);
@@ -1099,7 +1158,8 @@ static int command_add_article(xsltStylesheetPtr stylesheet, int argc,
     parameters[2].value = LP5Source;
     parameters[3].name = "article_file";
     parameters[3].value = argv[3];
-    return transform_file(stylesheet, argv[1], parameters, 4, NULL, NULL);
+    return transform_file(stylesheet, argv[1], parameters, 4,
+        NULL, NULL, NULL);
 }
 
 static int command_show_bundle(xsltStylesheetPtr stylesheet, int argc,
@@ -1115,7 +1175,8 @@ static int command_show_bundle(xsltStylesheetPtr stylesheet, int argc,
 
     parameter.name = "code_name";
     parameter.value = argv[2];
-    return transform_file(stylesheet, argv[1], &parameter, 1, NULL, NULL);
+    return transform_file(stylesheet, argv[1], &parameter, 1,
+        NULL, NULL, NULL);
 }
 
 static const struct command_entry commands[] = {
@@ -1274,7 +1335,7 @@ int main(int argc, char *argv[])
             parameter.name = "source-directory";
             parameter.value = directory;
             status = transform_file(stylesheet, argv[first_argument + 1],
-                &parameter, 1, NULL, NULL);
+                &parameter, 1, NULL, NULL, NULL);
             free(directory);
         }
     }

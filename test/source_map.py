@@ -120,6 +120,22 @@ delta();
                 source = source_lines[line_number - 1]
                 assert Path(source).name == expected[text], (line_number, text, source)
 
+        weave_file = directory / "weave.xml"
+        weave_file.write_text('<lp5-weave version="1"/>', encoding="utf-8")
+        invalid_input = subprocess.run(
+            [executable, "tangle", str(weave_file), "-m", str(map_file)],
+            cwd=PROJECT_DIR,
+            text=True,
+            capture_output=True,
+        )
+        assert invalid_input.returncode == 1
+        assert (
+            f"tangle input '{weave_file}' is not an LP5 root article: "
+            "found <lp5-weave>; expected <template>. Use -o to name the generated output."
+        ) in invalid_input.stderr
+        assert "Usage: lp5 tangle [root-article]" in invalid_input.stderr
+        assert "transformation failed" not in invalid_input.stderr
+
     print("source-map parity and fragment-attribution test passed")
 
 
