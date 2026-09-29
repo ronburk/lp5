@@ -87,13 +87,13 @@
             </xsl:message>
         </xsl:if>
 
-        <xsl:if test="$document/template/*[not(self::children or self::heading or self::section)]">
+        <xsl:if test="$document/template/*[not(self::children or self::heading or self::keywords or self::section)]">
             <xsl:message terminate="yes">
                 <xsl:text>Invalid article '</xsl:text>
                 <xsl:value-of select="$location"/>
                 <xsl:text>': unexpected direct child &lt;</xsl:text>
                 <xsl:value-of select="name($document/template/*[not(self::children or
-                        self::heading or self::section)][1])"/>
+                        self::heading or self::keywords or self::section)][1])"/>
                 <xsl:text>&gt; of &lt;template&gt;.</xsl:text>
             </xsl:message>
         </xsl:if>
@@ -108,6 +108,7 @@
 
         <xsl:if test="count($document/template/children) &gt; 1 or
                 count($document/template/heading) &gt; 1 or
+                count($document/template/keywords) &gt; 1 or
                 count($document/template/section[@data-lp5-kind = 'explanation']) &gt; 1 or
                 count($document/template/section[@data-lp5-kind = 'code']) &gt; 1">
             <xsl:message terminate="yes">
@@ -137,6 +138,20 @@
                 <xsl:text>Invalid article '</xsl:text>
                 <xsl:value-of select="$location"/>
                 <xsl:text>': &lt;children&gt; must contain only empty &lt;li id="name.lp5"&gt; links.</xsl:text>
+            </xsl:message>
+        </xsl:if>
+
+        <xsl:if test="$document/template/keywords/node()[
+                self::*[not(self::li)] or
+                self::text()[normalize-space()] or
+                self::comment() or
+                self::processing-instruction()] or
+                $document/template/keywords/li/node()[
+                    self::* or self::comment() or self::processing-instruction()]">
+            <xsl:message terminate="yes">
+                <xsl:text>Invalid article '</xsl:text>
+                <xsl:value-of select="$location"/>
+                <xsl:text>': &lt;keywords&gt; must contain only &lt;li&gt; elements and whitespace, and each &lt;li&gt; may contain only text.</xsl:text>
             </xsl:message>
         </xsl:if>
 

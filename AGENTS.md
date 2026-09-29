@@ -55,10 +55,11 @@ An **article** is one `.lp5` file. Each file is an XML document with one `<templ
 
 - `<children>` (optional): contains child-article links as `<li id="name.lp5">`.
 - `<heading>` (optional): the article's display title.
+- `<keywords>` (optional): contains zero or more `<li>` elements, each with a text-only keyword. Whitespace between list items is allowed. The editor trims terms, ignores empty terms, and permits an empty element for legacy articles.
 - `<section data-lp5-kind="explanation">` (optional): the article's explanatory HTML/XML content. Inline HTML `<code>` elements here are ordinary inline code.
 - `<section data-lp5-kind="code">` (optional): one code section containing exactly one `<name>` and one `<code>` child.
 
-Each kind of `<section>` may appear at most once in an article, and no other `data-lp5-kind` values are allowed. In a code section, `<name>` is required but may be empty; an empty name denotes an unnamed/root fragment. `<code>` is required and may be empty. Its children must be CDATA sections containing literal code or XML elements whose names start with `lp5-` (for example, `<lp5- ref="name">`) representing code directives/references. Ordinary literal code belongs in CDATA; whitespace between child nodes is formatting whitespace.
+Each permitted direct child may appear at most once in an article. Each kind of `<section>` may appear at most once, and no other `data-lp5-kind` values are allowed. In a code section, `<name>` is required but may be empty; an empty name denotes an unnamed/root fragment. `<code>` is required and may be empty. Its children must be CDATA sections containing literal code or XML elements whose names start with `lp5-` (for example, `<lp5- ref="name">`) representing code directives/references. Ordinary literal code belongs in CDATA; whitespace between child nodes is formatting whitespace.
 
 The `data-lp5-kind` attribute distinguishes the explanation and code sections, and distinguishes both from inline HTML `<code>` markup in the explanation. If an article has no code fragment, omit the code section rather than writing an empty one.
 
