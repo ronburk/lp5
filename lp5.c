@@ -40,6 +40,7 @@ typedef int (*command_function)(xsltStylesheetPtr stylesheet, int argc,
 
 const char *LP5Source = "lp5.lp5";
 const char *LP5OutputName;
+const char *LP5MapName;
 static FILE *LP5OutputFile;
 
 #define LP5_EXTENSION_NAMESPACE "http://example.com/lp5ext"
@@ -957,6 +958,18 @@ static int remove_global_options(int *argc, char *argv[])
             }
             LP5OutputName = argv[read_argument + 1];
             read_argument += 2;
+        } else if (strcmp(argv[read_argument], "-m") == 0) {
+            if (read_argument + 1 >= *argc) {
+                fprintf(stderr, "lp5: -m requires a source-map file\n");
+                return 1;
+            }
+            if (LP5MapName != NULL &&
+                    strcmp(LP5MapName, argv[read_argument + 1]) != 0) {
+                fprintf(stderr, "lp5: source map specified more than once\n");
+                return 1;
+            }
+            LP5MapName = argv[read_argument + 1];
+            read_argument += 2;
         } else {
             argv[write_argument++] = argv[read_argument++];
         }
@@ -970,54 +983,32 @@ static int command_tangle(xsltStylesheetPtr stylesheet, int argc, char *argv[])
 {
     static const char default_input[] = "lp5.lp5/lp5.lp5";
     const char *input_filename = default_input;
-    const char *map_filename = NULL;
     struct xslt_parameter parameters[3];
-    int read_argument = 1;
-    int write_argument = 1;
-
-    while (read_argument < argc) {
-        if (strcmp(argv[read_argument], "-m") == 0) {
-            if (read_argument + 1 >= argc) {
-                fprintf(stderr, "Usage: lp5 tangle [-m map-file] [xml-file]\n");
-                return 1;
-            }
-            if (map_filename != NULL) {
-                fprintf(stderr, "lp5: source map specified more than once\n");
-                return 1;
-            }
-            map_filename = argv[read_argument + 1];
-            read_argument += 2;
-        } else {
-            argv[write_argument++] = argv[read_argument++];
-        }
-    }
-    argv[write_argument] = NULL;
-    argc = write_argument;
 
     if (argc > 2) {
-        fprintf(stderr, "Usage: lp5 tangle [-m map-file] [xml-file]\n");
+        fprintf(stderr, "Usage: lp5 tangle [xml-file]\n");
         return 1;
     }
     if (argc == 2) {
         input_filename = argv[1];
     }
 
-    if (map_filename != NULL && LP5OutputName != NULL &&
-            strcmp(map_filename, LP5OutputName) == 0) {
+    if (LP5MapName != NULL && LP5OutputName != NULL &&
+            strcmp(LP5MapName, LP5OutputName) == 0) {
         fprintf(stderr, "lp5: source map and generated output must use different files\n");
         return 1;
     }
     parameters[0].name = "root-location";
     parameters[0].value = input_filename;
     parameters[1].name = "source-map-enabled";
-    parameters[1].value = map_filename == NULL ? "false" : "true";
+    parameters[1].value = LP5MapName == NULL ? "false" : "true";
     {
         char marker_name[64];
         static unsigned long marker_sequence;
         const char *marker_name_parameter = NULL;
-        size_t parameter_count = map_filename == NULL ? 2 : 3;
+        size_t parameter_count = LP5MapName == NULL ? 2 : 3;
 
-        if (map_filename != NULL) {
+        if (LP5MapName != NULL) {
             snprintf(marker_name, sizeof(marker_name), "lp5sm%lx%lx",
                 (unsigned long) time(NULL), marker_sequence++);
             parameters[2].name = "source-map-marker-name";
@@ -1025,7 +1016,7 @@ static int command_tangle(xsltStylesheetPtr stylesheet, int argc, char *argv[])
             marker_name_parameter = marker_name;
         }
         return transform_file(stylesheet, input_filename, parameters,
-            parameter_count, map_filename, marker_name_parameter);
+            parameter_count, LP5MapName, marker_name_parameter);
     }
 }
 
@@ -1200,12 +1191,13 @@ static int run_command(const struct command_entry *command, int argc,
 static void print_usage(const char *program)
 {
     fprintf(stderr,
-        "Usage: %s [-s source-dir] [-o output-file] <command> [args...]\n"
+        "Usage: %s [-s source-dir] [-o output-file] [-m map-file] <command> [args...]\n"
         "       Commands: tangle, weave, add-article, show-bundle\n"
-        "       %s tangle [-m map-file] [xml-file]\n"
+        "       %s tangle [xml-file]\n"
         "       %s [-s source-dir] [-o output-file] <stylesheet.xsl|stylesheet.xslt> [xml-file] [other args...]\n"
         "       Source directory defaults to lp5.lp5; LP5Source sets the environment default.\n"
-        "       -s source-dir and -o output-file may appear anywhere; both are removed before command dispatch.\n",
+        "       -s, -o, and -m options may appear anywhere; they are removed before command dispatch.\n"
+        "       -m map-file applies only to tangle.\n",
         program, program, program);
 }
 
@@ -1238,8 +1230,17 @@ int main(int argc, char *argv[])
             print_usage(argv[0]);
             return 1;
         }
+        if (LP5MapName != NULL && command->function != command_tangle) {
+            fprintf(stderr, "lp5: -m is only valid with the tangle command\n");
+            return finish_output(1);
+        }
         status = run_command(command, argc, argv, first_argument);
         return finish_output(status);
+    }
+
+    if (LP5MapName != NULL) {
+        fprintf(stderr, "lp5: -m is only valid with the tangle command\n");
+        return 1;
     }
 
     xmlInitParser();
