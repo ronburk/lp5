@@ -8,10 +8,62 @@
 #include <libxslt/transform.h>
 #include <libxslt/xsltutils.h>
 #include <stdio.h>
+#include <string.h>
+
+typedef int (*command_function)(int argc, char *argv[]);
+
+struct command_entry {
+    const char *name;
+    command_function function;
+};
+
+static int command_foo(int argc, char *argv[])
+{
+    int i;
+
+    puts("command foo:");
+    for (i = 0; i < argc; ++i) {
+        printf("  argv[%d]: %s\n", i, argv[i]);
+    }
+    return 0;
+}
+
+static const struct command_entry commands[] = {
+    {"foo", command_foo}
+};
+
+static int ends_with(const char *text, const char *suffix)
+{
+    size_t text_length = strlen(text);
+    size_t suffix_length = strlen(suffix);
+
+    return text_length >= suffix_length &&
+        strcmp(text + text_length - suffix_length, suffix) == 0;
+}
+
+static int is_stylesheet_name(const char *name)
+{
+    return ends_with(name, ".xsl") || ends_with(name, ".xslt");
+}
+
+static command_function find_command(const char *name)
+{
+    size_t i;
+
+    for (i = 0; i < sizeof(commands) / sizeof(commands[0]); ++i) {
+        if (strcmp(commands[i].name, name) == 0) {
+            return commands[i].function;
+        }
+    }
+    return NULL;
+}
 
 static void print_usage(const char *program)
 {
-    fprintf(stderr, "Usage: %s <stylesheet> [xml-file] [other args...]\n", program);
+    fprintf(stderr,
+        "Usage: %s <command> [args...]\n"
+        "       %s <stylesheet.xsl|stylesheet.xslt> [xml-file] [other args...]\n",
+        program, program);
 }
 
 int main(int argc, char *argv[])
@@ -24,6 +76,16 @@ int main(int argc, char *argv[])
     if (argc < 2) {
         print_usage(argv[0]);
         return 1;
+    }
+
+    if (!is_stylesheet_name(argv[1])) {
+        command_function function = find_command(argv[1]);
+        if (function == NULL) {
+            fprintf(stderr, "lp5: unknown command '%s'\n", argv[1]);
+            print_usage(argv[0]);
+            return 1;
+        }
+        return function(argc, argv);
     }
 
     xmlInitParser();
