@@ -215,6 +215,7 @@
                     <article file="{$location}">
                         <!-- Preserve source order and section content. -->
                         <xsl:for-each select="$document/template/heading |
+                                $document/template/keywords |
                                 $document/template/section[@data-lp5-kind='explanation'] |
                                 $document/template/section[@data-lp5-kind='code']">
                             <xsl:text>&#10;      </xsl:text>
