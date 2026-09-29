@@ -1993,6 +1993,21 @@ state home
                              width: fit-content;
                              /*             width: auto;*/
                          }
+                         .LP5-Keywords {
+                             margin: 0.5em 0;
+                         }
+                         .LP5-Keywords ul {
+                             display: inline;
+                             margin: 0;
+                             padding: 0;
+                         }
+                         .LP5-Keywords li {
+                             display: inline;
+                             list-style: none;
+                         }
+                         .LP5-Keywords li + li::before {
+                             content: ", ";
+                         }
                          .LP5-Code {
                              font-family: "Consolas", monospace;
                              white-space: pre;
@@ -2148,6 +2163,23 @@ state home
                              }
                              return result;
                          }
+                         function renderKeywords(article){
+                             if(!article.keywords.length)
+                                 return null;
+                             const section = document.createElement('section');
+                             section.className = 'LP5-Keywords';
+                             const label = document.createElement('strong');
+                             label.textContent = 'Keywords: ';
+                             section.appendChild(label);
+                             const list = document.createElement('ul');
+                             for(const keyword of article.keywords){
+                                 const item = document.createElement('li');
+                                 item.textContent = keyword;
+                                 list.appendChild(item);
+                             }
+                             section.appendChild(list);
+                             return section;
+                         }
                          function renderExplanation(article){
                              let result = "";
                              let explanation = article.sections.explanation;
@@ -2208,13 +2240,14 @@ state home
                              console.log("source pane renderArticle ", article);
                              let articleNode = document.createElement('ARTICLE');
                              articleNode.setAttribute('tabIndex', 0);
-                             const innerHTML =
-                                     renderHeading(article) +
-                                     renderExplanation(article) +
-                                     renderName(article) +
-                                     renderScript(article)
-                             ;
-                             articleNode.innerHTML = innerHTML;
+                             articleNode.innerHTML = renderHeading(article);
+                             const keywords = renderKeywords(article);
+                             if(keywords)
+                                 articleNode.appendChild(keywords);
+                             articleNode.insertAdjacentHTML('beforeend',
+                                 renderExplanation(article) +
+                                 renderName(article) +
+                                 renderScript(article));
                              articleNode.id = article.URL;
                              articleNode.querySelectorAll('a').
                                          forEach(link => link.tabIndex = -1);
@@ -2851,7 +2884,7 @@ state home
                          this.template = xml.documentElement;
                          assert(this.template?.tagName === 'template', 'Article root must be <template>');
 
-                         const allowed = new Set(['children', 'heading', 'section']);
+                         const allowed = new Set(['children', 'heading', 'keywords', 'section']);
                          for(const child of this.template.children){
                              assert(allowed.has(child.tagName), `Unexpected <${child.tagName}> child of <template>`);
                              if(child.tagName === 'section'){
@@ -2875,6 +2908,26 @@ state home
                              }
                              for(const li of children.children)
                                  assert(li.hasAttribute('id'), 'Each child <li> must have an id');
+                         }
+                         const keywords = this.sections.keywords;
+                         this.keywords = [];
+                         if(keywords){
+                             for(const child of keywords.childNodes){
+                                 if(child.nodeType === Node.TEXT_NODE){
+                                     assert(!child.textContent.trim(),
+                                            '<keywords> may contain only <li> elements and whitespace');
+                                 } else if(child.nodeType === Node.ELEMENT_NODE){
+                                     assert(child.tagName === 'li',
+                                            '<keywords> may contain only <li> elements');
+                                     for(const liChild of child.childNodes)
+                                         assert(liChild.nodeType === Node.TEXT_NODE ||
+                                                liChild.nodeType === Node.CDATA_SECTION_NODE,
+                                                'Keyword <li> elements may contain only text');
+                                     const value = child.textContent.trim();
+                                     if(value)
+                                         this.keywords.push(value);
+                                 }
+                             }
                          }
                          const codeSection = this.sections.code;
                          if(codeSection){
@@ -2963,6 +3016,9 @@ state home
                              articleString += `<children>${sectionStrings.children}</children>`;
                          if(sectionStrings.heading)
                              articleString += `<heading>${Article2.xmlText(sectionStrings.heading)}</heading>`;
+                         if(this.keywords.length)
+                             articleString += '<keywords>' + this.keywords.map(keyword =>
+                                 `<li>${Article2.xmlText(keyword)}</li>`).join('') + '</keywords>';
                          if(sectionStrings.explanation)
                              articleString += `<section data-lp5-kind="explanation">${sectionStrings.explanation}</section>`;
                          if(sectionStrings.hasCode || sectionStrings.name || sectionStrings.code)
