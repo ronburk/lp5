@@ -11,18 +11,22 @@
 #include <stdlib.h>
 #include <string.h>
 
-typedef int (*command_function)(int argc, char *argv[]);
+typedef int (*command_function)(const char *command_name, int argc,
+    char *argv[]);
+
+const char *LP5Source = "lp5.lp5";
 
 struct command_entry {
     const char *name;
     command_function function;
 };
 
-static int command_stub(int argc, char *argv[])
+static int command_stub(const char *command_name, int argc, char *argv[])
 {
     int i;
 
-    printf("command %s:\n", argv[1]);
+    printf("command %s:\n", command_name);
+    printf("LP5Source: %s\n", LP5Source);
     for (i = 0; i < argc; ++i) {
         printf("  argv[%d]: %s\n", i, argv[i]);
     }
@@ -90,7 +94,7 @@ static int run_command(const struct command_entry *command, int argc,
     }
 
     free(stylesheet_name);
-    status = command->function(argc, argv);
+    status = command->function(command->name, argc, argv);
     xsltFreeStylesheet(stylesheet);
     xsltCleanupGlobals();
     xmlCleanupParser();
@@ -100,9 +104,11 @@ static int run_command(const struct command_entry *command, int argc,
 static void print_usage(const char *program)
 {
     fprintf(stderr,
-        "Usage: %s <command> [args...]\n"
+        "Usage: %s [-s source-dir] <command> [args...]\n"
         "       Commands: tangle, weave, add-article, show-bundle\n"
-        "       %s <stylesheet.xsl|stylesheet.xslt> [xml-file] [other args...]\n",
+        "       %s [-s source-dir] <stylesheet.xsl|stylesheet.xslt> [xml-file] [other args...]\n"
+        "       Source directory defaults to lp5.lp5; LP5Source sets the environment default.\n"
+        "       -s overrides both.\n",
         program, program);
 }
 
@@ -111,17 +117,33 @@ int main(int argc, char *argv[])
     xsltStylesheetPtr stylesheet;
     xmlDocPtr document;
     xmlDocPtr result;
+    const char *environment_source;
+    int first_argument = 1;
     int status = 0;
 
-    if (argc < 2) {
+    environment_source = getenv("LP5Source");
+    if (environment_source != NULL) {
+        LP5Source = environment_source;
+    }
+
+    if (first_argument < argc && strcmp(argv[first_argument], "-s") == 0) {
+        if (first_argument + 1 >= argc) {
+            print_usage(argv[0]);
+            return 1;
+        }
+        LP5Source = argv[first_argument + 1];
+        first_argument += 2;
+    }
+
+    if (first_argument >= argc) {
         print_usage(argv[0]);
         return 1;
     }
 
-    if (!is_stylesheet_name(argv[1])) {
-        const struct command_entry *command = find_command(argv[1]);
+    if (!is_stylesheet_name(argv[first_argument])) {
+        const struct command_entry *command = find_command(argv[first_argument]);
         if (command == NULL) {
-            fprintf(stderr, "lp5: unknown command '%s'\n", argv[1]);
+            fprintf(stderr, "lp5: unknown command '%s'\n", argv[first_argument]);
             print_usage(argv[0]);
             return 1;
         }
@@ -130,28 +152,28 @@ int main(int argc, char *argv[])
 
     xmlInitParser();
     exsltRegisterAll();
-    stylesheet = xsltParseStylesheetFile((const xmlChar *) argv[1]);
+    stylesheet = xsltParseStylesheetFile((const xmlChar *) argv[first_argument]);
     if (stylesheet == NULL) {
-        fprintf(stderr, "lp5: cannot load stylesheet '%s'\n", argv[1]);
+        fprintf(stderr, "lp5: cannot load stylesheet '%s'\n", argv[first_argument]);
         xmlCleanupParser();
         return 1;
     }
 
-    if (argc < 3) {
+    if (first_argument + 1 >= argc) {
         xsltFreeStylesheet(stylesheet);
         xsltCleanupGlobals();
         xmlCleanupParser();
         return 0;
     }
 
-    if (argc > 3) {
+    if (first_argument + 2 < argc) {
         fprintf(stderr, "lp5: additional arguments are not supported yet\n");
         print_usage(argv[0]);
         status = 1;
     } else {
-        document = xmlReadFile(argv[2], NULL, XML_PARSE_NONET);
+        document = xmlReadFile(argv[first_argument + 1], NULL, XML_PARSE_NONET);
         if (document == NULL) {
-            fprintf(stderr, "lp5: cannot load XML file '%s'\n", argv[2]);
+            fprintf(stderr, "lp5: cannot load XML file '%s'\n", argv[first_argument + 1]);
             status = 1;
         } else {
             result = xsltApplyStylesheet(stylesheet, document, NULL);
