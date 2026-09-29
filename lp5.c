@@ -8,6 +8,7 @@
 #include <libxslt/transform.h>
 #include <libxslt/xsltutils.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 typedef int (*command_function)(int argc, char *argv[]);
@@ -17,11 +18,11 @@ struct command_entry {
     command_function function;
 };
 
-static int command_foo(int argc, char *argv[])
+static int command_stub(int argc, char *argv[])
 {
     int i;
 
-    puts("command foo:");
+    printf("command %s:\n", argv[1]);
     for (i = 0; i < argc; ++i) {
         printf("  argv[%d]: %s\n", i, argv[i]);
     }
@@ -29,7 +30,10 @@ static int command_foo(int argc, char *argv[])
 }
 
 static const struct command_entry commands[] = {
-    {"foo", command_foo}
+    {"tangle", command_stub},
+    {"weave", command_stub},
+    {"add-article", command_stub},
+    {"show-bundle", command_stub}
 };
 
 static int ends_with(const char *text, const char *suffix)
@@ -46,22 +50,58 @@ static int is_stylesheet_name(const char *name)
     return ends_with(name, ".xsl") || ends_with(name, ".xslt");
 }
 
-static command_function find_command(const char *name)
+static const struct command_entry *find_command(const char *name)
 {
     size_t i;
 
     for (i = 0; i < sizeof(commands) / sizeof(commands[0]); ++i) {
         if (strcmp(commands[i].name, name) == 0) {
-            return commands[i].function;
+            return &commands[i];
         }
     }
     return NULL;
+}
+
+static int run_command(const struct command_entry *command, int argc,
+        char *argv[])
+{
+    size_t name_length = strlen(command->name);
+    char *stylesheet_name = malloc(name_length + sizeof(".xsl"));
+    xsltStylesheetPtr stylesheet;
+    int status;
+
+    if (stylesheet_name == NULL) {
+        fprintf(stderr, "lp5: out of memory\n");
+        return 1;
+    }
+    memcpy(stylesheet_name, command->name, name_length);
+    memcpy(stylesheet_name + name_length, ".xsl", sizeof(".xsl"));
+
+    xmlInitParser();
+    exsltRegisterAll();
+    stylesheet = xsltParseStylesheetFile((const xmlChar *) stylesheet_name);
+    if (stylesheet == NULL) {
+        fprintf(stderr, "lp5: cannot load stylesheet '%s' for command '%s'\n",
+            stylesheet_name, command->name);
+        free(stylesheet_name);
+        xsltCleanupGlobals();
+        xmlCleanupParser();
+        return 1;
+    }
+
+    free(stylesheet_name);
+    status = command->function(argc, argv);
+    xsltFreeStylesheet(stylesheet);
+    xsltCleanupGlobals();
+    xmlCleanupParser();
+    return status;
 }
 
 static void print_usage(const char *program)
 {
     fprintf(stderr,
         "Usage: %s <command> [args...]\n"
+        "       Commands: tangle, weave, add-article, show-bundle\n"
         "       %s <stylesheet.xsl|stylesheet.xslt> [xml-file] [other args...]\n",
         program, program);
 }
@@ -79,13 +119,13 @@ int main(int argc, char *argv[])
     }
 
     if (!is_stylesheet_name(argv[1])) {
-        command_function function = find_command(argv[1]);
-        if (function == NULL) {
+        const struct command_entry *command = find_command(argv[1]);
+        if (command == NULL) {
             fprintf(stderr, "lp5: unknown command '%s'\n", argv[1]);
             print_usage(argv[0]);
             return 1;
         }
-        return function(argc, argv);
+        return run_command(command, argc, argv);
     }
 
     xmlInitParser();
