@@ -1283,6 +1283,19 @@ state home
                  return result;
              }
 
+             function codeEditorText(codeNode){
+                 if(!codeNode)
+                     return '';
+                 let result = '';
+                 for(const node of codeNode.childNodes){
+                     if(node.nodeType === Node.CDATA_SECTION_NODE)
+                         result += node.textContent;
+                     else if(node.nodeType === Node.ELEMENT_NODE)
+                         result += new XMLSerializer().serializeToString(node);
+                 }
+                 return result;
+             }
+
              function renderDialog(article, namedNodes){
                  const {articleTitle, docText, codeText, codeName } = namedNodes;
                  let title = sectionGetTitle(article);
@@ -1293,19 +1306,21 @@ state home
                  let value = "";
                  codeName.value = article.getCodeName();
                  codeText.value = article.unindentCode(
-                     Article2.codeEditorText(article.codeNode));
+                     codeEditorText(article.codeNode));
              }
 
              class EditArticle extends LP5Element {
                  constructor(){
                      super(require('template'));
                      this.template = new LP5Element.TemplateInstance();
+                     this.attachShadow({mode:'open', delegatesFocus:true}).
+                         append(this.template.nodes);
                      this.addListeners();
                  }
                  connectedCallback(){
                      super.connectedCallback();
-                     renderDialog(this.#article, this.namedNodes);
-                     this.namedNodes.dialog.showModal();
+                     renderDialog(this.#article, this.template.namedNodes);
+                     this.template.namedNodes.dialog.showModal();
                  }
                  disconnectedCallback(){
                      this.#article = null;
@@ -1328,7 +1343,7 @@ state home
                      this.#article = article;
                  }
                  getArticleRevision(){
-                     const {articleTitle, docText, codeName, codeText}=this.namedNodes;
+                     const {articleTitle, docText, codeName, codeText}=this.template.namedNodes;
                      let sectionStrings = {
                          children    : this.#article.sections.children?.innerHTML,
                          heading     : articleTitle.value,
@@ -1340,7 +1355,7 @@ state home
                      return this.#article.createRevision(sectionStrings);
                  }
                  getArticleSerial(){
-                     const {articleTitle, docText, codeName, codeText}=this.namedNodes;
+                     const {articleTitle, docText, codeName, codeText}=this.template.namedNodes;
                      return this.#article.createSerial(
                          articleTitle.value, docText.value,
                          codeName.value, codeText.value);
@@ -4459,42 +4474,62 @@ state home
              model.createEmptyArticle = async function (location, targetArticle){
                  // location: -1 = before, 0 = first child, 1 = after
                  console.log("createEmptyArticle ", location, targetArticle);
-                 // create empty resource
                  let emptyArticleName = await model.createUniqueArticle();
                  console.assert(emptyArticleName);
+                 if(!emptyArticleName)
+                     throw new Error("Could not allocate a unique article filename");
+
                  let parentArticle = null;
                  if(targetArticle){
                      if(location == 0)
                          parentArticle = targetArticle;
-                     else {
-                         console.assert(targetArticle.parent);
-                         parentArticle = targetArticle.parent;
-                     }
+                     else
+                         parentArticle = targetArticle.parentURL;
                  }
-                 let newArticle = model.articles.newArticle(
-                     parentArticle, emptyArticleName);
-                 let serial = newArticle.toSerial();
-                 await model.project.write(emptyArticleName, serial);
-                 // must update some parent article correctly to point to new empty
+                 const newArticle = Articles.create(
+                     emptyArticleName, parentArticle,
+                     '<template><heading>New Article</heading></template>');
+                 await model.project.write(emptyArticleName, newArticle.toString());
 
-                 // if very first article of project
                  if(!targetArticle)
-                     return;
+                     return newArticle;
 
-                 if(location == 0)
-                     parentArticle.addFirstChild(newArticle);
-                 else if(location == -1)
-                     parentArticle.addChildBefore(newArticle, targetArticle);
-                 else if(location == 1)
-                     parentArticle.addChildAfter(newArticle, targetArticle);
-                 else
-                     console.assert(false);
+                 if(!parentArticle)
+                     throw new Error("Could not find the parent article");
 
-                 let changedArticle = location ? targetArticle.parent : targetArticle;
-                 serial = parentArticle.toSerial();
-                 console.log("write changed article", parentArticle, serial);
-                 await model.project.write(parentArticle.URL,serial);
+                 let childList = parentArticle.sections.children;
+                 if(!childList){
+                     childList = parentArticle.template.ownerDocument.createElement('children');
+                     parentArticle.template.append(childList);
+                     parentArticle.sections.children = childList;
+                 }
+                 const childLink = childList.ownerDocument.createElement('li');
+                 childLink.setAttribute('id', emptyArticleName);
+
+                 if(location == 0){
+                     childList.insertBefore(childLink, childList.firstChild);
+                 } else {
+                     const sibling = Array.from(childList.children).find(
+                         child => child.tagName === 'li' &&
+                                  child.getAttribute('id') === targetArticle.URL);
+                     if(!sibling)
+                         throw new Error(`Could not find ${targetArticle.URL} in its parent article`);
+                     if(location == -1)
+                         childList.insertBefore(childLink, sibling);
+                     else if(location == 1)
+                         childList.insertBefore(childLink, sibling.nextSibling);
+                     else
+                         throw new Error(`Invalid article insertion location: ${location}`);
+                 }
+                 const updatedChildIDs = Array.from(childList.children)
+                     .filter(child => child.tagName === 'li')
+                     .map(child => child.getAttribute('id'));
+                 parentArticle.childrenIDs.splice(
+                     0, parentArticle.childrenIDs.length, ...updatedChildIDs);
+
+                 await model.project.write(parentArticle.URL, parentArticle.toString());
                  model.updateDerivedState();
+                 return newArticle;
              };
              model.docOrder = function*(article){
                  //                 console.assert(this.articles); // detect bogus 'this'
