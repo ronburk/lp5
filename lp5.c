@@ -126,14 +126,33 @@ static int command_weave(xsltStylesheetPtr stylesheet, int argc, char *argv[])
 {
     const char *input_filename;
     char *default_input = NULL;
+    int first_argument = 1;
     int status;
 
-    if (argc > 2) {
-        fprintf(stderr, "Usage: lp5 [-s source-dir] weave [xml-file]\n");
+    while (first_argument < argc) {
+        if (strcmp(argv[first_argument], "-o") == 0) {
+            if (first_argument + 1 >= argc) {
+                fprintf(stderr, "Usage: lp5 [-s source-dir] weave [-o output-file] [xml-file]\n");
+                return 1;
+            }
+            if (LP5OutputName != NULL &&
+                    strcmp(LP5OutputName, argv[first_argument + 1]) != 0) {
+                fprintf(stderr, "lp5: output file specified more than once\n");
+                return 1;
+            }
+            LP5OutputName = argv[first_argument + 1];
+            first_argument += 2;
+        } else {
+            break;
+        }
+    }
+
+    if (first_argument + 1 < argc) {
+        fprintf(stderr, "Usage: lp5 [-s source-dir] weave [-o output-file] [xml-file]\n");
         return 1;
     }
-    if (argc == 2) {
-        input_filename = argv[1];
+    if (first_argument < argc) {
+        input_filename = argv[first_argument];
     } else {
         default_input = weave_default_input();
         if (default_input == NULL) {
