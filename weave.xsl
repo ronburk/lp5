@@ -79,6 +79,7 @@
             <xsl:call-template name="visit-article">
                 <xsl:with-param name="document" select="."/>
                 <xsl:with-param name="source-root" select="$source-root"/>
+                <xsl:with-param name="available-files" select="$directory-entries"/>
                 <xsl:with-param name="location" select="'lp5.lp5'"/>
                 <xsl:with-param name="seen" select="'|'"/>
             </xsl:call-template>
@@ -120,6 +121,7 @@
             <xsl:call-template name="visit-article-list">
                 <xsl:with-param name="articles" select="exsl:node-set($orphan-roots)/roots/orphan"/>
                 <xsl:with-param name="source-root" select="$source-root"/>
+                <xsl:with-param name="available-files" select="$directory-entries"/>
                 <xsl:with-param name="seen" select="$root-seen"/>
             </xsl:call-template>
         </xsl:variable>
@@ -129,6 +131,7 @@
             <xsl:call-template name="visit-article-list">
                 <xsl:with-param name="articles" select="exsl:node-set($orphan-candidates)/orphans/orphan"/>
                 <xsl:with-param name="source-root" select="$source-root"/>
+                <xsl:with-param name="available-files" select="$directory-entries"/>
                 <xsl:with-param name="seen"
                     select="string(exsl:node-set($orphan-root-result)/result/@seen)"/>
             </xsl:call-template>
@@ -186,6 +189,7 @@
     <xsl:template name="visit-article">
         <xsl:param name="document"/>
         <xsl:param name="source-root"/>
+        <xsl:param name="available-files"/>
         <xsl:param name="location"/>
         <xsl:param name="seen"/>
 
@@ -203,6 +207,7 @@
                     <xsl:call-template name="visit-child-links">
                         <xsl:with-param name="links" select="$document/template/children/li"/>
                         <xsl:with-param name="source-root" select="$source-root"/>
+                        <xsl:with-param name="available-files" select="$available-files"/>
                         <xsl:with-param name="seen" select="$seen-current"/>
                     </xsl:call-template>
                 </xsl:variable>
@@ -220,13 +225,20 @@
                         <xsl:text>&#10;      </xsl:text>
                         <children>
                             <xsl:for-each select="$document/template/children/li">
-                                <xsl:variable name="child-document" select="document(string(@id), .)"/>
+                                <xsl:variable name="child-filename" select="string(@id)"/>
                                 <xsl:text>&#10;        </xsl:text>
                                 <child>
-                                    <xsl:attribute name="file"><xsl:value-of select="@id"/></xsl:attribute>
+                                    <xsl:attribute name="file"><xsl:value-of select="$child-filename"/></xsl:attribute>
                                     <xsl:attribute name="status">
                                         <xsl:choose>
-                                            <xsl:when test="$child-document/*">available</xsl:when>
+                                            <xsl:when test="$available-files[@name = $child-filename]">
+                                                <xsl:variable name="child-document"
+                                                    select="document($child-filename, .)"/>
+                                                <xsl:choose>
+                                                    <xsl:when test="$child-document/*">available</xsl:when>
+                                                    <xsl:otherwise>missing</xsl:otherwise>
+                                                </xsl:choose>
+                                            </xsl:when>
                                             <xsl:otherwise>missing</xsl:otherwise>
                                         </xsl:choose>
                                     </xsl:attribute>
@@ -248,6 +260,7 @@
     <xsl:template name="visit-child-links">
         <xsl:param name="links"/>
         <xsl:param name="source-root"/>
+        <xsl:param name="available-files"/>
         <xsl:param name="seen"/>
 
         <xsl:choose>
@@ -255,22 +268,36 @@
                 <result seen="{$seen}"/>
             </xsl:when>
             <xsl:otherwise>
-                <xsl:variable name="child-document"
-                    select="document(string($links[1]/@id), $links[1])"/>
+                <xsl:variable name="child-filename" select="string($links[1]/@id)"/>
                 <xsl:variable name="first">
                     <xsl:choose>
-                        <xsl:when test="$child-document/*">
-                            <xsl:call-template name="visit-article">
-                                <xsl:with-param name="document" select="$child-document"/>
-                                <xsl:with-param name="source-root" select="$source-root"/>
-                                <xsl:with-param name="location" select="string($links[1]/@id)"/>
-                                <xsl:with-param name="seen" select="$seen"/>
-                            </xsl:call-template>
+                        <xsl:when test="$available-files[@name = $child-filename]">
+                            <xsl:variable name="child-document"
+                                select="document($child-filename, $links[1])"/>
+                            <xsl:choose>
+                                <xsl:when test="$child-document/*">
+                                    <xsl:call-template name="visit-article">
+                                        <xsl:with-param name="document" select="$child-document"/>
+                                        <xsl:with-param name="source-root" select="$source-root"/>
+                                        <xsl:with-param name="available-files" select="$available-files"/>
+                                        <xsl:with-param name="location" select="$child-filename"/>
+                                        <xsl:with-param name="seen" select="$seen"/>
+                                    </xsl:call-template>
+                                </xsl:when>
+                                <xsl:otherwise>
+                                    <xsl:message>
+                                        <xsl:text>Warning: article '</xsl:text>
+                                        <xsl:value-of select="$child-filename"/>
+                                        <xsl:text>' is linked but unavailable.</xsl:text>
+                                    </xsl:message>
+                                    <result seen="{$seen}"/>
+                                </xsl:otherwise>
+                            </xsl:choose>
                         </xsl:when>
                         <xsl:otherwise>
                             <xsl:message>
                                 <xsl:text>Warning: article '</xsl:text>
-                                <xsl:value-of select="$links[1]/@id"/>
+                                <xsl:value-of select="$child-filename"/>
                                 <xsl:text>' is linked but unavailable.</xsl:text>
                             </xsl:message>
                             <result seen="{$seen}"/>
@@ -281,6 +308,7 @@
                     <xsl:call-template name="visit-child-links">
                         <xsl:with-param name="links" select="$links[position() &gt; 1]"/>
                         <xsl:with-param name="source-root" select="$source-root"/>
+                        <xsl:with-param name="available-files" select="$available-files"/>
                         <xsl:with-param name="seen"
                             select="string(exsl:node-set($first)/result/@seen)"/>
                     </xsl:call-template>
@@ -297,6 +325,7 @@
     <xsl:template name="visit-article-list">
         <xsl:param name="articles"/>
         <xsl:param name="source-root"/>
+        <xsl:param name="available-files"/>
         <xsl:param name="seen"/>
 
         <xsl:choose>
@@ -310,6 +339,7 @@
                     <xsl:call-template name="visit-article">
                         <xsl:with-param name="document" select="$document"/>
                         <xsl:with-param name="source-root" select="$source-root"/>
+                        <xsl:with-param name="available-files" select="$available-files"/>
                         <xsl:with-param name="location" select="$filename"/>
                         <xsl:with-param name="seen" select="$seen"/>
                     </xsl:call-template>
@@ -318,6 +348,7 @@
                     <xsl:call-template name="visit-article-list">
                         <xsl:with-param name="articles" select="$articles[position() &gt; 1]"/>
                         <xsl:with-param name="source-root" select="$source-root"/>
+                        <xsl:with-param name="available-files" select="$available-files"/>
                         <xsl:with-param name="seen"
                             select="string(exsl:node-set($first)/result/@seen)"/>
                     </xsl:call-template>
