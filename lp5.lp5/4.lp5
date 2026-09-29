@@ -1,5 +1,9 @@
 <template>
     <heading>Outermost Code</heading>
+    <keywords>
+        <li>doctype</li>
+        <li>meta</li>
+    </keywords>
     <section data-lp5-kind="explanation">
         <p>
     Note that this code section has no name,
