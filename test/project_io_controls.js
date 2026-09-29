@@ -51,16 +51,10 @@
             if(action === "reload")
                 void run("Reload project", reloadProject);
             else if(action === "edit"){
-                const editor = document.createElement("lp5-editarticle");
-                editor.setArticle(window.Articles.fromURL(model.rootTOC.URL));
-                editor.addEventListener("lp5DialogSave", () => {
-                    void run("Save article", async () => {
-                        const revision = editor.getArticleRevision();
-                        await model.storeResource2(revision.URL, revision.toString());
-                        editor.remove();
-                    });
-                }, {once:true});
-                document.body.append(editor);
+                document.dispatchEvent(new CustomEvent("lp5EditArticle", {
+                    detail: model.rootTOC.URL
+                }));
+                status.textContent = "Editing root article";
             } else if(action === "create")
                 void run("Create article", async () => {
                     const before = new Set(window.LP5.testProjectIO.writes.keys());

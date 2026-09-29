@@ -74,6 +74,11 @@ def main():
     parser.add_argument("forwarded_port", nargs="?", type=int, help="optional preview port")
     parser.add_argument("--host", default=None, help="bind address (or HOST environment variable)")
     parser.add_argument("--port", type=int, default=None, help="bind port (or PORT environment variable)")
+    parser.add_argument(
+        "--strictPort",
+        action="store_true",
+        help="accepted for sites-preview compatibility",
+    )
     args = parser.parse_args()
     host = args.host or args.forwarded_host or os.environ.get("HOST", "0.0.0.0")
     port = args.port or args.forwarded_port or int(os.environ.get("PORT", "8000"))
