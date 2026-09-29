@@ -1350,8 +1350,8 @@ state awaitArticleSave
              }
 
              function renderDialog(article, namedNodes){
-                 articleFilename.textContent = String(article.URL).split(/[\\/]/).pop();
                  const {articleTitle, articleFilename, docText, keywordText, codeText, codeName } = namedNodes;
+                 articleFilename.textContent = String(article.URL).split(/[\\/]/).pop();
                  let title = sectionGetTitle(article);
                  articleTitle.value = title ;
                  let explain = article.sections?.explanation?.innerHTML;
