@@ -43,16 +43,14 @@ state selectOrCreateProject
 
 state awaitProjectPicker
     on  lp5AsyncComplete
-        const {handle, error} = event.detail;
+        const {name, error} = event.detail;
         if(error) {
             console.error('Directory picker failed:', error);
             views.dialog.shadowRoot.querySelector('[data-name="selectionError"]').textContent =
                 `Could not select project: ${error.name}: ${error.message}`;
     ->      selectOrCreateProject
         }
-        console.assert(handle.kind === 'directory');
-        model.projects[handle.name] = {dirHandle: handle};
-        asyncSchedule(model.openProject.bind(model), handle.name);
+        asyncSchedule(model.openProject.bind(model), name);
     ->  awaitProjectLoad
 
 state awaitProjectLoad
@@ -88,9 +86,7 @@ state home
              'lp5DialogSave',
              'lp5DialogCancel',
              'lp5NavSelect',
-             'lp5SelectParentDir',
              'lp5SelectProject',
-             'lp5UsePreviousParentDir',
              'error',
              'hashchange',
              'input',
@@ -104,27 +100,6 @@ state home
              'SyntaxError',
              'unhandledrejection',
          ]);
-             window.LP5.modFileSystem = (function(){
-                 async function showDirectoryPicker(){
-                 console.assert(navigator.userActivation.isActive,
-                                'Directory picker requires active user interaction');
-                 return window.showDirectoryPicker({mode:'read'});
-             }
-             async function scanDir(parentHandle, match) {
-                 const result = {};
-
-                 try {
-                     for await (const [name, handle] of parentHandle.entries())
-                     if (match(name, handle))
-                         result[name] = handle;
-                 } catch(e) {
-                     console.error("scanDir failed", e);
-                     result = null;
-                 }
-                 return result;
-             }
-             return {showDirectoryPicker, scanDir};
-         }());
          window.LP5.modString = (function(){
              function getIndent(line){
                  let indent = -1;
@@ -268,30 +243,6 @@ state home
              return { get, put };
          })();
 
-         window.LP5.modStorage = (function(){
-             const {get} = window.LP5.modIndexedDB;
-
-             // Attempt to load and validate a previously saved directory handle
-             async function loadPreviousHandle() {
-                 const handle = await get("lp5PreviousHandle");
-                 if (!handle) return null;
-
-                 const option = { mode: 'readwrite' };
-
-                 try {
-                     let perms = await handle.queryPermission(option);
-                     if (perms !== 'granted') {
-                         perms = await handle.requestPermission(option);
-                     }
-                     return perms === 'granted' ? handle : null;
-                 } catch (e) {
-                     console.error("Permission check failed:", e);
-                     return null;
-                 }
-             }
-
-             return { loadPreviousHandle };
-         }());
         </script>
         <script>
          window.LP5.eggGlobals = {
@@ -1456,57 +1407,6 @@ state home
              return result;
             </script>
         </template>
-        <lp5-dialog data-popup="lp5-selectparent">
-            <template>
-                <style>
-                </style>
-                <center>
-                    <p>
-                        Select <em>parent</em> directory of existing
-                        or new lp5 project.
-                        <span style="background-color:#ffffa0; border-radius:50%; cursor:help;" title="I need access to the parent directory to place generated files there.&#10;A user click is required by Chrome for me to ask for this permission.">&#9432;</span>
-                    </p>
-                    <input id="SelectParentDirButton"
-                           autofocus type="button" value="Select"
-                           data-name="selectButton" @click="clickFind">
-                    <div data-name="auxDiv">
-                        <p>or select previous parent directory:</p>
-                        <input id="SelectParentDirPreviousButton"
-                               data-name="previousDir" type="button" @click="clickReuse">
-                    </div>
-                </center>
-                <script data-name="[SelectParentDialog]">
-                 const egg                   = this;
-                 const {auxDiv, previousDir} = egg.namedNodes;
-                 const {dirParentHandle}     = window.LP5.model;
-                 const {publish}             = window.LP5.controller;
-
-                 console.error("SelectParentDialog code!");
-                 function render(){
-                     console.error("SelectParentDialog render!!!!!!");
-                     if(dirParentHandle){
-                         console.log("Show button ",  dirParentHandle.name);
-                         auxDiv.style.display = 'block';
-                         previousDir.value    = dirParentHandle.name;
-                     } else {
-                         auxDiv.style.display = 'none';
-                     }
-                 };
-                 render();
-                 function clickFind(event){
-                     const target = event.composedPath()[0];
-                     publish('lp5SelectParentDir');
-                 }
-                 function clickReuse(event){
-                     const target = event.composedPath()[0];
-                     publish('lp5UsePreviousParentDir');
-                 }
-
-                 return  { render, clickFind, clickReuse };
-
-                </script>
-            </template>
-        </lp5-dialog>
         <lp5-dialog data-popup="lp5-selectorcreate">
             <template>
                 <style>
@@ -1592,8 +1492,8 @@ state home
                  render();
                  function clickSelect(event){
                      egg.namedNodes.selectionError.textContent = '';
-                     const selection = window.LP5.modFileSystem.showDirectoryPicker()
-                         .then(handle => ({handle}), error => ({error}));
+                     const selection = window.LP5.modProjectIO.pick_parent_directory()
+                         .then(name => ({name}), error => ({error}));
                      publish('lp5SelectProject', selection);
                  }
                  function clickCreate(event){
@@ -2656,97 +2556,149 @@ state home
                  }
                  *[Symbol.iterator](){ yield* this.#ranges; }
              }
-             class Storage {
-                 constructor(dirHandle){
-                     this.dirHandle = dirHandle;
+             window.LP5.modProjectIO = (() => {
+                 const {get, put} = window.LP5.modIndexedDB;
+                 const PARENT_KEY = "handle";
+                 const PREVIOUS_PROJECT_KEY = "lp5PreviousHandle";
+                 const projects = new Map();
+                 let parentHandle = null;
+
+                 function rememberProject(handle){
+                     projects.set(handle.name, handle);
                  }
-                 async exists(name){
-                     let result = false;
-                     try {
-                         let handle = await this.dirHandle.getFileHandle(
-                             name, {create:false});
-                         result = true;
-                     } catch(err) {
-                         console.log(`exists(${name}) fails: `, err);
+
+                 class NativeProjectStore {
+                     #directoryHandle;
+                     constructor(directoryHandle){
+                         this.#directoryHandle = directoryHandle;
                      }
-                     return result;
-                 }
-                 async write(name, data){
-                     let result     = false;
-                     let fileHandle = null;
-                     let writable   = null;
-                     try {
-                         fileHandle = await this.dirHandle.getFileHandle(name, {create:true});
-                         console.log("Got fileHandle ", fileHandle);
-                     } catch(err) {
-                         console.log(`Storage.write(${name}) `, err);
-                     }
-                     const value =await fileHandle.queryPermission({mode:'readwrite'});
-                     console.log("permissions = ", value);
-                     try {
-                         writable = await fileHandle.createWritable();
-                     } catch(err) {
-                         console.log("createWritable ", err);
-                     }
-                     try {
-                         await writable.write(data);
-                     } catch(err) {
-                         console.log("writable.write ", err);
-                     }
-                     try {
-                         await writable.close();
-                         result = true;
-                     } catch(err) {
-                         console.log("writable.close ", err);
-                     }
-                     return true;
-                 }
-                 async read(name){
-                     let text = null;
-                     try {
-                         const fileHandle = await this.dirHandle.getFileHandle(name);
-                         console.assert(fileHandle);
+                     async read(name){
+                         const fileHandle = await this.#directoryHandle.getFileHandle(name);
                          const file = await fileHandle.getFile();
-                         text = await file.text();
-                     } catch (e) {
-                         console.log(`read(${name}) failed`, e);
+                         return await file.text();
                      }
-                     return text;
-                 }
-                 async createUniqueFile(pattern, number){
-                     let   result    = null;
-                     const MAX_TRIES = 99;
-                     let   handle    = null;
-                     let   name      = "";
-                     console.assert(this.dirHandle);
-                     for(let i = 0; i < MAX_TRIES; ++i){
-            ++number;
-                         name   = pattern.replace(/%d/, number);
-                         try {
-                             console.log(`getFileHandle(${name})`);
-                             await this.dirHandle.getFileHandle(
-                                 name, {create:false});
-                         } catch(err) {
-                             if(err.name == 'NotFoundError')
-                                 break;
-                             else{
-                                 console.log(`getFileHandle(${name}) failed:`, err);
+                     async write(name, text){
+                         const fileHandle = await this.#directoryHandle.getFileHandle(
+                             name, {create:true});
+                         console.log("permissions = ",
+                                     await fileHandle.queryPermission({mode:'readwrite'}));
+                         const writable = await fileHandle.createWritable();
+                         await writable.write(text);
+                         await writable.close();
+                         return true;
+                     }
+                     async create_unique_article(pattern, startingNumber){
+                         const MAX_TRIES = 99;
+                         let number = startingNumber;
+                         let name = "";
+                         for(let i = 0; i < MAX_TRIES; ++i){
+                             ++number;
+                             name = pattern.replace(/%d/, number);
+                             try {
+                                 await this.#directoryHandle.getFileHandle(name);
+                             } catch(error) {
+                                 if(error.name == 'NotFoundError')
+                                     break;
+                                 console.log(`getFileHandle(${name}) failed:`, error);
                                  return null;
                              }
-                             break;
+                         }
+                         try {
+                             await this.#directoryHandle.getFileHandle(name, {create:true});
+                             return name;
+                         } catch(error) {
+                             console.log(`create_unique_article(${pattern},${startingNumber}) failed`);
+                             console.assert(false, error);
+                             return null;
                          }
                      }
-                     try {
-                         handle = await this.dirHandle.getFileHandle(
-                             name, {create:true});
-                         result = handle;
-                     } catch(err) {
-                         console.log(`createUniqueFile(${pattern},${startNumber}) failed`);
-                         console.assert(false, err);
-                     }
-                     return result;
                  }
-             }
+
+                 async function pick_parent_directory(){
+                     // The active dialog picks a project directory directly. Keep this
+                     // call synchronous with its button gesture; also index child projects.
+                     console.assert(navigator.userActivation.isActive,
+                                    'Directory picker requires active user interaction');
+                     const handle = await window.showDirectoryPicker({mode:'read'});
+                     parentHandle = handle;
+                     await save_parent();
+                     if(handle.name.endsWith('.lp5'))
+                         rememberProject(handle);
+                     await list_projects();
+                     return handle.name;
+                 }
+                 async function load_previous_parent(){
+                     parentHandle = await get(PARENT_KEY);
+                     if(parentHandle && parentHandle.name.endsWith('.lp5'))
+                         rememberProject(parentHandle);
+                     return parentHandle ? parentHandle.name : null;
+                 }
+                 async function save_parent(){
+                     if(!parentHandle)
+                         return null;
+                     await put(PARENT_KEY, parentHandle);
+                     return parentHandle.name;
+                 }
+                 async function list_projects(){
+                     const names = [];
+                     if(!parentHandle)
+                         return names;
+                     if(parentHandle.name.endsWith('.lp5')){
+                         rememberProject(parentHandle);
+                         names.push(parentHandle.name);
+                     }
+                     try {
+                         for await (const [name, handle] of parentHandle.entries()){
+                             if(name.endsWith('.lp5') && handle.kind == 'directory'){
+                                 rememberProject(handle);
+                                 if(!names.includes(name))
+                                     names.push(name);
+                             }
+                         }
+                     } catch(error) {
+                         console.error("Project enumeration failed:", error);
+                     }
+                     return names;
+                 }
+                 async function open_project(name){
+                     let handle = projects.get(name);
+                     if(!handle && parentHandle && parentHandle.name == name)
+                         handle = parentHandle;
+                     if(!handle && parentHandle)
+                         handle = await parentHandle.getDirectoryHandle(name);
+                     if(!handle)
+                         throw new Error(`Project not found: ${name}`);
+                     rememberProject(handle);
+                     return new NativeProjectStore(handle);
+                 }
+                 async function load_previous_project(){
+                     const handle = await get(PREVIOUS_PROJECT_KEY);
+                     if(!handle)
+                         return null;
+                     const option = {mode:'readwrite'};
+                     try {
+                         let permission = await handle.queryPermission(option);
+                         if(permission !== 'granted')
+                             permission = await handle.requestPermission(option);
+                         if(permission !== 'granted')
+                             return null;
+                         rememberProject(handle);
+                         return handle.name;
+                     } catch(error) {
+                         console.error("Permission check failed:", error);
+                         return null;
+                     }
+                 }
+
+                 return {
+                     pick_parent_directory,
+                     load_previous_parent,
+                     save_parent,
+                     list_projects,
+                     open_project,
+                     load_previous_project
+                 };
+             })();
              window.Articles = null;
              let Article  = null;
              let Article2  = null;
@@ -3306,150 +3258,13 @@ state home
                      to.appendChild(child);
              }
 
-             const {get, put} = window.LP5.modIndexedDB;
-
-             // load any previously stored handle to our parent directory
-             async function loadDirParentHandle(){
-                 let result = null;
-                 let handle = await get("handle");
-                 if(false){
-                     let option = {mode:'readwrite'};
-                     let perms = await handle.queryPermission(option);
-                     console.log("perms = ", perms);
-                     if(perms != 'granted'){
-                         perms = handle.requestPermission(option);
-                         if(perms != 'granted'){
-                             console.log("Well hell");
-                         }
-                         else
-                             result = handle;
-                     }
-                 }else{
-                     result       = handle;
-                 }
-                 return result;
-             }
-             async function selectParentDir(model, targetID){
-                 console.log(`selectParentDir(${targetID})`);
-
-                 let handle = model.dirParentHandle;
-                 let options = {mode:'readwrite'};
-                 try {
-                     if(targetID == 'SelectParentDirPreviousButton'){
-                         console.log("    It was the previousDir button");
-                         let option = {mode:'readwrite'};
-                         let perms = await handle.queryPermission(option);
-                         console.log("    perms = ", perms);
-                         if(perms != 'granted'){
-                             perms = await handle.requestPermission(option);
-                             console.log("    now perms = ", perms);
-                             if(perms == 'granted'){
-                                 console.log("selectParentDir: reusing existing handle.");
-                             }
-                             else{
-                                 model.dirParentHandle = undefined;
-                             }
-                         }
-                     }else{
-                         console.assert(targetID == 'SelectParentDirButton');
-                         model.dirParentHandle = await window.showDirectoryPicker(options);
-                         if(model.dirParentHandle){
-                             await put("handle", model.dirParentHandle);
-                             console.log("Stored handle!!!!");
-                         }
-                     }
-                 } catch (error) {
-                     console.log(typeof error);
-                     console.log(error);
-                 } finally {
-                     if(!model.dirParentHandle){
-                         console.log("selectParentDir() returns early");
-                         return false;
-                     }                     
-                 }
-                 console.assert(model.dirParentHandle);
-                 // now we have a handle to the parent directory
-                 try {
-                     console.log(model.dirParentHandle);
-                     let projectCount = 0;
-                     for await (let [name, handle] of model.dirParentHandle) {
-                         if(name.endsWith('.lp5') && handle.kind == 'directory'){
-                             console.log("looks like a project: ", handle);
-                             model.projects[name] = { dirHandle: handle };
-                             model.projectName = name;
-                             ++projectCount;
-                         }
-                     }
-                 } catch(error) {
-                     console.log("What is this error? Filesystem problem?");
-                     console.log(error);
-                     return false;
-                 }
-                 if(model.dirParentHandle){
-                     console.log("coSelectParent got a dirParentHandle");
-                 }
-                 console.log("selectParentDir() returns");
-                 return true;
-             }
-
-             async function testbody(model){
-                 console.log("create scratch project for testing.");
-                 let {dirParentHandle} = model;
-                 const TEST_DIR = 'lp5test';
-                 for await(let [name,handle] of dirParentHandle){
-                     if(name == TEST_DIR){
-                         if(window.confirm(`OK to delete recursively ${name}?`)){
-                             dirParentHandle.removeEntry(
-                                 name, { recursive: true });
-                         } else {
-                             console.log("testing halted");
-                             console.assert(false, handle);
-                             return false;
-                         }
-                     }
-                 }
-                 console.log(`TEST: create project directory '${TEST_DIR}'`);
-                 let dirHandle = await dirParentHandle.getDirectoryHandle(
-                     TEST_DIR, { create: true });
-                 console.assert(dirHandle.kind == 'directory', dirHandle);
-                 console.log(`TEST: create a unique file `);
-                 let fileInfo = await model.createUniqueFile(dirHandle, 0);
-                 if(fileInfo.handle)
-                     console.assert(fileInfo.handle.name == "0.lp5");
-                 else
-                     console.assert(false, fileInfo);
-                 
-                 return true;
-             }
-
              async function writeOutput(model){
                  console.log("writeOutput", model);
-                 let {dirParentHandle} = model;
-                 if(!dirParentHandle){
-                     console.log("can't write output, dirParentHandle not set.");
-                     console.assert(false, model);
-                 }
-                 let result = false;
-                 
-                 // temporarily hard-coded
-                 await model.storage.write("lp5.html", model.outputText);
+                 await model.project.write("lp5.html", model.outputText);
              }
              async function test(model){
                  console.log("TEST!");
-                 let {dirParentHandle} = model;
-                 if(!dirParentHandle){
-                     console.log("can't run tests, dirParentHandle not set.");
-                     console.assert(false, model);
-                 }
-                 let result = false;
-                 
                  return;
-                 try {
-                     result = testbody(model);
-                 } catch(err) {
-                     console.log("Testing failed: ", err);
-                     console.assert(false);
-                 }
              }
 
              function controller(event){
@@ -3542,80 +3357,8 @@ state home
                  controller.inSync = true;
 
                  
-                 if(false){
-                     const machine = {
-                         Crash(event){
-                             controller.crash(event.detail);
-                             console.log("crash.");
-                             return 'Crash';
-                         },
-                         ...(() => {
-                             let selectParentDialog;
-                             return {
-                                 stateLoad(event){
-                                     console.assert(event.type == 'load', event);
-                                     asyncSchedule(loadDirParentHandle, model);
-                                     return 'stateAwaitDirHandleLoad';
-                                 },
-                                 stateAwaitDirHandleLoad(event){
-                                     if(event.type != 'lp5AsyncComplete')
-                                         console.error("event.type = ", event.type);
-                                     console.assert(event.type == 'lp5AsyncComplete');
-                                     views.loadTemplates();
-                                     views.change('home');
-                                     selectParentDialog = window.LP5.popup['lp5-selectparent']
-                                     document.body.append(selectParentDialog);
-                                     selectParentDialog.show();
-                                     controller.state = 'stateSelectParent';
-                                     return 'stateSelectParent';
-                                 }
-                             }
-                         })(),
-                         stateSelectParent(event){
-                             let path   = event.composedPath();
-                             let target = path[0];
-                             if(target.id == 'SelectParentDirButton'
-                                || target.id == 'SelectParentDirPreviousButton'){
-                                 //                             console.assert(event.type == 'click');
-                                 asyncSchedule(selectParentDir, model, target.id);
-                                 controller.state = 'SelectingParent';
-                             } else if(event.type == 'click') {
-                                 console.log("SelectParent got clicks");
-                                 // let the view handle clicks
-                             } else if(event.type == 'close') {
-                                 console.log("'close' event came in");
-                             } else {
-                                 console.assert(false, event);
-                             }
-                             return 'stateSelectingParent';
-                             console.assert(event.click == 'load', event);
-                             asyncSchedule(loadDirParentHandle, model);
-                             return 'stateAwaitDirHandleLoad';
-                         },
-                         stateSelectingParent(event){
-                             if(event.type == 'hashchange'){
-                                 controller.state = 'SelectingParentHashChanged';
-                                 controller.oldURL = event.oldURL;
-                             } else {
-                                 console.assert(event.type == 'lp5AsyncComplete', event);
-                                 views.pop();
-                                 if(event.detail){
-                                     console.assert(model.dirParentHandle);
-                                     controller.state = 'PickOrCreateProject';
-                                     views.push('PickOrCreateProject');
-                                 } else {
-                                     views.push('SelectParent');
-                                     controller.state = 'SelectParent';
-                                 }
-                             }
-
-                         },
-                         stateHome(event){
-                             console.log("In home state!");
-                             return 'stateHome';
-                         }
-                     };
-                 }
+                 // The former parent-folder controller was unreachable; project selection
+                 // now goes through the active state machine and modProjectIO.
                  if(!window.LP5.views)
                      console.error("views not defined!!!!!!");
                  let nextState = window.LP5.modStateMachine.send(event);
@@ -3629,60 +3372,6 @@ state home
                          controller.crash(event.detail);
                          console.log("crash.");
                          controller.state = 'Crash';
-                         break;
-                     case 'load' :
-                         console.assert(event.type == 'load', event);
-                         asyncSchedule(loadDirParentHandle, model);
-                         controller.state = 'AwaitDirHandleLoad';
-                         break;
-                     case 'AwaitDirHandleLoad' :
-                         console.assert(event.type == 'lp5AsyncComplete');
-                         views.loadTemplates();
-                         views.change('home');
-                         views.push('SelectParent');
-                         controller.state = 'SelectParent';
-                         break;
-                     case 'SelectParent' :
-                         let path   = event.composedPath();
-                         let target = path[0];
-                         if(target.id == 'SelectParentDirButton'
-                            || target.id == 'SelectParentDirPreviousButton'){
-                             //                             console.assert(event.type == 'click');
-                             asyncSchedule(selectParentDir, model, target.id);
-                             controller.state = 'SelectingParent';
-                         } else if(event.type == 'click') {
-                             console.log("SelectParent got clicks");
-                             // let the view handle clicks
-                         } else if(event.type == 'close') {
-                             console.log("'close' event came in");
-                         } else {
-                             console.assert(false, event);
-                         }
-                         break;
-                     case 'SelectingParent':
-                         if(event.type == 'hashchange'){
-                             controller.state = 'SelectingParentHashChanged';
-                             controller.oldURL = event.oldURL;
-                         } else {
-                             console.assert(event.type == 'lp5AsyncComplete', event);
-                             views.pop();
-                             if(event.detail){
-                                 console.assert(model.dirParentHandle);
-                                 controller.state = 'PickOrCreateProject';
-                                 views.push('PickOrCreateProject');
-                             } else {
-                                 views.push('SelectParent');
-                                 controller.state = 'SelectParent';
-                             }
-                         }
-                         break;
-                         // unusual case where user changed hash while sysdialog was up
-                     case 'SelectingParentHashChanged' :
-                         console.assert(event.type == 'lp5AsyncComplete');
-                         window.location = controller.oldURL;
-                         views.pop();
-                         views.push('SelectParent');
-                         controller.state = 'SelectParent';
                          break;
                      case 'PickOrCreateProject' :
                          if(event.type == 'click' || event.type == 'input' || event.type == 'change'){
@@ -4586,14 +4275,11 @@ state home
              window.LP5.eggGlobals.model = model;
 
              model.nextArticleID    = 0;
-             model.storage          = null;
-             //             model.dirHandle        = null;
-             model.dirParentHandle  = null;
-             model.projectName      = new Map;
+             model.project         = null;
+             model.projectName     = null;
              model.urlToResource    = null;
              model.articles         = new Articles();
              model.rootTOC          = null;
-             model.projects         = {};
              model.anchorNameToNode = new Map();
              model.updateDerivedState = function(){
                  console.log("updateDerivedState!!!!!!");
@@ -4654,14 +4340,14 @@ state home
                  else
                      return [];
              }
-             model.createUniqueFile = async function (){
-                 let handle = await this.storage.createUniqueFile(
+             model.createUniqueArticle = async function (){
+                 let name = await this.project.create_unique_article(
                      "%d.lp5", this.nextArticleID);
-                 if(handle){
-                     let dotPos = handle.name.indexOf('.');
-                     this.nextArticleID = 1 + handle.name.slice(0,dotPos);
+                 if(name){
+                     let dotPos = name.indexOf('.');
+                     this.nextArticleID = 1 + name.slice(0,dotPos);
                  }
-                 return handle;
+                 return name;
              };
 
              if(false){
@@ -4689,9 +4375,8 @@ state home
                  // location: -1 = before, 0 = first child, 1 = after
                  console.log("createEmptyArticle ", location, targetArticle);
                  // create empty resource
-                 let handle  = await model.createUniqueFile();
-                 console.assert(handle);
-                 let emptyArticleName = handle.name;
+                 let emptyArticleName = await model.createUniqueArticle();
+                 console.assert(emptyArticleName);
                  let parentArticle = null;
                  if(targetArticle){
                      if(location == 0)
@@ -4704,9 +4389,7 @@ state home
                  let newArticle = model.articles.newArticle(
                      parentArticle, emptyArticleName);
                  let serial = newArticle.toSerial();
-                 let writable = await handle.createWritable();
-                 await writable.write(serial);
-                 await writable.close();
+                 await model.project.write(emptyArticleName, serial);
                  // must update some parent article correctly to point to new empty
 
                  // if very first article of project
@@ -4725,7 +4408,7 @@ state home
                  let changedArticle = location ? targetArticle.parent : targetArticle;
                  serial = parentArticle.toSerial();
                  console.log("write changed article", parentArticle, serial);
-                 await model.storage.write(parentArticle.URL,serial);
+                 await model.project.write(parentArticle.URL,serial);
                  model.updateDerivedState();
              };
              model.docOrder = function*(article){
@@ -4755,30 +4438,26 @@ state home
              model.storeResource = async function(articleNode, serial){
                  console.log("storeResource ", articleNode, serial);
                  let article = this.articles.fromArticleNode(articleNode);
-                 await this.storage.write(article.URL, serial);
+                 await this.project.write(article.URL, serial);
                  return true;
              }
              model.storeResource2 = async function(URL, articleString){
                  console.log("storeResource2 ", URL, articleString);
-                 await this.storage.write(URL, articleString);
+                 await this.project.write(URL, articleString);
                  return true;
              }
 
-             model.loadResource = async function(url){
-                 let result = { loaded : true, url : url }
+             model.loadResource = async function(name){
+                 let result = { loaded : true, url : name }
                  try {
-                     const fileHandle = await this.dirHandle.getFileHandle(url);
-                     console.assert(fileHandle);
-                     // open, load file into string, close
-                     const file = await fileHandle.getFile();
-                     result.text = await file.text();
+                     result.text = await this.project.read(name);
                  } catch (error) {
                      result.error  = error;
                      result.loaded = false;
                  }
                  return result;
              }
-             model.loadArticle = async function(dirHandle, filename, parent){
+             model.loadArticle = async function(filename, parent){
                  const articleText = await this.loadResource(filename);
                  let text = articleText.text;
                  if(!articleText.loaded){
@@ -4808,11 +4487,11 @@ state home
              model.scanForProjects = async function(){
                  console.error("scanForProjects not written");
              }
-             model.loadTOC = async function(dirHandle, name, parent=null){
+             model.loadTOC = async function(name, parent=null){
                  console.log("loadTOC ", name);
                  if(parent == null)
                      Articles.reset();
-                 let article = await this.loadArticle(dirHandle, name, parent);
+                 let article = await this.loadArticle(name, parent);
                  console.log("loadTOC back from await of loadArticle ", name, article);
                  let match = name.match(/^[0-9]+/);
                  if(match && match[0] > model.nextArticleID)
@@ -4820,7 +4499,7 @@ state home
                  // if article contains a <ul>, it is parent of other articles
                  let children = article.childrenIDs;
                  for(const id of children){
-                     let child = await this.loadTOC(dirHandle, id, article);
+                     let child = await this.loadTOC(id, article);
                      console.log("loaded child", child);
                  }
                  controller.deferEvent(document, "lp5Render");
@@ -4829,12 +4508,10 @@ state home
              }
 
              model.openProject = async function(name){
-                 console.error("openProject ", name, this.projects);
-                 const {dirHandle} = this.projects[name];
-                 console.log("dirHandle ", dirHandle);
-                 this.dirHandle = dirHandle;
-                 this.storage   = new Storage(dirHandle);
-                 this.rootTOC   = await this.loadTOC(dirHandle, name);
+                 console.error("openProject ", name);
+                 this.project = await window.LP5.modProjectIO.open_project(name);
+                 this.projectName = name;
+                 this.rootTOC = await this.loadTOC(name);
                  console.log("openProject got rootTOC of ", this.rootTOC);
                  console.assert(this.rootTOC.URL == name, this.rootTOC);
                  console.log("OpenProject returns after scheduling asyncComplete");
