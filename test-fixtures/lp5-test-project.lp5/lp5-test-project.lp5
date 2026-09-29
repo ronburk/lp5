@@ -1,0 +1,10 @@
+<template>
+    <children>
+        <li id="0.lp5"/>
+        <li id="1.lp5"/>
+    </children>
+    <heading>LP5 test project</heading>
+    <section data-lp5-kind="explanation">
+        <p>This deterministic fixture project is loaded over HTTP for cloud-browser testing.</p>
+    </section>
+</template>
