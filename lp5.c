@@ -15,21 +15,61 @@ typedef int (*command_function)(xsltStylesheetPtr stylesheet, int argc,
     char *argv[]);
 
 const char *LP5Source = "lp5.lp5";
+const char *LP5OutputName;
+static FILE *LP5OutputFile;
 
 struct command_entry {
     const char *name;
     command_function function;
 };
 
+static FILE *output_stream(void)
+{
+    return LP5OutputFile == NULL ? stdout : LP5OutputFile;
+}
+
+static int open_output_file(void)
+{
+    if (LP5OutputName == NULL || LP5OutputFile != NULL) {
+        return 0;
+    }
+
+    LP5OutputFile = fopen(LP5OutputName, "wb");
+    if (LP5OutputFile == NULL) {
+        fprintf(stderr, "lp5: cannot open output file '%s'\n", LP5OutputName);
+        return 1;
+    }
+    return 0;
+}
+
+static int finish_output(int status)
+{
+    if (fflush(output_stream()) == EOF) {
+        fprintf(stderr, "lp5: could not write output\n");
+        status = 1;
+    }
+    if (LP5OutputFile != NULL) {
+        if (fclose(LP5OutputFile) == EOF) {
+            fprintf(stderr, "lp5: could not close output file '%s'\n", LP5OutputName);
+            status = 1;
+        }
+        LP5OutputFile = NULL;
+    }
+    return status;
+}
+
 static int command_stub(xsltStylesheetPtr stylesheet, int argc, char *argv[])
 {
     int i;
 
     (void) stylesheet;
-    printf("command %s:\n", argv[0]);
-    printf("LP5Source: %s\n", LP5Source);
+    if (open_output_file() != 0) {
+        return 1;
+    }
+    fprintf(output_stream(), "command %s:\n", argv[0]);
+    fprintf(output_stream(), "LP5Source: %s\n", LP5Source);
     for (i = 0; i < argc; ++i) {
-        printf("  argv[%d]: %s\n", i, argv[i]);
+        fprintf(output_stream(), "  argv[%d]: %s\n", i, argv[i]);
     }
     return 0;
 }
@@ -51,8 +91,8 @@ static int transform_file(xsltStylesheetPtr stylesheet, const char *filename)
         fprintf(stderr, "lp5: transformation failed\n");
         status = 1;
     } else {
-        if (xsltSaveResultToFile(stdout, result, stylesheet) < 0 ||
-                fflush(stdout) == EOF) {
+        if (open_output_file() != 0 ||
+                xsltSaveResultToFile(output_stream(), result, stylesheet) < 0) {
             fprintf(stderr, "lp5: could not write transformation result\n");
             status = 1;
         }
@@ -180,11 +220,11 @@ static int run_command(const struct command_entry *command, int argc,
 static void print_usage(const char *program)
 {
     fprintf(stderr,
-        "Usage: %s [-s source-dir] <command> [args...]\n"
+        "Usage: %s [-s source-dir] [-o output-file] <command> [args...]\n"
         "       Commands: tangle, weave, add-article, show-bundle\n"
-        "       %s [-s source-dir] <stylesheet.xsl|stylesheet.xslt> [xml-file] [other args...]\n"
+        "       %s [-s source-dir] [-o output-file] <stylesheet.xsl|stylesheet.xslt> [xml-file] [other args...]\n"
         "       Source directory defaults to lp5.lp5; LP5Source sets the environment default.\n"
-        "       -s overrides both.\n",
+        "       -s overrides both; -o writes command output instead of stdout.\n",
         program, program);
 }
 
@@ -200,13 +240,24 @@ int main(int argc, char *argv[])
         LP5Source = environment_source;
     }
 
-    if (first_argument < argc && strcmp(argv[first_argument], "-s") == 0) {
-        if (first_argument + 1 >= argc) {
-            print_usage(argv[0]);
-            return 1;
+    while (first_argument < argc) {
+        if (strcmp(argv[first_argument], "-s") == 0) {
+            if (first_argument + 1 >= argc) {
+                print_usage(argv[0]);
+                return 1;
+            }
+            LP5Source = argv[first_argument + 1];
+            first_argument += 2;
+        } else if (strcmp(argv[first_argument], "-o") == 0) {
+            if (first_argument + 1 >= argc) {
+                print_usage(argv[0]);
+                return 1;
+            }
+            LP5OutputName = argv[first_argument + 1];
+            first_argument += 2;
+        } else {
+            break;
         }
-        LP5Source = argv[first_argument + 1];
-        first_argument += 2;
     }
 
     if (first_argument >= argc) {
@@ -221,7 +272,8 @@ int main(int argc, char *argv[])
             print_usage(argv[0]);
             return 1;
         }
-        return run_command(command, argc, argv, first_argument);
+        status = run_command(command, argc, argv, first_argument);
+        return finish_output(status);
     }
 
     xmlInitParser();
@@ -251,5 +303,5 @@ int main(int argc, char *argv[])
     xsltFreeStylesheet(stylesheet);
     xsltCleanupGlobals();
     xmlCleanupParser();
-    return status;
+    return finish_output(status);
 }
