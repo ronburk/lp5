@@ -1,0 +1,10 @@
+<template>
+    <heading>Named code definition</heading>
+    <section data-lp5-kind="explanation">
+        <p>This child defines the named Greeting code section.</p>
+    </section>
+    <section data-lp5-kind="code">
+        <name>Greeting</name>
+        <code><![CDATA[Hello from the named Greeting section.]]></code>
+    </section>
+</template>

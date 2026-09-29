@@ -1,0 +1,11 @@
+<template>
+    <heading>Named code reference</heading>
+    <section data-lp5-kind="explanation">
+        <p>This child references Greeting; the generated output should include its text.</p>
+    </section>
+    <section data-lp5-kind="code">
+        <name></name>
+        <code><![CDATA[Expanded section: ]]><lp5- ref="Greeting"/><![CDATA[
+]]></code>
+    </section>
+</template>
