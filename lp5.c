@@ -11,7 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-typedef int (*command_function)(const char *command_name, int argc,
+typedef int (*command_function)(xsltStylesheetPtr stylesheet, int argc,
     char *argv[]);
 
 const char *LP5Source = "lp5.lp5";
@@ -21,11 +21,12 @@ struct command_entry {
     command_function function;
 };
 
-static int command_stub(const char *command_name, int argc, char *argv[])
+static int command_stub(xsltStylesheetPtr stylesheet, int argc, char *argv[])
 {
     int i;
 
-    printf("command %s:\n", command_name);
+    (void) stylesheet;
+    printf("command %s:\n", argv[0]);
     printf("LP5Source: %s\n", LP5Source);
     for (i = 0; i < argc; ++i) {
         printf("  argv[%d]: %s\n", i, argv[i]);
@@ -33,9 +34,83 @@ static int command_stub(const char *command_name, int argc, char *argv[])
     return 0;
 }
 
+static int transform_file(xsltStylesheetPtr stylesheet, const char *filename)
+{
+    xmlDocPtr document;
+    xmlDocPtr result;
+    int status = 0;
+
+    document = xmlReadFile(filename, NULL, XML_PARSE_NONET);
+    if (document == NULL) {
+        fprintf(stderr, "lp5: cannot load XML file '%s'\n", filename);
+        return 1;
+    }
+
+    result = xsltApplyStylesheet(stylesheet, document, NULL);
+    if (result == NULL) {
+        fprintf(stderr, "lp5: transformation failed\n");
+        status = 1;
+    } else {
+        if (xsltSaveResultToFile(stdout, result, stylesheet) < 0 ||
+                fflush(stdout) == EOF) {
+            fprintf(stderr, "lp5: could not write transformation result\n");
+            status = 1;
+        }
+        xmlFreeDoc(result);
+    }
+    xmlFreeDoc(document);
+    return status;
+}
+
+static char *weave_default_input(void)
+{
+    static const char filename[] = "lp5.lp5";
+    size_t directory_length = strlen(LP5Source);
+    int needs_separator = directory_length > 0 &&
+        LP5Source[directory_length - 1] != '/' &&
+        LP5Source[directory_length - 1] != '\\';
+    char *path = malloc(directory_length + (size_t) needs_separator + sizeof(filename));
+
+    if (path == NULL) {
+        return NULL;
+    }
+    memcpy(path, LP5Source, directory_length);
+    if (needs_separator) {
+        path[directory_length++] = '/';
+    }
+    memcpy(path + directory_length, filename, sizeof(filename));
+    return path;
+}
+
+static int command_weave(xsltStylesheetPtr stylesheet, int argc, char *argv[])
+{
+    const char *input_filename;
+    char *default_input = NULL;
+    int status;
+
+    if (argc > 2) {
+        fprintf(stderr, "Usage: lp5 [-s source-dir] weave [xml-file]\n");
+        return 1;
+    }
+    if (argc == 2) {
+        input_filename = argv[1];
+    } else {
+        default_input = weave_default_input();
+        if (default_input == NULL) {
+            fprintf(stderr, "lp5: out of memory\n");
+            return 1;
+        }
+        input_filename = default_input;
+    }
+
+    status = transform_file(stylesheet, input_filename);
+    free(default_input);
+    return status;
+}
+
 static const struct command_entry commands[] = {
     {"tangle", command_stub},
-    {"weave", command_stub},
+    {"weave", command_weave},
     {"add-article", command_stub},
     {"show-bundle", command_stub}
 };
@@ -67,7 +142,7 @@ static const struct command_entry *find_command(const char *name)
 }
 
 static int run_command(const struct command_entry *command, int argc,
-        char *argv[])
+        char *argv[], int command_argument)
 {
     size_t name_length = strlen(command->name);
     char *stylesheet_name = malloc(name_length + sizeof(".xsl"));
@@ -94,7 +169,8 @@ static int run_command(const struct command_entry *command, int argc,
     }
 
     free(stylesheet_name);
-    status = command->function(command->name, argc, argv);
+    status = command->function(stylesheet, argc - command_argument,
+        argv + command_argument);
     xsltFreeStylesheet(stylesheet);
     xsltCleanupGlobals();
     xmlCleanupParser();
@@ -115,8 +191,6 @@ static void print_usage(const char *program)
 int main(int argc, char *argv[])
 {
     xsltStylesheetPtr stylesheet;
-    xmlDocPtr document;
-    xmlDocPtr result;
     const char *environment_source;
     int first_argument = 1;
     int status = 0;
@@ -147,7 +221,7 @@ int main(int argc, char *argv[])
             print_usage(argv[0]);
             return 1;
         }
-        return run_command(command, argc, argv);
+        return run_command(command, argc, argv, first_argument);
     }
 
     xmlInitParser();
@@ -171,25 +245,7 @@ int main(int argc, char *argv[])
         print_usage(argv[0]);
         status = 1;
     } else {
-        document = xmlReadFile(argv[first_argument + 1], NULL, XML_PARSE_NONET);
-        if (document == NULL) {
-            fprintf(stderr, "lp5: cannot load XML file '%s'\n", argv[first_argument + 1]);
-            status = 1;
-        } else {
-            result = xsltApplyStylesheet(stylesheet, document, NULL);
-            if (result == NULL) {
-                fprintf(stderr, "lp5: transformation failed\n");
-                status = 1;
-            } else {
-                if (xsltSaveResultToFile(stdout, result, stylesheet) < 0 ||
-                        fflush(stdout) == EOF) {
-                    fprintf(stderr, "lp5: could not write transformation result\n");
-                    status = 1;
-                }
-                xmlFreeDoc(result);
-            }
-            xmlFreeDoc(document);
-        }
+        status = transform_file(stylesheet, argv[first_argument + 1]);
     }
 
     xsltFreeStylesheet(stylesheet);
