@@ -8,6 +8,7 @@
 #include <libxml/xpathInternals.h>
 #include <libxslt/extensions.h>
 #include <libxslt/transform.h>
+#include <libxslt/variables.h>
 #include <libxslt/xsltutils.h>
 #include <libxslt/variables.h>
 #include <stdio.h>
@@ -340,6 +341,61 @@ static int transform_file(xsltStylesheetPtr stylesheet, const char *filename,
     return status;
 }
 
+static int command_tangle(xsltStylesheetPtr stylesheet, int argc, char *argv[])
+{
+    static const char default_input[] = "lp5.lp5/lp5.lp5";
+    const char *input_filename = default_input;
+    xmlDocPtr document;
+    xmlDocPtr result;
+    xsltTransformContextPtr context;
+    int status = 0;
+
+    if (argc > 2) {
+        fprintf(stderr, "Usage: lp5 [-o output-file] tangle [xml-file]\n");
+        return 1;
+    }
+    if (argc == 2) {
+        input_filename = argv[1];
+    }
+
+    document = xmlReadFile(input_filename, NULL, XML_PARSE_NONET);
+    if (document == NULL) {
+        fprintf(stderr, "lp5: cannot load XML file '%s'\n", input_filename);
+        return 1;
+    }
+
+    context = xsltNewTransformContext(stylesheet, document);
+    if (context == NULL) {
+        fprintf(stderr, "lp5: cannot create transformation context\n");
+        xmlFreeDoc(document);
+        return 1;
+    }
+    if (xsltQuoteOneUserParam(context, BAD_CAST "root-location",
+            BAD_CAST input_filename) != 0) {
+        fprintf(stderr, "lp5: cannot set root article location\n");
+        xsltFreeTransformContext(context);
+        xmlFreeDoc(document);
+        return 1;
+    }
+
+    result = xsltApplyStylesheetUser(stylesheet, document, NULL, NULL, NULL,
+        context);
+    xsltFreeTransformContext(context);
+    if (result == NULL) {
+        fprintf(stderr, "lp5: tangling failed\n");
+        status = 1;
+    } else {
+        if (open_output_file() != 0 ||
+                xsltSaveResultToFile(output_stream(), result, stylesheet) < 0) {
+            fprintf(stderr, "lp5: could not write tangle result\n");
+            status = 1;
+        }
+        xmlFreeDoc(result);
+    }
+    xmlFreeDoc(document);
+    return status;
+}
+
 static char *weave_default_input(void)
 {
     static const char filename[] = "lp5.lp5";
@@ -414,7 +470,7 @@ static int command_weave(xsltStylesheetPtr stylesheet, int argc, char *argv[])
 }
 
 static const struct command_entry commands[] = {
-    {"tangle", command_stub},
+    {"tangle", command_tangle},
     {"weave", command_weave},
     {"add-article", command_stub},
     {"show-bundle", command_stub}
