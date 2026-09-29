@@ -1309,6 +1309,10 @@ state awaitArticleSave
                         <textarea data-id="docText" rows="10" cols="60"></textarea>
                     </p>
                     <p>
+                        <label>keywords (one per line):</label>
+                        <textarea data-id="keywordText" rows="4" cols="60"></textarea>
+                    </p>
+                    <p>
                         <label>name:</label>
                         <input data-id="codeName" type="text">
                     </p>
@@ -1329,12 +1333,13 @@ state awaitArticleSave
              }
 
              function renderDialog(article, namedNodes){
-                 const {articleTitle, docText, codeText, codeName } = namedNodes;
+                 const {articleTitle, docText, keywordText, codeText, codeName } = namedNodes;
                  let title = sectionGetTitle(article);
                  articleTitle.value = title ;
                  let explain = article.sections?.explanation?.innerHTML;
                  if(explain)
                      docText.value = article.unindentCode(explain);
+                 keywordText.value = article.keywords.join('\n');
                  let value = "";
                  codeName.value = article.getCodeName();
                  codeText.value = article.unindentCode(
@@ -1384,11 +1389,14 @@ state awaitArticleSave
                      this.#article = article;
                  }
                  getArticleRevision(){
-                     const {articleTitle, docText, codeName, codeText}=this.template.namedNodes;
+                     const {articleTitle, docText, keywordText, codeName, codeText}=this.template.namedNodes;
                      let sectionStrings = {
                          children    : this.#article.sections.children?.innerHTML,
                          heading     : articleTitle.value,
                          explanation : docText.value,
+                         keywords    : keywordText.value.split(/\r?\n/)
+                             .map(keyword => keyword.trim())
+                             .filter(keyword => keyword.length > 0),
                          name        : codeName.value,
                          code        : codeText.value,
                          hasCode     : Boolean(this.#article.codeSectionNode)
@@ -3109,8 +3117,9 @@ state awaitArticleSave
                              articleString += `<children>${sectionStrings.children}</children>`;
                          if(sectionStrings.heading)
                              articleString += `<heading>${Article2.xmlText(sectionStrings.heading)}</heading>`;
-                         if(this.keywords.length)
-                             articleString += '<keywords>' + this.keywords.map(keyword =>
+                         const keywords = sectionStrings.keywords ?? this.keywords;
+                         if(keywords.length)
+                             articleString += '<keywords>' + keywords.map(keyword =>
                                  `<li>${Article2.xmlText(keyword)}</li>`).join('') + '</keywords>';
                          if(sectionStrings.explanation)
                              articleString += `<section data-lp5-kind="explanation">${sectionStrings.explanation}</section>`;
