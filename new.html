@@ -3306,62 +3306,12 @@ state home
                      to.appendChild(child);
              }
 
-             async function openDB(){
-                 return new Promise((resolve, reject) => {
-                     console.log("indexedDB.open");
-                     const request = window.indexedDB.open("lp5-001", 2);
-                     request.onerror   = (event) => {
-                         console.error("openDB error:", event.target.error);
-                         reject("db error!" + event.target.error);
-                     }
-                     request.onsuccess = (event) => { resolve(request.result);  };
-                     request.onupgradeneeded = (event) => {
-                         console.log("upgrade needed.");
-                         const db = event.target.result;
-                         try {
-                             db.deleteObjectStore("handles");
-                         } catch(error) {
-                             // let's assume it failed because it didn't exist.
-                         }
-                         const objectStore = db.createObjectStore("handles");
-                     };
-                 });
-             }
-
-             
-
-             async function putDB(db, key, value){
-                 console.log("putDB: ", key, value);
-                 return new Promise((resolve, reject) => {
-                     let txn = db.transaction(["handles"], "readwrite");
-                     txn.objectStore("handles")
-                        .add(value, key)
-                     ;
-
-                     txn.oncomplete = (event) => { resolve(txn.result); };
-                 });
-             }
-
-             async function getDB(db, key){
-                 return new Promise((resolve, reject) => {
-                     console.log("getDB: ", key);
-                     console.log(db);
-                     let txn = db.transaction(["handles"], "readwrite");
-                     let get = txn.objectStore("handles")
-                                  .get(key)
-                     ;
-
-                     txn.oncomplete = (event) => { console.log("!");resolve(get.result); };
-                     txn.onerror    = (event) => { console.log("getDB error!");reject(); }
-                     console.log("getDB() end of function");
-                 });
-             }
+             const {get, put} = window.LP5.modIndexedDB;
 
              // load any previously stored handle to our parent directory
              async function loadDirParentHandle(){
                  let result = null;
-                 let db     = await openDB();
-                 let handle = await getDB(db, "handle");
+                 let handle = await get("handle");
                  if(false){
                      let option = {mode:'readwrite'};
                      let perms = await handle.queryPermission(option);
@@ -3404,8 +3354,7 @@ state home
                          console.assert(targetID == 'SelectParentDirButton');
                          model.dirParentHandle = await window.showDirectoryPicker(options);
                          if(model.dirParentHandle){
-                             let db = await openDB();
-                             await putDB(db, "handle", model.dirParentHandle);
+                             await put("handle", model.dirParentHandle);
                              console.log("Stored handle!!!!");
                          }
                      }
