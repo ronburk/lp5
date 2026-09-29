@@ -10,9 +10,20 @@
 #include <libxslt/transform.h>
 #include <libxslt/variables.h>
 #include <libxslt/xsltutils.h>
+#include <errno.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+
+#ifdef _WIN32
+#include <direct.h>
+#define LP5_GETCWD _getcwd
+#else
+#include <unistd.h>
+#define LP5_GETCWD getcwd
+#endif
 
 #ifdef _WIN32
 #include <io.h>
@@ -41,10 +52,53 @@ struct extension_function {
 };
 
 static void register_ls_function(void);
+static void register_source_marker_function(void);
+
+static char **LP5MapSources;
+static size_t LP5MapSourceCount;
+static size_t LP5MapSourceCapacity;
 
 static const struct extension_function extension_functions[] = {
-    {"ls", register_ls_function}
+    {"ls", register_ls_function},
+    {"source-marker", register_source_marker_function}
 };
+
+static void clear_source_map_sources(void)
+{
+    size_t i;
+    for (i = 0; i < LP5MapSourceCount; ++i) {
+        free(LP5MapSources[i]);
+    }
+    free(LP5MapSources);
+    LP5MapSources = NULL;
+    LP5MapSourceCount = 0;
+    LP5MapSourceCapacity = 0;
+}
+
+static size_t source_map_source_index(const char *filename)
+{
+    size_t i;
+    for (i = 0; i < LP5MapSourceCount; ++i) {
+        if (strcmp(LP5MapSources[i], filename) == 0) {
+            return i;
+        }
+    }
+    if (LP5MapSourceCount == LP5MapSourceCapacity) {
+        size_t capacity = LP5MapSourceCapacity == 0 ? 8 : LP5MapSourceCapacity * 2;
+        char **sources = (char **) realloc(LP5MapSources, capacity * sizeof(*sources));
+        if (sources == NULL) {
+            return (size_t) -1;
+        }
+        LP5MapSources = sources;
+        LP5MapSourceCapacity = capacity;
+    }
+    LP5MapSources[LP5MapSourceCount] = (char *) malloc(strlen(filename) + 1);
+    if (LP5MapSources[LP5MapSourceCount] == NULL) {
+        return (size_t) -1;
+    }
+    strcpy(LP5MapSources[LP5MapSourceCount], filename);
+    return LP5MapSourceCount++;
+}
 
 static void extension_ls(xmlXPathParserContextPtr parser, int argument_count)
 {
@@ -201,6 +255,73 @@ static void register_ls_function(void)
         BAD_CAST LP5_EXTENSION_NAMESPACE, extension_ls);
 }
 
+static void extension_source_marker(xmlXPathParserContextPtr parser,
+        int argument_count)
+{
+    xmlChar *filename;
+    xmlChar *marker_name;
+    xmlNodePtr context_node;
+    xmlNodePtr marker;
+    xmlXPathObjectPtr result;
+    size_t source_index;
+    long line_number;
+    char marker_data[64];
+
+    if (argument_count != 2) {
+        xmlXPathSetArityError(parser);
+        return;
+    }
+    marker_name = xmlXPathPopString(parser);
+    filename = xmlXPathPopString(parser);
+    if (filename == NULL || marker_name == NULL) {
+        if (filename != NULL) xmlFree(filename);
+        if (marker_name != NULL) xmlFree(marker_name);
+        xmlXPathSetTypeError(parser);
+        return;
+    }
+    context_node = parser->context->node;
+    if (context_node == NULL || context_node->doc == NULL) {
+        xmlFree(filename);
+        xmlFree(marker_name);
+        xmlXPathSetTypeError(parser);
+        return;
+    }
+    source_index = source_map_source_index((const char *) filename);
+    if (source_index == (size_t) -1) {
+        xmlFree(filename);
+        xmlFree(marker_name);
+        xmlXPathSetError(parser, XPATH_MEMORY_ERROR);
+        return;
+    }
+    line_number = xmlGetLineNo(context_node);
+    if (line_number < 1) {
+        line_number = 1;
+    }
+    snprintf(marker_data, sizeof(marker_data), "%lu %ld",
+        (unsigned long) source_index, line_number);
+    marker = xmlNewDocPI(context_node->doc, marker_name,
+        BAD_CAST marker_data);
+    xmlFree(filename);
+    xmlFree(marker_name);
+    if (marker == NULL) {
+        xmlXPathSetError(parser, XPATH_MEMORY_ERROR);
+        return;
+    }
+    result = xmlXPathNewNodeSet(marker);
+    if (result == NULL) {
+        xmlFreeNode(marker);
+        xmlXPathSetError(parser, XPATH_MEMORY_ERROR);
+        return;
+    }
+    valuePush(parser, result);
+}
+
+static void register_source_marker_function(void)
+{
+    (void) xsltRegisterExtModuleFunction(BAD_CAST "source-marker",
+        BAD_CAST LP5_EXTENSION_NAMESPACE, extension_source_marker);
+}
+
 static void register_extension_functions(void)
 {
     size_t i;
@@ -287,17 +408,468 @@ static char *input_directory(const char *filename)
     return directory;
 }
 
+struct source_map_position {
+    unsigned long generated_line;
+    unsigned long generated_column;
+    unsigned long source_index;
+    unsigned long original_line;
+    unsigned long original_column;
+};
+
+struct source_map_positions {
+    struct source_map_position *items;
+    size_t count;
+    size_t capacity;
+    unsigned long line_count;
+};
+
+static int add_source_map_position(struct source_map_positions *positions,
+        unsigned long generated_line, unsigned long generated_column,
+        unsigned long source_index, unsigned long original_line,
+        unsigned long original_column)
+{
+    struct source_map_position *position;
+
+    if (positions->count > 0) {
+        position = &positions->items[positions->count - 1];
+        if (position->generated_line == generated_line &&
+                position->generated_column == generated_column) {
+            position->source_index = source_index;
+            position->original_line = original_line;
+            position->original_column = original_column;
+            return 0;
+        }
+    }
+    if (positions->count == positions->capacity) {
+        size_t capacity = positions->capacity == 0 ? 64 : positions->capacity * 2;
+        struct source_map_position *items = (struct source_map_position *)
+            realloc(positions->items, capacity * sizeof(*items));
+        if (items == NULL) {
+            return 1;
+        }
+        positions->items = items;
+        positions->capacity = capacity;
+    }
+    position = &positions->items[positions->count++];
+    position->generated_line = generated_line;
+    position->generated_column = generated_column;
+    position->source_index = source_index;
+    position->original_line = original_line;
+    position->original_column = original_column;
+    return 0;
+}
+
+static unsigned long decode_utf8(const unsigned char *text, size_t remaining,
+        size_t *byte_count)
+{
+    unsigned char first = text[0];
+    size_t count;
+    unsigned long codepoint;
+    size_t i;
+
+    if (first < 0x80) {
+        *byte_count = 1;
+        return first;
+    }
+    if ((first & 0xe0) == 0xc0) {
+        count = 2;
+        codepoint = first & 0x1f;
+    } else if ((first & 0xf0) == 0xe0) {
+        count = 3;
+        codepoint = first & 0x0f;
+    } else if ((first & 0xf8) == 0xf0) {
+        count = 4;
+        codepoint = first & 0x07;
+    } else {
+        *byte_count = 1;
+        return 0xfffd;
+    }
+    if (count > remaining) {
+        *byte_count = 1;
+        return 0xfffd;
+    }
+    for (i = 1; i < count; ++i) {
+        if ((text[i] & 0xc0) != 0x80) {
+            *byte_count = 1;
+            return 0xfffd;
+        }
+        codepoint = (codepoint << 6) | (text[i] & 0x3f);
+    }
+    *byte_count = count;
+    return codepoint;
+}
+
+static int process_source_map_markers(const xmlChar *serialized, size_t length,
+        const char *marker_name,
+        xmlChar **clean_output, size_t *clean_length,
+        struct source_map_positions *positions)
+{
+    size_t marker_start_length = strlen(marker_name) + 3;
+    char *marker_start = (char *) malloc(marker_start_length + 1);
+    size_t input_offset = 0;
+    size_t output_offset = 0;
+    unsigned long generated_line = 0;
+    unsigned long generated_column = 0;
+    unsigned long source_index = 0;
+    unsigned long original_line = 0;
+    unsigned long original_column = 0;
+    int have_source = 0;
+    int pending_mapping = 0;
+    xmlChar *output = (xmlChar *) malloc(length + 1);
+
+    if (marker_start == NULL || output == NULL) {
+        free(marker_start);
+        free(output);
+        return 1;
+    }
+    snprintf(marker_start, marker_start_length + 1, "<?%s ", marker_name);
+    while (input_offset < length) {
+        if (length - input_offset >= marker_start_length &&
+                memcmp(serialized + input_offset, marker_start,
+                    marker_start_length) == 0) {
+            const xmlChar *close = (const xmlChar *) strchr(
+                (const char *) serialized + input_offset, '>');
+            unsigned long marker_source;
+            unsigned long marker_line;
+            char *end;
+            const char *payload = (const char *) serialized + input_offset +
+                marker_start_length;
+
+            if (close == NULL || sscanf(payload, "%lu %lu", &marker_source,
+                    &marker_line) != 2 || marker_source >= LP5MapSourceCount) {
+                free(output);
+                free(marker_start);
+                return 1;
+            }
+            end = (char *) close + 1;
+            input_offset = (size_t) (end - (const char *) serialized);
+            source_index = marker_source;
+            original_line = marker_line == 0 ? 0 : marker_line - 1;
+            original_column = 0;
+            have_source = 1;
+            pending_mapping = 1;
+            continue;
+        }
+
+        {
+            size_t byte_count;
+            unsigned long codepoint = decode_utf8(serialized + input_offset,
+                length - input_offset, &byte_count);
+            memcpy(output + output_offset, serialized + input_offset, byte_count);
+            output_offset += byte_count;
+            input_offset += byte_count;
+
+            if (codepoint == '\r' || codepoint == '\n' ||
+                    codepoint == 0x2028 || codepoint == 0x2029) {
+                if (codepoint == '\r' && input_offset < length &&
+                        serialized[input_offset] == '\n') {
+                    output[output_offset++] = serialized[input_offset++];
+                }
+                ++generated_line;
+                generated_column = 0;
+                ++positions->line_count;
+                if (have_source) {
+                    ++original_line;
+                    original_column = 0;
+                    if (!pending_mapping && add_source_map_position(positions,
+                            generated_line, generated_column, source_index,
+                            original_line, original_column) != 0) {
+                        free(output);
+                        free(marker_start);
+                        return 1;
+                    }
+                }
+            } else {
+                if (pending_mapping) {
+                    if (add_source_map_position(positions, generated_line,
+                            generated_column, source_index, original_line,
+                            original_column) != 0) {
+                        free(output);
+                        free(marker_start);
+                        return 1;
+                    }
+                    pending_mapping = 0;
+                }
+                generated_column += codepoint > 0xffff ? 2 : 1;
+                if (have_source) {
+                    original_column += codepoint > 0xffff ? 2 : 1;
+                }
+            }
+        }
+    }
+    output[output_offset] = '\0';
+    free(marker_start);
+    *clean_output = output;
+    *clean_length = output_offset;
+    return 0;
+}
+
+static int write_json_string(FILE *file, const char *text)
+{
+    const unsigned char *cursor = (const unsigned char *) text;
+    if (fputc('"', file) == EOF) {
+        return 1;
+    }
+    while (*cursor != '\0') {
+        switch (*cursor) {
+        case '"':
+        case '\\':
+            if (fputc('\\', file) == EOF || fputc(*cursor, file) == EOF) {
+                return 1;
+            }
+            break;
+        case '\b': if (fputs("\\b", file) == EOF) return 1; break;
+        case '\f': if (fputs("\\f", file) == EOF) return 1; break;
+        case '\n': if (fputs("\\n", file) == EOF) return 1; break;
+        case '\r': if (fputs("\\r", file) == EOF) return 1; break;
+        case '\t': if (fputs("\\t", file) == EOF) return 1; break;
+        default:
+            if (*cursor < 0x20) {
+                if (fprintf(file, "\\u%04x", *cursor) < 0) {
+                    return 1;
+                }
+            } else if (fputc(*cursor, file) == EOF) {
+                return 1;
+            }
+            break;
+        }
+        ++cursor;
+    }
+    return fputc('"', file) == EOF;
+}
+
+static char *source_map_root_uri(void)
+{
+    size_t capacity = 256;
+    char *directory = NULL;
+    char *uri;
+    size_t directory_length;
+    size_t prefix_length;
+    size_t output = 0;
+    size_t i;
+
+    while (capacity <= INT_MAX) {
+        directory = (char *) malloc(capacity);
+        if (directory == NULL) {
+            return NULL;
+        }
+        if (LP5_GETCWD(directory, (int) capacity) != NULL) {
+            break;
+        }
+        free(directory);
+        directory = NULL;
+        if (errno != ERANGE) {
+            return NULL;
+        }
+        capacity *= 2;
+    }
+    if (directory == NULL) {
+        return NULL;
+    }
+
+    directory_length = strlen(directory);
+    prefix_length = directory[0] == '/' ? strlen("file://") : strlen("file:///");
+    uri = (char *) malloc(prefix_length + directory_length * 3 + 2);
+    if (uri == NULL) {
+        free(directory);
+        return NULL;
+    }
+    memcpy(uri, directory[0] == '/' ? "file://" : "file:///", prefix_length);
+    output = prefix_length;
+    for (i = 0; i < directory_length; ++i) {
+        unsigned char ch = (unsigned char) directory[i];
+        if (ch == '\\') {
+            ch = '/';
+        }
+        if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+                (ch >= '0' && ch <= '9') || ch == '-' || ch == '.' ||
+                ch == '_' || ch == '~' || ch == '/' || ch == ':') {
+            uri[output++] = (char) ch;
+        } else {
+            static const char hex[] = "0123456789ABCDEF";
+            uri[output++] = '%';
+            uri[output++] = hex[ch >> 4];
+            uri[output++] = hex[ch & 15];
+        }
+    }
+    if (output == 0 || uri[output - 1] != '/') {
+        uri[output++] = '/';
+    }
+    uri[output] = '\0';
+    free(directory);
+    return uri;
+}
+
+static int write_vlq(FILE *file, long long value)
+{
+    static const char base64[] =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    unsigned long long encoded = value < 0
+        ? ((unsigned long long) (-value) << 1) | 1
+        : (unsigned long long) value << 1;
+
+    do {
+        unsigned int digit = (unsigned int) (encoded & 31);
+        encoded >>= 5;
+        if (encoded != 0) {
+            digit |= 32;
+        }
+        if (fputc(base64[digit], file) == EOF) {
+            return 1;
+        }
+    } while (encoded != 0);
+    return 0;
+}
+
+static int write_source_map(const char *filename, const char *generated_file,
+        const struct source_map_positions *positions)
+{
+    FILE *file = fopen(filename, "wb");
+    char *source_root = source_map_root_uri();
+    unsigned long line;
+    size_t position_index = 0;
+    long long previous_source = 0;
+    long long previous_original_line = 0;
+    long long previous_original_column = 0;
+    int status = 0;
+
+    if (file == NULL) {
+        fprintf(stderr, "lp5: cannot open source map '%s'\n", filename);
+        free(source_root);
+        return 1;
+    }
+    if (source_root == NULL) {
+        fclose(file);
+        free(source_root);
+        fprintf(stderr, "lp5: cannot determine source root for map '%s'\n",
+            filename);
+        return 1;
+    }
+    if (fputs("{\"version\":3", file) == EOF) {
+        status = 1;
+    }
+    if (generated_file != NULL && !status) {
+        if (fputs(",\"file\":", file) == EOF ||
+                write_json_string(file, generated_file) != 0) {
+            status = 1;
+        }
+    }
+    if (!status && fputs(",\"sources\":[", file) == EOF) {
+        status = 1;
+    }
+    for (line = 0; line < LP5MapSourceCount && !status; ++line) {
+        if (line != 0 && fputc(',', file) == EOF) {
+            status = 1;
+            break;
+        }
+        if (write_json_string(file, LP5MapSources[line]) != 0) {
+            status = 1;
+        }
+    }
+    if (!status && (fputs("],\"sourceRoot\":", file) == EOF ||
+            write_json_string(file, source_root) != 0 ||
+            fputs(",\"names\":[],\"mappings\":\"", file) == EOF)) {
+        status = 1;
+    }
+    for (line = 0; line <= positions->line_count && !status; ++line) {
+        unsigned long previous_generated_column = 0;
+        int first_segment = 1;
+        if (line != 0 && fputc(';', file) == EOF) {
+            status = 1;
+            break;
+        }
+        while (position_index < positions->count &&
+                positions->items[position_index].generated_line == line) {
+            const struct source_map_position *position =
+                &positions->items[position_index++];
+            if (!first_segment && fputc(',', file) == EOF) {
+                status = 1;
+                break;
+            }
+            first_segment = 0;
+            if (write_vlq(file, (long long) position->generated_column -
+                    previous_generated_column) != 0 ||
+                    write_vlq(file, (long long) position->source_index -
+                    previous_source) != 0 ||
+                    write_vlq(file, (long long) position->original_line -
+                    previous_original_line) != 0 ||
+                    write_vlq(file, (long long) position->original_column -
+                    previous_original_column) != 0) {
+                status = 1;
+                break;
+            }
+            previous_generated_column = position->generated_column;
+            previous_source = position->source_index;
+            previous_original_line = position->original_line;
+            previous_original_column = position->original_column;
+        }
+    }
+    if (!status && (fputs("\"}\n", file) == EOF || fflush(file) == EOF)) {
+        status = 1;
+    }
+    if (fclose(file) == EOF) {
+        status = 1;
+    }
+    free(source_root);
+    if (status) {
+        fprintf(stderr, "lp5: could not write source map '%s'\n", filename);
+    }
+    return status;
+}
+
+static int save_result_with_source_map(xmlDocPtr result,
+        xsltStylesheetPtr stylesheet, const char *map_filename,
+        const char *marker_name)
+{
+    xmlChar *serialized = NULL;
+    xmlChar *clean_output = NULL;
+    int serialized_length = 0;
+    size_t clean_length = 0;
+    struct source_map_positions positions = {NULL, 0, 0, 0};
+    int status = 0;
+
+    if (xsltSaveResultToString(&serialized, &serialized_length, result,
+            stylesheet) < 0 || serialized == NULL || serialized_length < 0) {
+        fprintf(stderr, "lp5: could not serialize tangle output\n");
+        status = 1;
+    } else if (process_source_map_markers(serialized,
+            (size_t) serialized_length, marker_name,
+            &clean_output, &clean_length,
+            &positions) != 0) {
+        fprintf(stderr, "lp5: could not process source map markers\n");
+        status = 1;
+    } else if (open_output_file() != 0 ||
+            fwrite(clean_output, 1, clean_length, output_stream()) != clean_length) {
+        fprintf(stderr, "lp5: could not write transformation result\n");
+        status = 1;
+    } else if (write_source_map(map_filename, LP5OutputName, &positions) != 0) {
+        status = 1;
+    }
+
+    free(positions.items);
+    xmlFree(clean_output);
+    xmlFree(serialized);
+    return status;
+}
+
 static int transform_file(xsltStylesheetPtr stylesheet, const char *filename,
-        const struct xslt_parameter *parameters, size_t parameter_count)
+        const struct xslt_parameter *parameters, size_t parameter_count,
+        const char *source_map_filename, const char *source_map_marker_name)
 {
     xmlDocPtr document;
     xmlDocPtr result;
     xsltTransformContextPtr context;
     int status = 0;
 
+    if (source_map_filename != NULL) {
+        clear_source_map_sources();
+    }
     document = xmlReadFile(filename, NULL, XML_PARSE_NONET);
     if (document == NULL) {
         fprintf(stderr, "lp5: cannot load XML file '%s'\n", filename);
+        if (source_map_filename != NULL) {
+            clear_source_map_sources();
+        }
         return 1;
     }
 
@@ -305,12 +877,18 @@ static int transform_file(xsltStylesheetPtr stylesheet, const char *filename,
     if (context == NULL) {
         fprintf(stderr, "lp5: cannot create transformation context\n");
         xmlFreeDoc(document);
+        if (source_map_filename != NULL) {
+            clear_source_map_sources();
+        }
         return 1;
     }
     if (parameter_count > 0 && parameters == NULL) {
         fprintf(stderr, "lp5: invalid stylesheet parameters\n");
         xsltFreeTransformContext(context);
         xmlFreeDoc(document);
+        if (source_map_filename != NULL) {
+            clear_source_map_sources();
+        }
         return 1;
     }
     {
@@ -322,6 +900,9 @@ static int transform_file(xsltStylesheetPtr stylesheet, const char *filename,
                     parameters[i].name);
                 xsltFreeTransformContext(context);
                 xmlFreeDoc(document);
+                if (source_map_filename != NULL) {
+                    clear_source_map_sources();
+                }
                 return 1;
             }
         }
@@ -332,6 +913,10 @@ static int transform_file(xsltStylesheetPtr stylesheet, const char *filename,
     if (result == NULL) {
         fprintf(stderr, "lp5: transformation failed\n");
         status = 1;
+    } else if (source_map_filename != NULL) {
+        status = save_result_with_source_map(result, stylesheet,
+            source_map_filename, source_map_marker_name);
+        xmlFreeDoc(result);
     } else {
         if (open_output_file() != 0 ||
                 xsltSaveResultToFile(output_stream(), result, stylesheet) < 0) {
@@ -341,6 +926,9 @@ static int transform_file(xsltStylesheetPtr stylesheet, const char *filename,
         xmlFreeDoc(result);
     }
     xmlFreeDoc(document);
+    if (source_map_filename != NULL) {
+        clear_source_map_sources();
+    }
     return status;
 }
 
@@ -382,19 +970,63 @@ static int command_tangle(xsltStylesheetPtr stylesheet, int argc, char *argv[])
 {
     static const char default_input[] = "lp5.lp5/lp5.lp5";
     const char *input_filename = default_input;
-    struct xslt_parameter parameter;
+    const char *map_filename = NULL;
+    struct xslt_parameter parameters[3];
+    int read_argument = 1;
+    int write_argument = 1;
+
+    while (read_argument < argc) {
+        if (strcmp(argv[read_argument], "-m") == 0) {
+            if (read_argument + 1 >= argc) {
+                fprintf(stderr, "Usage: lp5 tangle [-m map-file] [xml-file]\n");
+                return 1;
+            }
+            if (map_filename != NULL) {
+                fprintf(stderr, "lp5: source map specified more than once\n");
+                return 1;
+            }
+            map_filename = argv[read_argument + 1];
+            read_argument += 2;
+        } else {
+            argv[write_argument++] = argv[read_argument++];
+        }
+    }
+    argv[write_argument] = NULL;
+    argc = write_argument;
 
     if (argc > 2) {
-        fprintf(stderr, "Usage: lp5 tangle [xml-file]\n");
+        fprintf(stderr, "Usage: lp5 tangle [-m map-file] [xml-file]\n");
         return 1;
     }
     if (argc == 2) {
         input_filename = argv[1];
     }
 
-    parameter.name = "root-location";
-    parameter.value = input_filename;
-    return transform_file(stylesheet, input_filename, &parameter, 1);
+    if (map_filename != NULL && LP5OutputName != NULL &&
+            strcmp(map_filename, LP5OutputName) == 0) {
+        fprintf(stderr, "lp5: source map and generated output must use different files\n");
+        return 1;
+    }
+    parameters[0].name = "root-location";
+    parameters[0].value = input_filename;
+    parameters[1].name = "source-map-enabled";
+    parameters[1].value = map_filename == NULL ? "false" : "true";
+    {
+        char marker_name[64];
+        static unsigned long marker_sequence;
+        const char *marker_name_parameter = NULL;
+        size_t parameter_count = map_filename == NULL ? 2 : 3;
+
+        if (map_filename != NULL) {
+            snprintf(marker_name, sizeof(marker_name), "lp5sm%lx%lx",
+                (unsigned long) time(NULL), marker_sequence++);
+            parameters[2].name = "source-map-marker-name";
+            parameters[2].value = marker_name;
+            marker_name_parameter = marker_name;
+        }
+        return transform_file(stylesheet, input_filename, parameters,
+            parameter_count, map_filename, marker_name_parameter);
+    }
 }
 
 static char *weave_default_input(void)
@@ -449,7 +1081,8 @@ static int command_weave(xsltStylesheetPtr stylesheet, int argc, char *argv[])
         struct xslt_parameter parameter;
         parameter.name = "source-directory";
         parameter.value = directory;
-        status = transform_file(stylesheet, input_filename, &parameter, 1);
+        status = transform_file(stylesheet, input_filename, &parameter, 1,
+            NULL, NULL);
     }
     free(directory);
     free(default_input);
@@ -475,7 +1108,7 @@ static int command_add_article(xsltStylesheetPtr stylesheet, int argc,
     parameters[2].value = LP5Source;
     parameters[3].name = "article_file";
     parameters[3].value = argv[3];
-    return transform_file(stylesheet, argv[1], parameters, 4);
+    return transform_file(stylesheet, argv[1], parameters, 4, NULL, NULL);
 }
 
 static int command_show_bundle(xsltStylesheetPtr stylesheet, int argc,
@@ -491,7 +1124,7 @@ static int command_show_bundle(xsltStylesheetPtr stylesheet, int argc,
 
     parameter.name = "code_name";
     parameter.value = argv[2];
-    return transform_file(stylesheet, argv[1], &parameter, 1);
+    return transform_file(stylesheet, argv[1], &parameter, 1, NULL, NULL);
 }
 
 static const struct command_entry commands[] = {
@@ -569,10 +1202,11 @@ static void print_usage(const char *program)
     fprintf(stderr,
         "Usage: %s [-s source-dir] [-o output-file] <command> [args...]\n"
         "       Commands: tangle, weave, add-article, show-bundle\n"
+        "       %s tangle [-m map-file] [xml-file]\n"
         "       %s [-s source-dir] [-o output-file] <stylesheet.xsl|stylesheet.xslt> [xml-file] [other args...]\n"
         "       Source directory defaults to lp5.lp5; LP5Source sets the environment default.\n"
         "       -s source-dir and -o output-file may appear anywhere; both are removed before command dispatch.\n",
-        program, program);
+        program, program, program);
 }
 
 int main(int argc, char *argv[])
@@ -639,7 +1273,7 @@ int main(int argc, char *argv[])
             parameter.name = "source-directory";
             parameter.value = directory;
             status = transform_file(stylesheet, argv[first_argument + 1],
-                &parameter, 1);
+                &parameter, 1, NULL, NULL);
             free(directory);
         }
     }

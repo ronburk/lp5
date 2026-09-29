@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <xsl:stylesheet version="1.0"
-    xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+    xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
+    xmlns:my="http://example.com/lp5ext"
+    exclude-result-prefixes="my">
 
     <xsl:output method="html" encoding="UTF-8" omit-xml-declaration="yes"/>
 
@@ -9,6 +11,8 @@
 
     <!-- Override when tangling a root article outside the project convention. -->
     <xsl:param name="root-location" select="'lp5.lp5/lp5.lp5'"/>
+    <xsl:param name="source-map-enabled" select="'false'"/>
+    <xsl:param name="source-map-marker-name" select="'lp5-source'"/>
 
     <xsl:template match="/">
         <xsl:call-template name="validate-article-tree">
@@ -20,6 +24,7 @@
             <xsl:with-param name="document" select="."/>
             <xsl:with-param name="root" select="."/>
             <xsl:with-param name="location" select="$root-location"/>
+            <xsl:with-param name="source-map-enabled" select="$source-map-enabled"/>
         </xsl:call-template>
         <xsl:call-template name="warn-about-scripts">
             <xsl:with-param name="document" select="."/>
@@ -239,11 +244,14 @@
         <xsl:param name="document"/>
         <xsl:param name="root"/>
         <xsl:param name="location"/>
+        <xsl:param name="source-map-enabled"/>
 
         <xsl:for-each select="$document/template/section[@data-lp5-kind = 'code'][not(normalize-space(name))]/code">
             <xsl:apply-templates select="node()" mode="emit-code">
                 <xsl:with-param name="root" select="$root"/>
                 <xsl:with-param name="stack" select="'|'"/>
+                <xsl:with-param name="source-location" select="$location"/>
+                <xsl:with-param name="source-map-enabled" select="$source-map-enabled"/>
             </xsl:apply-templates>
         </xsl:for-each>
 
@@ -267,9 +275,14 @@
                         <xsl:with-param name="document" select="$child"/>
                         <xsl:with-param name="root" select="$root"/>
                         <xsl:with-param name="location" select="string($child-location)"/>
+                        <xsl:with-param name="source-map-enabled" select="$source-map-enabled"/>
                     </xsl:call-template>
                 </xsl:when>
                 <xsl:otherwise>
+                    <xsl:if test="$source-map-enabled = 'true'">
+                        <xsl:copy-of select="my:source-marker($location,
+                                $source-map-marker-name)"/>
+                    </xsl:if>
                     <xsl:text>&#10;[[ERROR: MISSING ARTICLE '</xsl:text>
                     <xsl:value-of select="translate($child-location,
                             'abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ')"/>
@@ -283,7 +296,13 @@
     </xsl:template>
 
     <xsl:template match="text()" mode="emit-code">
+        <xsl:param name="source-location"/>
+        <xsl:param name="source-map-enabled"/>
         <xsl:if test="not(parent::code and not(normalize-space(.)) and ../*)">
+            <xsl:if test="$source-map-enabled = 'true'">
+                <xsl:copy-of select="my:source-marker($source-location,
+                        $source-map-marker-name)"/>
+            </xsl:if>
             <xsl:value-of select="." disable-output-escaping="yes"/>
         </xsl:if>
     </xsl:template>
@@ -291,19 +310,28 @@
     <xsl:template match="*" mode="emit-code">
         <xsl:param name="root"/>
         <xsl:param name="stack"/>
+        <xsl:param name="source-location"/>
+        <xsl:param name="source-map-enabled"/>
         <xsl:choose>
             <xsl:when test="self::lp5-">
                 <xsl:call-template name="emit-reference">
                     <xsl:with-param name="root" select="$root"/>
                     <xsl:with-param name="name" select="normalize-space(@ref)"/>
                     <xsl:with-param name="stack" select="$stack"/>
+                    <xsl:with-param name="source-map-enabled" select="$source-map-enabled"/>
                 </xsl:call-template>
             </xsl:when>
             <xsl:otherwise>
+                <xsl:if test="$source-map-enabled = 'true'">
+                    <xsl:copy-of select="my:source-marker($source-location,
+                            $source-map-marker-name)"/>
+                </xsl:if>
                 <xsl:copy>
                     <xsl:apply-templates select="@*|node()" mode="emit-code">
                         <xsl:with-param name="root" select="$root"/>
                         <xsl:with-param name="stack" select="$stack"/>
+                        <xsl:with-param name="source-location" select="$source-location"/>
+                        <xsl:with-param name="source-map-enabled" select="$source-map-enabled"/>
                     </xsl:apply-templates>
                 </xsl:copy>
             </xsl:otherwise>
@@ -318,6 +346,7 @@
         <xsl:param name="root"/>
         <xsl:param name="name"/>
         <xsl:param name="stack"/>
+        <xsl:param name="source-map-enabled"/>
 
         <xsl:if test="not(string-length($name))">
             <xsl:message terminate="yes">A code reference has no name.</xsl:message>
@@ -348,6 +377,8 @@
             <xsl:with-param name="root" select="$root"/>
             <xsl:with-param name="name" select="$name"/>
             <xsl:with-param name="stack" select="concat($stack, $name, '|')"/>
+            <xsl:with-param name="location" select="$root-location"/>
+            <xsl:with-param name="source-map-enabled" select="$source-map-enabled"/>
         </xsl:call-template>
     </xsl:template>
 
@@ -372,20 +403,38 @@
         <xsl:param name="root"/>
         <xsl:param name="name"/>
         <xsl:param name="stack"/>
+        <xsl:param name="location"/>
+        <xsl:param name="source-map-enabled"/>
 
         <xsl:for-each select="$document/template/section[@data-lp5-kind = 'code'][normalize-space(name) = $name]/code">
             <xsl:apply-templates select="node()" mode="emit-code">
                 <xsl:with-param name="root" select="$root"/>
                 <xsl:with-param name="stack" select="$stack"/>
+                <xsl:with-param name="source-location" select="$location"/>
+                <xsl:with-param name="source-map-enabled" select="$source-map-enabled"/>
             </xsl:apply-templates>
         </xsl:for-each>
         <xsl:for-each select="$document/template/children/li">
+            <xsl:variable name="article-directory">
+                <xsl:call-template name="article-directory">
+                    <xsl:with-param name="path" select="$location"/>
+                </xsl:call-template>
+            </xsl:variable>
+            <xsl:variable name="child-location">
+                <xsl:if test="string-length(string($article-directory))">
+                    <xsl:value-of select="$article-directory"/>
+                    <xsl:text>/</xsl:text>
+                </xsl:if>
+                <xsl:value-of select="@id"/>
+            </xsl:variable>
             <xsl:variable name="child" select="document(string(@id), .)"/>
             <xsl:call-template name="emit-named-fragments">
                 <xsl:with-param name="document" select="$child"/>
                 <xsl:with-param name="root" select="$root"/>
                 <xsl:with-param name="name" select="$name"/>
                 <xsl:with-param name="stack" select="$stack"/>
+                <xsl:with-param name="location" select="string($child-location)"/>
+                <xsl:with-param name="source-map-enabled" select="$source-map-enabled"/>
             </xsl:call-template>
         </xsl:for-each>
     </xsl:template>
