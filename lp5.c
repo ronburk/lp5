@@ -5,11 +5,23 @@
 
 #include <libexslt/exslt.h>
 #include <libxml/parser.h>
+#include <libxml/xpathInternals.h>
+#include <libxslt/extensions.h>
 #include <libxslt/transform.h>
 #include <libxslt/xsltutils.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifdef _WIN32
+#include <io.h>
+#include <sys/stat.h>
+#define LP5_ISDIR(mode) (((mode) & _S_IFDIR) != 0)
+#else
+#include <dirent.h>
+#include <sys/stat.h>
+#define LP5_ISDIR(mode) S_ISDIR(mode)
+#endif
 
 typedef int (*command_function)(xsltStylesheetPtr stylesheet, int argc,
     char *argv[]);
@@ -17,6 +29,185 @@ typedef int (*command_function)(xsltStylesheetPtr stylesheet, int argc,
 const char *LP5Source = "lp5.lp5";
 const char *LP5OutputName;
 static FILE *LP5OutputFile;
+
+#define LP5_EXTENSION_NAMESPACE "http://example.com/lp5ext"
+
+/* Extension functions return nodes named entry with name and type attributes. */
+
+struct extension_function {
+    const char *name;
+    void (*register_function)(void);
+};
+
+static void register_ls_function(void);
+
+static const struct extension_function extension_functions[] = {
+    {"ls", register_ls_function}
+};
+
+static void extension_ls(xmlXPathParserContextPtr parser, int argument_count)
+{
+    xmlChar *directory;
+    xmlNodeSetPtr nodes;
+    xmlXPathObjectPtr result;
+    size_t path_length;
+
+    if (argument_count != 1) {
+        xmlXPathSetArityError(parser);
+        return;
+    }
+
+    directory = xmlXPathPopString(parser);
+    if (directory == NULL) {
+        xmlXPathSetTypeError(parser);
+        return;
+    }
+
+    path_length = strlen((const char *) directory);
+    if (path_length == 0) {
+        xmlFree(directory);
+        xmlXPathSetTypeError(parser);
+        return;
+    }
+
+    nodes = xmlXPathNodeSetCreate(NULL);
+    if (nodes == NULL) {
+        xmlFree(directory);
+        xmlXPathSetError(parser, XPATH_MEMORY_ERROR);
+        return;
+    }
+
+#ifdef _WIN32
+    {
+        struct _finddata_t entry;
+        intptr_t search;
+        size_t pattern_length = path_length + 3;
+        char *pattern = (char *) malloc(pattern_length);
+        if (pattern == NULL) {
+            xmlXPathFreeNodeSet(nodes);
+            xmlFree(directory);
+            xmlXPathSetError(parser, XPATH_MEMORY_ERROR);
+            return;
+        }
+        memcpy(pattern, directory, path_length);
+        if (path_length != 0 && directory[path_length - 1] != '/' &&
+                directory[path_length - 1] != '\\') {
+            pattern[path_length++] = '\\';
+        }
+        pattern[path_length++] = '*';
+        pattern[path_length] = '\0';
+
+        search = _findfirst(pattern, &entry);
+        free(pattern);
+        if (search != -1) {
+            do {
+                xmlNodePtr node = xmlNewNode(NULL, BAD_CAST "entry");
+                if (node == NULL || xmlSetProp(node, BAD_CAST "name",
+                        BAD_CAST entry.name) == NULL ||
+                        xmlSetProp(node, BAD_CAST "type",
+                            BAD_CAST ((entry.attrib & _A_SUBDIR) ? "directory" : "file")) == NULL ||
+                        xmlXPathNodeSetAdd(nodes, node) < 0) {
+                    if (node != NULL) {
+                        xmlFreeNode(node);
+                    }
+                    _findclose(search);
+                    xmlXPathFreeNodeSet(nodes);
+                    xmlFree(directory);
+                    xmlXPathSetError(parser, XPATH_MEMORY_ERROR);
+                    return;
+                }
+            } while (_findnext(search, &entry) == 0);
+            _findclose(search);
+        }
+    }
+#else
+    {
+        DIR *directory_stream = opendir((const char *) directory);
+        struct dirent *entry;
+
+        if (directory_stream == NULL) {
+            xmlXPathFreeNodeSet(nodes);
+            xmlFree(directory);
+            xmlXPathSetError(parser, XPATH_INVALID_OPERAND);
+            return;
+        }
+        while ((entry = readdir(directory_stream)) != NULL) {
+            size_t name_length = strlen(entry->d_name);
+            size_t full_length = path_length + name_length + 2;
+            char *full_path;
+            struct stat info;
+            xmlNodePtr node;
+
+            if (strcmp(entry->d_name, ".") == 0 ||
+                    strcmp(entry->d_name, "..") == 0) {
+                continue;
+            }
+            full_path = (char *) malloc(full_length);
+            if (full_path == NULL) {
+                closedir(directory_stream);
+                xmlXPathFreeNodeSet(nodes);
+                xmlFree(directory);
+                xmlXPathSetError(parser, XPATH_MEMORY_ERROR);
+                return;
+            }
+            memcpy(full_path, directory, path_length);
+            {
+                size_t full_path_length = path_length;
+                if (full_path_length != 0 && directory[full_path_length - 1] != '/') {
+                    full_path[full_path_length++] = '/';
+                }
+                memcpy(full_path + full_path_length, entry->d_name, name_length + 1);
+            }
+            if (stat(full_path, &info) != 0) {
+                free(full_path);
+                continue;
+            }
+            free(full_path);
+
+            node = xmlNewNode(NULL, BAD_CAST "entry");
+            if (node == NULL || xmlSetProp(node, BAD_CAST "name",
+                    BAD_CAST entry->d_name) == NULL ||
+                    xmlSetProp(node, BAD_CAST "type",
+                        BAD_CAST (LP5_ISDIR(info.st_mode) ? "directory" : "file")) == NULL ||
+                    xmlXPathNodeSetAdd(nodes, node) < 0) {
+                if (node != NULL) {
+                    xmlFreeNode(node);
+                }
+                closedir(directory_stream);
+                xmlXPathFreeNodeSet(nodes);
+                xmlFree(directory);
+                xmlXPathSetError(parser, XPATH_MEMORY_ERROR);
+                return;
+            }
+        }
+        closedir(directory_stream);
+    }
+#endif
+
+    xmlFree(directory);
+    result = xmlXPathWrapNodeSet(nodes);
+    if (result == NULL) {
+        xmlXPathFreeNodeSet(nodes);
+        xmlXPathSetError(parser, XPATH_MEMORY_ERROR);
+        return;
+    }
+    valuePush(parser, result);
+}
+
+static void register_ls_function(void)
+{
+    (void) xsltRegisterExtModuleFunction(BAD_CAST "ls",
+        BAD_CAST LP5_EXTENSION_NAMESPACE, extension_ls);
+}
+
+static void register_extension_functions(void)
+{
+    size_t i;
+
+    for (i = 0; i < sizeof(extension_functions) / sizeof(extension_functions[0]); ++i) {
+        extension_functions[i].register_function();
+    }
+}
 
 struct command_entry {
     const char *name;
@@ -217,6 +408,7 @@ static int run_command(const struct command_entry *command, int argc,
 
     xmlInitParser();
     exsltRegisterAll();
+    register_extension_functions();
     stylesheet = xsltParseStylesheetFile((const xmlChar *) stylesheet_name);
     if (stylesheet == NULL) {
         fprintf(stderr, "lp5: cannot load stylesheet '%s' for command '%s'\n",
@@ -297,6 +489,7 @@ int main(int argc, char *argv[])
 
     xmlInitParser();
     exsltRegisterAll();
+    register_extension_functions();
     stylesheet = xsltParseStylesheetFile((const xmlChar *) argv[first_argument]);
     if (stylesheet == NULL) {
         fprintf(stderr, "lp5: cannot load stylesheet '%s'\n", argv[first_argument]);
