@@ -344,16 +344,19 @@ static int transform_file(xsltStylesheetPtr stylesheet, const char *filename,
     return status;
 }
 
-static int remove_output_options(int *argc, char *argv[])
+static int remove_global_options(int *argc, char *argv[])
 {
     int read_argument = 1;
     int write_argument = 1;
 
     while (read_argument < *argc) {
-        if (strcmp(argv[read_argument], "-s") == 0 &&
-                read_argument + 1 < *argc) {
-            argv[write_argument++] = argv[read_argument++];
-            argv[write_argument++] = argv[read_argument++];
+        if (strcmp(argv[read_argument], "-s") == 0) {
+            if (read_argument + 1 >= *argc) {
+                fprintf(stderr, "lp5: -s requires a source directory\n");
+                return 1;
+            }
+            LP5Source = argv[read_argument + 1];
+            read_argument += 2;
         } else if (strcmp(argv[read_argument], "-o") == 0) {
             if (read_argument + 1 >= *argc) {
                 fprintf(stderr, "lp5: -o requires an output file\n");
@@ -568,7 +571,7 @@ static void print_usage(const char *program)
         "       Commands: tangle, weave, add-article, show-bundle\n"
         "       %s [-s source-dir] [-o output-file] <stylesheet.xsl|stylesheet.xslt> [xml-file] [other args...]\n"
         "       Source directory defaults to lp5.lp5; LP5Source sets the environment default.\n"
-        "       -s overrides both; -o output-file may appear anywhere and is removed before command dispatch.\n",
+        "       -s source-dir and -o output-file may appear anywhere; both are removed before command dispatch.\n",
         program, program);
 }
 
@@ -584,22 +587,9 @@ int main(int argc, char *argv[])
         LP5Source = environment_source;
     }
 
-    if (remove_output_options(&argc, argv) != 0) {
+    if (remove_global_options(&argc, argv) != 0) {
         print_usage(argv[0]);
         return 1;
-    }
-
-    while (first_argument < argc) {
-        if (strcmp(argv[first_argument], "-s") == 0) {
-            if (first_argument + 1 >= argc) {
-                print_usage(argv[0]);
-                return 1;
-            }
-            LP5Source = argv[first_argument + 1];
-            first_argument += 2;
-        } else {
-            break;
-        }
     }
 
     if (first_argument >= argc) {
