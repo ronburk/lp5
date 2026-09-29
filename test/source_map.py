@@ -57,6 +57,8 @@ def main():
         ordinary = directory / "ordinary.html"
         mapped = directory / "mapped.html"
         map_file = directory / "mapped.html.map"
+        trailing_option_output = directory / "trailing-option.html"
+        trailing_option_map = directory / "trailing-option.html.map"
 
         root.write_text(
             """<template>
@@ -86,13 +88,21 @@ delta();
             check=True,
         )
         subprocess.run(
-            [executable, "-o", str(mapped), "tangle", "-m", str(map_file), str(root)],
+            [executable, "-m", str(map_file), "-o", str(mapped), "tangle", str(root)],
+            cwd=PROJECT_DIR,
+            check=True,
+        )
+        subprocess.run(
+            [executable, "tangle", str(root), "-m", str(trailing_option_map),
+             "-o", str(trailing_option_output)],
             cwd=PROJECT_DIR,
             check=True,
         )
 
         assert ordinary.read_bytes() == mapped.read_bytes()
+        assert ordinary.read_bytes() == trailing_option_output.read_bytes()
         source_map = json.loads(map_file.read_text(encoding="utf-8"))
+        json.loads(trailing_option_map.read_text(encoding="utf-8"))
         assert source_map["version"] == 3
         assert source_map["file"] == str(mapped)
 
