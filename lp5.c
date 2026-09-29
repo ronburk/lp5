@@ -344,21 +344,34 @@ static int transform_file(xsltStylesheetPtr stylesheet, const char *filename,
     return status;
 }
 
-static int consume_output_option(int argc, char *argv[], int *argument)
+static int remove_output_options(int *argc, char *argv[])
 {
-    while (*argument < argc && strcmp(argv[*argument], "-o") == 0) {
-        if (*argument + 1 >= argc) {
-            fprintf(stderr, "lp5: -o requires an output file\n");
-            return 1;
+    int read_argument = 1;
+    int write_argument = 1;
+
+    while (read_argument < *argc) {
+        if (strcmp(argv[read_argument], "-s") == 0 &&
+                read_argument + 1 < *argc) {
+            argv[write_argument++] = argv[read_argument++];
+            argv[write_argument++] = argv[read_argument++];
+        } else if (strcmp(argv[read_argument], "-o") == 0) {
+            if (read_argument + 1 >= *argc) {
+                fprintf(stderr, "lp5: -o requires an output file\n");
+                return 1;
+            }
+            if (LP5OutputName != NULL &&
+                    strcmp(LP5OutputName, argv[read_argument + 1]) != 0) {
+                fprintf(stderr, "lp5: output file specified more than once\n");
+                return 1;
+            }
+            LP5OutputName = argv[read_argument + 1];
+            read_argument += 2;
+        } else {
+            argv[write_argument++] = argv[read_argument++];
         }
-        if (LP5OutputName != NULL &&
-                strcmp(LP5OutputName, argv[*argument + 1]) != 0) {
-            fprintf(stderr, "lp5: output file specified more than once\n");
-            return 1;
-        }
-        LP5OutputName = argv[*argument + 1];
-        *argument += 2;
     }
+    argv[write_argument] = NULL;
+    *argc = write_argument;
     return 0;
 }
 
@@ -367,17 +380,13 @@ static int command_tangle(xsltStylesheetPtr stylesheet, int argc, char *argv[])
     static const char default_input[] = "lp5.lp5/lp5.lp5";
     const char *input_filename = default_input;
     struct xslt_parameter parameter;
-    int first_argument = 1;
 
-    if (consume_output_option(argc, argv, &first_argument) != 0) {
+    if (argc > 2) {
+        fprintf(stderr, "Usage: lp5 tangle [xml-file]\n");
         return 1;
     }
-    if (argc - first_argument > 1) {
-        fprintf(stderr, "Usage: lp5 [-o output-file] tangle [xml-file]\n");
-        return 1;
-    }
-    if (first_argument < argc) {
-        input_filename = argv[first_argument];
+    if (argc == 2) {
+        input_filename = argv[1];
     }
 
     parameter.name = "root-location";
@@ -410,19 +419,14 @@ static int command_weave(xsltStylesheetPtr stylesheet, int argc, char *argv[])
     const char *input_filename;
     char *directory;
     char *default_input = NULL;
-    int first_argument = 1;
     int status;
 
-    if (consume_output_option(argc, argv, &first_argument) != 0) {
+    if (argc > 2) {
+        fprintf(stderr, "Usage: lp5 weave [xml-file]\n");
         return 1;
     }
-
-    if (first_argument + 1 < argc) {
-        fprintf(stderr, "Usage: lp5 [-s source-dir] weave [-o output-file] [xml-file]\n");
-        return 1;
-    }
-    if (first_argument < argc) {
-        input_filename = argv[first_argument];
+    if (argc == 2) {
+        input_filename = argv[1];
     } else {
         default_input = weave_default_input();
         if (default_input == NULL) {
@@ -453,48 +457,38 @@ static int command_add_article(xsltStylesheetPtr stylesheet, int argc,
         char *argv[])
 {
     struct xslt_parameter parameters[4];
-    int first_argument = 1;
-    int argument_count;
 
-    if (consume_output_option(argc, argv, &first_argument) != 0) {
-        return 1;
-    }
-    argument_count = argc - first_argument;
-    if (argument_count < 3 || argument_count > 4) {
+    if (argc < 4 || argc > 5) {
         fprintf(stderr,
-            "Usage: lp5 add-article [-o output-file] <weave.xml> <parent-id> <article-file> [before-child-id]\n");
+            "Usage: lp5 add-article <weave.xml> <parent-id> <article-file> [before-child-id]\n");
         return 1;
     }
 
     parameters[0].name = "parent_id";
-    parameters[0].value = argv[first_argument + 1];
+    parameters[0].value = argv[2];
     parameters[1].name = "before_child_id";
-    parameters[1].value = argument_count == 4 ? argv[first_argument + 3] : "";
+    parameters[1].value = argc == 5 ? argv[4] : "";
     parameters[2].name = "articles_dir";
     parameters[2].value = LP5Source;
     parameters[3].name = "article_file";
-    parameters[3].value = argv[first_argument + 2];
-    return transform_file(stylesheet, argv[first_argument], parameters, 4);
+    parameters[3].value = argv[3];
+    return transform_file(stylesheet, argv[1], parameters, 4);
 }
 
 static int command_show_bundle(xsltStylesheetPtr stylesheet, int argc,
         char *argv[])
 {
     struct xslt_parameter parameter;
-    int first_argument = 1;
 
-    if (consume_output_option(argc, argv, &first_argument) != 0) {
-        return 1;
-    }
-    if (argc - first_argument != 2) {
+    if (argc != 3) {
         fprintf(stderr,
-            "Usage: lp5 show-bundle [-o output-file] <weave.xml> <code-name>\n");
+            "Usage: lp5 show-bundle <weave.xml> <code-name>\n");
         return 1;
     }
 
     parameter.name = "code_name";
-    parameter.value = argv[first_argument + 1];
-    return transform_file(stylesheet, argv[first_argument], &parameter, 1);
+    parameter.value = argv[2];
+    return transform_file(stylesheet, argv[1], &parameter, 1);
 }
 
 static const struct command_entry commands[] = {
@@ -574,7 +568,7 @@ static void print_usage(const char *program)
         "       Commands: tangle, weave, add-article, show-bundle\n"
         "       %s [-s source-dir] [-o output-file] <stylesheet.xsl|stylesheet.xslt> [xml-file] [other args...]\n"
         "       Source directory defaults to lp5.lp5; LP5Source sets the environment default.\n"
-        "       -s overrides both; -o writes command output instead of stdout.\n",
+        "       -s overrides both; -o output-file may appear anywhere and is removed before command dispatch.\n",
         program, program);
 }
 
@@ -590,6 +584,11 @@ int main(int argc, char *argv[])
         LP5Source = environment_source;
     }
 
+    if (remove_output_options(&argc, argv) != 0) {
+        print_usage(argv[0]);
+        return 1;
+    }
+
     while (first_argument < argc) {
         if (strcmp(argv[first_argument], "-s") == 0) {
             if (first_argument + 1 >= argc) {
@@ -597,13 +596,6 @@ int main(int argc, char *argv[])
                 return 1;
             }
             LP5Source = argv[first_argument + 1];
-            first_argument += 2;
-        } else if (strcmp(argv[first_argument], "-o") == 0) {
-            if (first_argument + 1 >= argc) {
-                print_usage(argv[0]);
-                return 1;
-            }
-            LP5OutputName = argv[first_argument + 1];
             first_argument += 2;
         } else {
             break;
