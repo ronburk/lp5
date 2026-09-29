@@ -9,6 +9,7 @@
 #include <libxslt/extensions.h>
 #include <libxslt/transform.h>
 #include <libxslt/xsltutils.h>
+#include <libxslt/variables.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -265,10 +266,44 @@ static int command_stub(xsltStylesheetPtr stylesheet, int argc, char *argv[])
     return 0;
 }
 
-static int transform_file(xsltStylesheetPtr stylesheet, const char *filename)
+static char *input_directory(const char *filename)
+{
+    const char *slash = strrchr(filename, '/');
+    const char *backslash = strrchr(filename, '\\');
+    const char *separator = slash;
+    size_t length;
+    char *directory;
+
+    if (separator == NULL || (backslash != NULL && backslash > separator)) {
+        separator = backslash;
+    }
+    if (separator == NULL) {
+        directory = (char *) malloc(2);
+        if (directory != NULL) {
+            memcpy(directory, ".", 2);
+        }
+        return directory;
+    }
+    length = (size_t) (separator - filename);
+    /* Keep the separator for POSIX root paths and Windows drive roots. */
+    if (length == 0 || (length == 2 && filename[1] == ':')) {
+        ++length;
+    }
+    directory = (char *) malloc(length + 1);
+    if (directory == NULL) {
+        return NULL;
+    }
+    memcpy(directory, filename, length);
+    directory[length] = '\0';
+    return directory;
+}
+
+static int transform_file(xsltStylesheetPtr stylesheet, const char *filename,
+        const char *directory)
 {
     xmlDocPtr document;
     xmlDocPtr result;
+    xsltTransformContextPtr context;
     int status = 0;
 
     document = xmlReadFile(filename, NULL, XML_PARSE_NONET);
@@ -277,7 +312,19 @@ static int transform_file(xsltStylesheetPtr stylesheet, const char *filename)
         return 1;
     }
 
-    result = xsltApplyStylesheet(stylesheet, document, NULL);
+    context = xsltNewTransformContext(stylesheet, document);
+    if (context == NULL || xsltQuoteOneUserParam(context,
+            BAD_CAST "source-directory", BAD_CAST directory) != 0) {
+        fprintf(stderr, "lp5: cannot initialize weave source directory\n");
+        if (context != NULL) {
+            xsltFreeTransformContext(context);
+        }
+        xmlFreeDoc(document);
+        return 1;
+    }
+    result = xsltApplyStylesheetUser(stylesheet, document, NULL, NULL, NULL,
+        context);
+    xsltFreeTransformContext(context);
     if (result == NULL) {
         fprintf(stderr, "lp5: transformation failed\n");
         status = 1;
@@ -316,6 +363,7 @@ static char *weave_default_input(void)
 static int command_weave(xsltStylesheetPtr stylesheet, int argc, char *argv[])
 {
     const char *input_filename;
+    char *directory;
     char *default_input = NULL;
     int first_argument = 1;
     int status;
@@ -353,7 +401,14 @@ static int command_weave(xsltStylesheetPtr stylesheet, int argc, char *argv[])
         input_filename = default_input;
     }
 
-    status = transform_file(stylesheet, input_filename);
+    directory = input_directory(input_filename);
+    if (directory == NULL) {
+        fprintf(stderr, "lp5: out of memory\n");
+        free(default_input);
+        return 1;
+    }
+    status = transform_file(stylesheet, input_filename, directory);
+    free(directory);
     free(default_input);
     return status;
 }
@@ -509,7 +564,14 @@ int main(int argc, char *argv[])
         print_usage(argv[0]);
         status = 1;
     } else {
-        status = transform_file(stylesheet, argv[first_argument + 1]);
+        char *directory = input_directory(argv[first_argument + 1]);
+        if (directory == NULL) {
+            fprintf(stderr, "lp5: out of memory\n");
+            status = 1;
+        } else {
+            status = transform_file(stylesheet, argv[first_argument + 1], directory);
+            free(directory);
+        }
     }
 
     xsltFreeStylesheet(stylesheet);

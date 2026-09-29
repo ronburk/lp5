@@ -2,8 +2,8 @@
 <!--
      weave.xsl - make one XML snapshot of all discovered lp5 articles.
 
-     Example (run from the repository root):
-       xsltproc -o weave.xml weave.xsl lp5.lp5/lp5.lp5
+     Example (run from the repository root through the lp5 CLI):
+       ./lp5 weave -o weave.xml
 
      The result is an index for source-navigation tools, not tangled output.
      Each article is emitted in preorder, with the root article first. Article
@@ -13,22 +13,24 @@
      elements retain their original order and content.
 
      The input file is the root article. Its directory is the base for
-     document() lookups, so no directory parameter is needed. The root article
-     is emitted first. Afterwards numeric article filenames are probed in
-     ascending order; 20 consecutive misses end the scan. This finds
-     unlinked articles without requiring directory enumeration. A candidate
-     counts as found only when document() can parse it as XML.
+     document() lookups and is passed to my:ls() for directory enumeration.
+     The root article is emitted first. Afterwards numeric article filenames
+     are considered in ascending numeric order, followed by nonnumeric
+     article filenames in ascending text order. Only files are considered.
 
      Article validation is imported from tangle.xsl so both transforms apply
      the same on-disk format rules to each article that exists. Missing child
-     articles remain explicit unresolved links in the index. Numeric articles
-     not reachable from the root are appended as orphans; their child links
+     articles remain explicit unresolved links in the index. Articles not
+     reachable from the root are appended as orphans; their child links
      determine preorder within each orphan tree. A component with no root
-     (for example, a cycle) starts at its lowest-numbered still-unseen file.
+     (for example, a cycle) starts at its first still-unseen file in discovery
+     order.
 -->
 <xsl:stylesheet version="1.0"
     xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
+    xmlns:my="http://example.com/lp5ext"
     xmlns:exsl="http://exslt.org/common"
+    exclude-result-prefixes="my"
     extension-element-prefixes="exsl">
 
     <!-- Reuse the shared article validator and path helper from the tangle. -->
@@ -38,21 +40,37 @@
     <!-- Do not pretty-print: serializer-inserted whitespace could alter code. -->
     <xsl:output method="xml" encoding="UTF-8" indent="no"/>
 
+    <!-- lp5.c passes the directory containing the input root article. -->
+    <xsl:param name="source-directory" select="'lp5.lp5'"/>
+
     <xsl:template match="/">
         <xsl:variable name="source-root" select="/"/>
+        <xsl:variable name="directory-entries"
+            select="my:ls($source-directory)[@type='file']"/>
 
-        <!--
-             Probe numeric names from 1 upward. document() reports expected
-             misses to stderr; 20 consecutive misses bound the search and can
-             leave higher-numbered files undiscovered if there is a larger gap.
-        -->
+        <!-- List files, preserving numeric order and ordering other articles by name. -->
         <xsl:variable name="disk-files">
             <files>
-                <xsl:call-template name="scan-numeric-files">
-                    <xsl:with-param name="source-root" select="$source-root"/>
-                    <xsl:with-param name="candidate" select="1"/>
-                    <xsl:with-param name="misses" select="0"/>
-                </xsl:call-template>
+                <xsl:for-each select="$directory-entries[
+                        string-length(@name) &gt; 4 and
+                        substring(@name, string-length(@name) - 3) = '.lp5' and
+                        substring-after(@name, '.lp5') = '' and
+                        string-length(substring-before(@name, '.lp5')) &gt; 0 and
+                        translate(substring-before(@name, '.lp5'), '0123456789', '') = '']">
+                    <xsl:sort select="number(substring-before(@name, '.lp5'))"
+                              data-type="number" order="ascending"/>
+                    <xsl:sort select="@name" data-type="text" order="ascending"/>
+                    <file name="{@name}"/>
+                </xsl:for-each>
+                <xsl:for-each select="$directory-entries[
+                        string-length(@name) &gt; 4 and
+                        substring(@name, string-length(@name) - 3) = '.lp5' and
+                        substring-after(@name, '.lp5') = '' and
+                        string-length(substring-before(@name, '.lp5')) &gt; 0 and
+                        translate(substring-before(@name, '.lp5'), '0123456789', '') != '']">
+                    <xsl:sort select="@name" data-type="text" order="ascending"/>
+                    <file name="{@name}"/>
+                </xsl:for-each>
             </files>
         </xsl:variable>
 
@@ -97,7 +115,7 @@
             </roots>
         </xsl:variable>
 
-        <!-- Emit orphan roots in numeric order, following each children list. -->
+        <!-- Emit orphan roots in discovery order, following each children list. -->
         <xsl:variable name="orphan-root-result">
             <xsl:call-template name="visit-article-list">
                 <xsl:with-param name="articles" select="exsl:node-set($orphan-roots)/roots/orphan"/>
@@ -162,33 +180,6 @@
             <xsl:text>&#10;</xsl:text>
         </lp5-weave>
         <xsl:text>&#10;</xsl:text>
-    </xsl:template>
-
-    <!-- Probe numeric filenames until 20 consecutive names are absent. -->
-    <xsl:template name="scan-numeric-files">
-        <xsl:param name="source-root"/>
-        <xsl:param name="candidate"/>
-        <xsl:param name="misses"/>
-
-        <xsl:variable name="filename" select="concat($candidate, '.lp5')"/>
-        <xsl:variable name="document" select="document($filename, $source-root)"/>
-        <xsl:choose>
-            <xsl:when test="$document/*">
-                <file name="{$filename}"/>
-                <xsl:call-template name="scan-numeric-files">
-                    <xsl:with-param name="source-root" select="$source-root"/>
-                    <xsl:with-param name="candidate" select="$candidate + 1"/>
-                    <xsl:with-param name="misses" select="0"/>
-                </xsl:call-template>
-            </xsl:when>
-            <xsl:when test="$misses &lt; 19">
-                <xsl:call-template name="scan-numeric-files">
-                    <xsl:with-param name="source-root" select="$source-root"/>
-                    <xsl:with-param name="candidate" select="$candidate + 1"/>
-                    <xsl:with-param name="misses" select="$misses + 1"/>
-                </xsl:call-template>
-            </xsl:when>
-        </xsl:choose>
     </xsl:template>
 
     <!-- Visit one article and its descendants, threading a global seen list. -->
