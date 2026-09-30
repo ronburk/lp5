@@ -1318,8 +1318,8 @@ state awaitArticleSave
                     <div class="col1"></div>
                     <div class="col2"></div>
                     <p>
-                        <label>title:</label>
-                        <input data-id="articleTitle" type="text">
+                        <label>title (HTML markup):</label>
+                        <textarea data-id="articleTitle" rows="3" cols="60"></textarea>
                     </p>
                     <p>
                         <label>documentation:</label>
@@ -1343,7 +1343,7 @@ state awaitArticleSave
              const {deferEvent} = require('controller');
              const Article2 = require('Article2');
              function sectionGetTitle(article){
-                 let result = article.sections?.heading?.textContent;
+                 let result = article.sections?.heading?.innerHTML;
                  if(!result)
                      result = "";
                  return result;
@@ -1410,7 +1410,7 @@ state awaitArticleSave
                      const {articleTitle, docText, keywordText, codeName, codeText}=this.template.namedNodes;
                      let sectionStrings = {
                          children    : this.#article.sections.children?.innerHTML,
-                         heading     : articleTitle.value,
+                         headingMarkup : articleTitle.value,
                          explanation : docText.value,
                          keywords    : keywordText.value.split(/\r?\n/)
                              .map(keyword => keyword.trim())
@@ -1422,10 +1422,7 @@ state awaitArticleSave
                      return this.#article.createRevision(sectionStrings);
                  }
                  getArticleSerial(){
-                     const {articleTitle, docText, codeName, codeText}=this.template.namedNodes;
-                     return this.#article.createSerial(
-                         articleTitle.value, docText.value,
-                         codeName.value, codeText.value);
+                     return this.getArticleRevision().toString();
                  }
              }
              return EditArticle;
@@ -3133,7 +3130,9 @@ state awaitArticleSave
                          let articleString = '<template>';
                          if(sectionStrings.children)
                              articleString += `<children>${sectionStrings.children}</children>`;
-                         if(sectionStrings.heading)
+                         if(sectionStrings.headingMarkup)
+                             articleString += `<heading>${sectionStrings.headingMarkup}</heading>`;
+                         else if(sectionStrings.heading)
                              articleString += `<heading>${Article2.xmlText(sectionStrings.heading)}</heading>`;
                          const keywords = sectionStrings.keywords ?? this.keywords;
                          if(keywords.length)
