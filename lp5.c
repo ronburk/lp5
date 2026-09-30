@@ -1090,19 +1090,107 @@ static int command_tangle(xsltStylesheetPtr stylesheet, int argc, char *argv[])
     }
 }
 
+static int article_file_is_readable(const char *filename)
+{
+    FILE *file = fopen(filename, "rb");
+    if (file == NULL) {
+        return 0;
+    }
+    fclose(file);
+    return 1;
+}
+
+static int has_path_separator(const char *filename)
+{
+    return strchr(filename, '/') != NULL || strchr(filename, '\\') != NULL;
+}
+
+static char *check_lp5_filename(const char *filename)
+{
+    const char *last_dot = strrchr(filename, '.');
+    size_t filename_length = strlen(filename);
+    static const char suffix[] = ".lp5";
+    int needs_suffix = last_dot == NULL || last_dot[1] == '\0';
+    char *result = (char *) malloc(filename_length +
+        (needs_suffix ? sizeof(suffix) : 1));
+
+    if (result == NULL) {
+        return NULL;
+    }
+    memcpy(result, filename, filename_length);
+    if (needs_suffix) {
+        memcpy(result + filename_length, suffix, sizeof(suffix));
+    } else {
+        result[filename_length] = '\0';
+    }
+    return result;
+}
+
+static char *check_source_path(const char *filename)
+{
+    size_t directory_length = strlen(LP5Source);
+    size_t filename_length = strlen(filename);
+    int needs_separator = directory_length > 0 &&
+        LP5Source[directory_length - 1] != '/' &&
+        LP5Source[directory_length - 1] != '\\';
+    char *result = (char *) malloc(directory_length +
+        (size_t) needs_separator + filename_length + 1);
+
+    if (result == NULL) {
+        return NULL;
+    }
+    memcpy(result, LP5Source, directory_length);
+    if (needs_separator) {
+        result[directory_length++] = '/';
+    }
+    memcpy(result + directory_length, filename, filename_length + 1);
+    return result;
+}
+
 static int command_check(xsltStylesheetPtr stylesheet, int argc, char *argv[])
 {
     struct xslt_parameter parameter;
+    const char *input_filename;
+    char *suffixed_filename = NULL;
+    char *source_path = NULL;
 
     if (argc != 2) {
         fprintf(stderr, "Usage: lp5 check <article-file>\n");
         return 1;
     }
 
+    input_filename = argv[1];
+    if (!article_file_is_readable(input_filename) &&
+            !has_path_separator(input_filename)) {
+        suffixed_filename = check_lp5_filename(input_filename);
+        if (suffixed_filename == NULL) {
+            fprintf(stderr, "lp5: out of memory\n");
+            return 1;
+        }
+        if (article_file_is_readable(suffixed_filename)) {
+            input_filename = suffixed_filename;
+        } else {
+            source_path = check_source_path(suffixed_filename);
+            if (source_path == NULL) {
+                free(suffixed_filename);
+                fprintf(stderr, "lp5: out of memory\n");
+                return 1;
+            }
+            if (article_file_is_readable(source_path)) {
+                input_filename = source_path;
+            }
+        }
+    }
+
     parameter.name = "article-location";
-    parameter.value = argv[1];
-    return transform_file(stylesheet, argv[1], &parameter, 1,
-        NULL, NULL, NULL);
+    parameter.value = input_filename;
+    {
+        int status = transform_file(stylesheet, input_filename, &parameter, 1,
+            NULL, NULL, NULL);
+        free(source_path);
+        free(suffixed_filename);
+        return status;
+    }
 }
 
 static char *weave_default_input(void)
