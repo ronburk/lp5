@@ -1079,6 +1079,21 @@ static int command_tangle(xsltStylesheetPtr stylesheet, int argc, char *argv[])
     }
 }
 
+static int command_check(xsltStylesheetPtr stylesheet, int argc, char *argv[])
+{
+    struct xslt_parameter parameter;
+
+    if (argc != 2) {
+        fprintf(stderr, "Usage: lp5 check <article-file>\n");
+        return 1;
+    }
+
+    parameter.name = "article-location";
+    parameter.value = argv[1];
+    return transform_file(stylesheet, argv[1], &parameter, 1,
+        NULL, NULL, NULL);
+}
+
 static char *weave_default_input(void)
 {
     static const char filename[] = "lp5.lp5";
@@ -1181,6 +1196,7 @@ static int command_show_bundle(xsltStylesheetPtr stylesheet, int argc,
 
 static const struct command_entry commands[] = {
     {"tangle", command_tangle},
+    {"check", command_check},
     {"weave", command_weave},
     {"add-article", command_add_article},
     {"show-bundle", command_show_bundle}
@@ -1253,7 +1269,7 @@ static void print_usage(const char *program)
 {
     fprintf(stderr,
         "Usage: %s [-s source-dir] [-o output-file] [-m map-file] <command> [args...]\n"
-        "       Commands: tangle, weave, add-article, show-bundle\n"
+        "       Commands: tangle, check, weave, add-article, show-bundle\n"
         "       %s tangle [xml-file]\n"
         "       %s [-s source-dir] [-o output-file] <stylesheet.xsl|stylesheet.xslt> [xml-file] [other args...]\n"
         "       Source directory defaults to lp5.lp5; LP5Source sets the environment default.\n"

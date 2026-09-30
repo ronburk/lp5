@@ -53,6 +53,19 @@ sections, recursively expanding named code references. It validates articles
 as it reads them. `weave.xsl` generates the separate `weave.xml` source index;
 it does not build the HTML program.
 
+## Check one article
+
+Use the `check` command to validate one article without tangling the whole
+article tree:
+
+```sh
+./lp5 check lp5.lp5/1.lp5
+```
+
+It applies the same article-format validation used by `tangle`. A valid file
+prints its filename; invalid XML or an invalid article structure reports an
+error and exits unsuccessfully.
+
 ## Article terminology and format
 
 An **article** is one `.lp5` file. Each file is an XML document with one `<template>` root. The root may contain at most one each of these direct children, in any order:
