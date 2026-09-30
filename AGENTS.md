@@ -66,6 +66,12 @@ It applies the same article-format validation used by `tangle`. A valid file
 prints its filename; invalid XML or an invalid article structure reports an
 error and exits unsuccessfully.
 
+For a bare filename that cannot be opened as given, `check` tries appending
+`.lp5` when the name has no suffix, then looks for that resulting filename
+under `LP5Source`. Arguments containing `/` or `\` are used as paths and do
+not get these fallbacks. If no candidate exists, the error reports the
+original argument.
+
 ## Article terminology and format
 
 An **article** is one `.lp5` file. Each file is an XML document with one `<template>` root. The root may contain at most one each of these direct children, in any order:
