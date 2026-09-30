@@ -2121,6 +2121,10 @@ state awaitArticleSave
                              font-size: .9em;
                              line-height: 1.1;
                          }
+                         .lp5ArticleHeading {
+                             margin: .1em 0;
+                             padding: .1em .25em;
+                         }
                          .LP5-Comment{
                              /*             background-color: #FFFFEB; */
                          }
@@ -2246,7 +2250,7 @@ state awaitArticleSave
                              let result  = ""
                              let heading = article.sections.heading;
                              if(heading){
-                                 result = `<h2>${heading.innerHTML}</h2>`;
+                                 result = `<h2 class="lp5ArticleHeading">${heading.innerHTML}</h2>`;
                              }
                              return result;
                          }
@@ -2454,9 +2458,6 @@ state awaitArticleSave
                     <template data-name="outputDiv" id="LP5-Output">
                         <style>
                          #root { display: flex; flex-direction: column; }
-                         span[data-ref]:hover:not(:has(span[data-ref]:hover)) {
-                             background-color: #ffe58a;
-                         }
                         </style>
                         <div id="root">
                             <div data-id="outputDiv">
@@ -5018,3 +5019,4 @@ return {
         </script>
     </body>
 </html>
+
