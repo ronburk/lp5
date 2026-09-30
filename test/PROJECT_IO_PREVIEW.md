@@ -25,24 +25,26 @@ backend.
 3. Confirm the output pane contains `Hello from the named Greeting section.`;
    this proves that the unnamed child fragment expanded its reference to the
    named section in `0.lp5`.
-4. Use the visible test controls to edit the root article. Change its heading
+4. Click **View**. The View Settings dialog should open; click **Cancel** and
+   confirm it closes and returns to the project.
+5. Use the visible test controls to edit the root article. Change its heading
    or explanation in the application's editor and save. Click **Reload project**
    and confirm the change remains in the rendered article.
-5. Click **Create article**. The application model's article-creation method
+6. Click **Create article**. The application model's article-creation method
    should choose the next unused integer filename, write it in memory, and add
    it to the project tree.
-6. Click **Add after article 0**, select **Add article**, and save the dialog.
+7. Click **Add after article 0**, select **Add article**, and save the dialog.
    The code name should be prefilled with `Added after article 0`. The new
    article should appear immediately after `0.lp5` in the navigation order,
    and its entered title, explanation, and code should render after reloading.
-7. Click **Add root child**, select **Add article**, and save. The new article
+8. Click **Add root child**, select **Add article**, and save. The new article
    should appear after the existing root children with `Added as root child`
    prefilled as its code name.
-8. Open either add-article dialog again and click **Cancel**. No additional
+9. Open either add-article dialog again and click **Cancel**. No additional
    article should appear in navigation or in the test adapter's writes.
-9. Click **Export output**. The adapter records the generated text at
+10. Click **Export output**. The adapter records the generated text at
    `window.LP5.testProjectIO.lastGeneratedOutput`.
-10. In a fresh tab load `/new.html?test=1&fail=1.lp5` and select the fixture.
+11. In a fresh tab load `/new.html?test=1&fail=1.lp5` and select the fixture.
    The missing child should render the application's normal failed-load
    article, including `Controlled fixture read failure: 1.lp5`.
 

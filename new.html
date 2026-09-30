@@ -92,6 +92,10 @@ state home
                 -> editingArticle
             }
         }
+        if(event.composedPath().some(node => node.id === 'LP5-Menu-View')) {
+            views.push('EditView');
+            -> editingView
+        }
     on  lp5EditArticle
         openArticleEditor(event.detail);
     -> editingArticle
@@ -132,6 +136,11 @@ state editingArticle
     -> awaitArticleSave
     on  lp5DialogCancel
         event.detail.closeEditor();
+    -> home
+
+state editingView
+    on  close
+        views.pop();
     -> home
 
 state awaitArticleSave
