@@ -27,6 +27,7 @@
 <script type="text/state-machine" id="lp5StateMachine">
         const {asyncSchedule} = window.LP5.modSchedule;
         const {views, model}  = window.LP5;
+        const {elementFoundry} = window.LP5.eggGlobals;
         function openArticleEditor(url){
             const article = model.articleFromURL(url);
             if(!article)
@@ -69,6 +70,12 @@ state awaitProjectLoad
     ->  home
 
 state home
+    on  lp5CodeReferenceContext
+        const menu = elementFoundry['lp5-referencecontextmenu'];
+        menu.setContext(event.detail);
+        document.body.append(menu);
+        menu.showAt(event.detail.x, event.detail.y);
+    ->  referenceContextMenu
     on  click
         if(event.ctrlKey && event.shiftKey) {
             const articleNode = event.composedPath().find((node, index, path) =>
@@ -81,11 +88,17 @@ state home
                 -> editingArticle
             }
         }
-    -> home
-
     on  lp5EditArticle
         openArticleEditor(event.detail);
     -> editingArticle
+    -> home
+
+state referenceContextMenu
+    on  command
+        console.assert(event.detail[0] === 'addArticle');
+    -> home
+    on  lp5ContextMenuDismiss
+    -> home
 
 state editingArticle
     on  lp5DialogSave
@@ -125,6 +138,8 @@ state awaitArticleSave
              'DataCloneError',
              // 'lp5-treeview:select',
              'lp5ArticleContext',
+             'lp5CodeReferenceContext',
+             'lp5ContextMenuDismiss',
              'lp5CreateProject',
              'lp5DialogSave',
              'lp5DialogCancel',
@@ -940,9 +955,10 @@ state awaitArticleSave
             <style>
              dialog:has(> ul > li) { padding:0; }
              .lp5-context {
-                 position:absolute;
+                 position:fixed;
                  border: 1px solid blue;
                  cursor: pointer;
+                 margin: 0;
              }
              .lp5-context ul {
                  list-style: none;
@@ -973,6 +989,7 @@ state awaitArticleSave
              class LP5ContextMenu extends LP5Element {
                  #dialog;
                  #template;
+                 context = null;
                  constructor(){
                      super();
                      this.#template = new LP5Element.TemplateInstance();
@@ -987,26 +1004,54 @@ state awaitArticleSave
                  }
                  connectedCallback(){
                      console.error("LP5ContextMenu connected: ", this.#dialog);
-                     this.#dialog.addEventListener('click',(event)=>this.#clickHandler);
+                     this.#dialog.addEventListener('click', event=>this.#clickHandler(event));
+                     this.#dialog.addEventListener('close', ()=>{
+                         document.removeEventListener('pointerdown', this.#outsideHandler, true);
+                         this.remove();
+                         document.dispatchEvent(new Event('lp5ContextMenuDismiss'));
+                     });
                      const items = this.getMenuItems();
                      console.error("items = ", items);
                      this.#dialog.replaceChildren(this.getMenuItems());
+                 }
+                 setContext(context){
+                     this.context = context;
+                 }
+                 showAt(x, y){
+                     this.#dialog.style.left = `${x}px`;
+                     this.#dialog.style.top = `${y}px`;
+                     this.#dialog.show();
+                     const rect = this.#dialog.getBoundingClientRect();
+                     this.#dialog.style.left = `${Math.max(0, Math.min(x, innerWidth - rect.width))}px`;
+                     this.#dialog.style.top = `${Math.max(0, Math.min(y, innerHeight - rect.height))}px`;
+                     document.addEventListener('pointerdown', this.#outsideHandler, true);
+                     const firstItem = this.#dialog.querySelector('[role="menuitem"]');
+                     firstItem?.focus();
                  }
                  showModal(){
                      console.assert(this.#dialog.isConnected, this);
                      this.#dialog.showModal()
                  }
                  #clickHandler(event){
-                     const target = event.target;
-                     if(target.dataset.cmd){
-                         let argv = target.dataset.cmd.split(/[ ]+/);
-                         argv.push(articleTarget);
-                         document.dispatchEvent(
-                             new CustomEvent('command', {
-                                 detail : argv,
-                         }));
+                     const target = event.target.closest('[data-cmd]');
+                     if(target && this.#dialog.contains(target)){
+                         if(this.selectEvent(target)){
+                             const argv = target.dataset.cmd.trim().split(/[ ]+/);
+                             document.dispatchEvent(
+                                 new CustomEvent('command', {
+                                     detail : argv,
+                             }));
+                             this.#dialog.close();
+                         }
                      }
                  }
+                 selectEvent(menuItem){
+                     return true;
+                 }
+                 #outsideHandler = event=>{
+                     if(!event.composedPath().includes(this))
+                         this.#dialog.close();
+                 };
              }
              return LP5ContextMenu;
             </script>
@@ -1188,6 +1233,24 @@ state awaitArticleSave
                  }
              }
              return LP5ArticleContextMenu;
+            </script>
+        </template>
+        <template data-custom="lp5-referencecontextmenu" data-extends="lp5-contextmenu">
+            <ul data-id="ul" role="menu" aria-label="Code reference actions">
+                <li data-cmd="addArticle" role="menuitem" tabindex="-1">Add article</li>
+            </ul>
+            <script>
+             class LP5ReferenceContextMenu extends LP5Element {
+                 #template;
+                 constructor(){
+                     super();
+                     this.#template = new LP5Element.TemplateInstance();
+                 }
+                 getMenuItems(){
+                     return this.#template.namedNodes.ul;
+                 }
+             }
+             return LP5ReferenceContextMenu;
             </script>
         </template>
         <template data-name="EditView">
@@ -2082,6 +2145,20 @@ state awaitArticleSave
                                  match.scrollIntoView(true);
                          }
                          function contextMenuHandler(event){
+                             const referenceNode = event.composedPath().find(node =>
+                                 node instanceof Element
+                                 && node.matches('.LP5-CodeRef[data-unresolved="true"]'));
+                             if(referenceNode){
+                                 const articleNode = articleNodeFromClick(event);
+                                 event.preventDefault();
+                                 publish('lp5CodeReferenceContext', {
+                                     articleURL: articleNode?.id,
+                                     reference: referenceNode.dataset.ref,
+                                     x: event.clientX,
+                                     y: event.clientY
+                                 });
+                                 return;
+                             }
                              const articleNode = articleNodeFromClick(event);
                              if(articleNode){
                                  publish('lp5ArticleContext', articleNode.id);
@@ -2184,8 +2261,12 @@ state awaitArticleSave
                                  acc += item
                              else if(item.type == 'ref'){
                                  acc += "<span class='LP5-CodeRef'"
+                                 const refAttribute = item.value.replaceAll('&', '&amp;')
+                                     .replaceAll('"', '&quot;').replaceAll('<', '&lt;')
+                                     .replaceAll('>', '&gt;');
+                                 acc += ` data-ref="${refAttribute}"`;
                                  if(!Articles.byName[item.value])
-                                     acc += " style='background-color: red;'";
+                                     acc += " data-unresolved='true' style='background-color: red;'";
                                  /*
                                     const targetArticle = Articles.fromURL(item.value);
                                     let   targetName    = targetArticle?.;
