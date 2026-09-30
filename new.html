@@ -2132,7 +2132,9 @@ state awaitArticleSave
                          }
                          .lp5ArticleHeading {
                              margin: .1em 0;
-                             padding: .1em .25em;
+                         }
+                         .LP5-ArticleContent {
+                             margin-left: .25em;
                          }
                          .LP5-Comment{
                              /*             background-color: #FFFFEB; */
@@ -2345,13 +2347,16 @@ state awaitArticleSave
                              let articleNode = document.createElement('ARTICLE');
                              articleNode.setAttribute('tabIndex', 0);
                              articleNode.innerHTML = renderHeading(article);
+                             const content = document.createElement('div');
+                             content.className = 'LP5-ArticleContent';
                              const keywords = renderKeywords(article);
                              if(keywords)
-                                 articleNode.appendChild(keywords);
-                             articleNode.insertAdjacentHTML('beforeend',
+                                 content.appendChild(keywords);
+                             content.insertAdjacentHTML('beforeend',
                                  renderExplanation(article) +
                                  renderName(article) +
                                  renderScript(article));
+                             articleNode.appendChild(content);
                              articleNode.id = article.URL;
                              articleNode.querySelectorAll('a').
                                          forEach(link => link.tabIndex = -1);
@@ -5028,4 +5033,5 @@ return {
         </script>
     </body>
 </html>
+
 
