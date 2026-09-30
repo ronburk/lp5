@@ -38,7 +38,7 @@
             editor.setArticle(article, options);
             document.body.append(editor);
         }
-        let pendingCodeReference = null;
+        let pendingCodeReferenceContext = null;
 state load
         views.loadTemplates();
         views.change('home');
@@ -74,7 +74,7 @@ state awaitProjectLoad
 
 state home
     on  lp5CodeReferenceContext
-        pendingCodeReference = event.detail.reference;
+        pendingCodeReferenceContext = event.detail;
         const menu = elementFoundry['lp5-referencecontextmenu'];
         menu.setContext(event.detail);
         document.body.append(menu);
@@ -100,19 +100,30 @@ state home
 state referenceContextMenu
     on  command
         console.assert(event.detail[0] === 'addArticle');
-        openArticleEditor(null, {isNew:true, codeName:pendingCodeReference});
-        pendingCodeReference = null;
+        openArticleEditor(null, {
+            isNew:true,
+            codeName:pendingCodeReferenceContext.reference,
+            sourceURL:pendingCodeReferenceContext.articleURL
+        });
+        pendingCodeReferenceContext = null;
     -> editingArticle
     on  lp5ContextMenuDismiss
-        pendingCodeReference = null;
+        pendingCodeReferenceContext = null;
     -> home
 
 state editingArticle
     on  lp5DialogSave
         const editor = event.detail;
-        const revision = editor.getArticleRevision();
         asyncSchedule(async () => {
-            await model.storeResource2(revision.URL, revision.toString());
+            if(editor.isNewArticle()) {
+                await model.saveNewArticleAfterReference(
+                    editor.sourceArticleURL(),
+                    URL => editor.getArticleRevision(URL).toString(),
+                    editor.setArticleFilename.bind(editor));
+            } else {
+                const revision = editor.getArticleRevision();
+                await model.storeResource2(revision.URL, revision.toString());
+            }
             await model.openProject(model.projectName);
             model.updateDerivedState();
             views.render();
@@ -1449,8 +1460,6 @@ state awaitArticleSave
                      super.connectedCallback();
                      renderDialog(this.#article, this.template.namedNodes,
                                   this.#options.codeName);
-                     if(this.#options.isNew)
-                         this.template.namedNodes.save.disabled = true;
                      this.template.namedNodes.dialog.showModal();
                  }
                  disconnectedCallback(){
@@ -1483,7 +1492,7 @@ state awaitArticleSave
                      this.#article = article;
                      this.#options = options;
                  }
-                 getArticleRevision(){
+                 getArticleRevision(URL=this.#article.URL){
                      const {articleTitle, docText, keywordText, codeName, codeText}=this.template.namedNodes;
                      let sectionStrings = {
                          children    : this.#article.sections.children?.innerHTML,
@@ -1496,7 +1505,16 @@ state awaitArticleSave
                          code        : codeText.value,
                          hasCode     : Boolean(this.#article.codeSectionNode)
                      }
-                     return this.#article.createRevision(sectionStrings);
+                     return this.#article.createRevision(sectionStrings, URL);
+                 }
+                 isNewArticle(){
+                     return Boolean(this.#options.isNew);
+                 }
+                 sourceArticleURL(){
+                     return this.#options.sourceURL;
+                 }
+                 setArticleFilename(filename){
+                     this.template.namedNodes.articleFilename.textContent = filename;
                  }
                  getArticleSerial(){
                      return this.getArticleRevision().toString();
@@ -3221,7 +3239,7 @@ state awaitArticleSave
                          
                      }
                      // pass in object containing revised contents of sections
-                     createRevision(sectionStrings){
+                     createRevision(sectionStrings, URL=this.URL){
                          let articleString = '<template>';
                          if(sectionStrings.children)
                              articleString += `<children>${sectionStrings.children}</children>`;
@@ -3238,7 +3256,7 @@ state awaitArticleSave
                          if(sectionStrings.hasCode || sectionStrings.name || sectionStrings.code)
                              articleString += Article2.codeSectionXML(sectionStrings.name, sectionStrings.code);
                          articleString += '</template>';
-                         return new Article2(this.URL, this.parentURL, articleString);
+                         return new Article2(URL, this.parentURL, articleString);
                      }
                      clone(){
                          const result = window.structuredClone(this);
@@ -4609,6 +4627,47 @@ state awaitArticleSave
                      this.nextArticleID = 1 + name.slice(0,dotPos);
                  }
                  return name;
+             };
+
+             model.saveNewArticleAfterReference = async function(
+                 sourceURL, makeArticleSerial, setFilename){
+                 const source = this.articleFromURL(sourceURL);
+                 if(!source)
+                     throw new Error(`Cannot add article: source article not found: ${sourceURL}`);
+
+                 const isRoot = source.URL === this.rootTOC.URL;
+                 const parent = isRoot ? source : source.parentURL;
+                 if(!parent)
+                     throw new Error(`Cannot add article after '${sourceURL}': parent article is unavailable`);
+
+                 let childList = parent.sections.children;
+                 let sourceLink = null;
+                 if(!isRoot){
+                     sourceLink = Array.from(childList?.children ?? []).find(
+                         child => child.tagName === 'li' && child.getAttribute('id') === source.URL);
+                     if(!sourceLink)
+                         throw new Error(`Cannot add article after '${sourceURL}': parent link is unavailable`);
+                 }
+
+                 const URL = await this.createUniqueArticle();
+                 if(!URL)
+                     throw new Error('Could not allocate a filename for the new article');
+                 setFilename(URL);
+                 await this.project.write(URL, makeArticleSerial(URL));
+
+                 if(!childList){
+                     childList = parent.template.ownerDocument.createElement('children');
+                     parent.template.append(childList);
+                     parent.sections.children = childList;
+                 }
+                 const link = parent.template.ownerDocument.createElement('li');
+                 link.setAttribute('id', URL);
+                 if(isRoot)
+                     childList.append(link);
+                 else
+                     sourceLink.after(link);
+                 await this.project.write(parent.URL, parent.toString());
+                 return URL;
              };
 
              if(false){

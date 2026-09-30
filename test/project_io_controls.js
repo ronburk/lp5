@@ -20,6 +20,8 @@
                 <button type="button" data-action="reload">Reload project</button>
                 <button type="button" data-action="edit">Edit root article</button>
                 <button type="button" data-action="create">Create article</button>
+                <button type="button" data-action="add-after-0">Add after article 0</button>
+                <button type="button" data-action="add-root-child">Add root child</button>
                 <button type="button" data-action="export">Export output</button>
             </div>
             <output aria-live="polite" data-status>Ready</output>`;
@@ -64,6 +66,24 @@
                     await reloadProject();
                     return `Created ${name || "article"}`;
                 });
+            else if(action === "add-after-0")
+                document.dispatchEvent(new CustomEvent("lp5CodeReferenceContext", {
+                    detail: {
+                        articleURL: "0.lp5",
+                        reference: "Added after article 0",
+                        x: window.innerWidth / 2,
+                        y: window.innerHeight / 2
+                    }
+                }));
+            else if(action === "add-root-child")
+                document.dispatchEvent(new CustomEvent("lp5CodeReferenceContext", {
+                    detail: {
+                        articleURL: model.rootTOC.URL,
+                        reference: "Added as root child",
+                        x: window.innerWidth / 2,
+                        y: window.innerHeight / 2
+                    }
+                }));
             else if(action === "export")
                 void run("Export output", async () => {
                     views.render();
