@@ -1,10 +1,4 @@
-<template>
-    <heading>Outermost Code</heading>
-    <keywords>
-        <li>doctype</li>
-        <li>meta</li>
-    </keywords>
-    <section data-lp5-kind="explanation">
+<template><heading>Outermost Code</heading><keywords><li>doctype</li><li>meta</li></keywords><section data-lp5-kind="explanation">
         <p>
     Note that this code section has no name,
     and recall the lp5 code generation algorithm:
@@ -24,10 +18,7 @@
     element and its closing <code>&lt;/script&gt;</code> tag.
     CDATA keeps those tags as literal code in this XML chunk.
 </p>
-    </section>
-    <section data-lp5-kind="code">
-        <name/>
-        <code><![CDATA[<!doctype html>
+    </section><section data-lp5-kind="code"><name/><code><![CDATA[<!doctype html>
 <!-- lp5.html <>  -->
 <html lang="en">
 <head>
@@ -37,14 +28,15 @@
         ]]><lp5- ref="Global CSS declarations"/><![CDATA[
     </style>
     <script>
-        (function () {
-            ]]><lp5- ref="Outermost scope code"/><![CDATA[
+        window.LP5 = (function () {
+            ]]><lp5- ref="Outermost scope objects"/><![CDATA[
+            return {
+                ]]><lp5- ref="Outermost scope object names"/><![CDATA[
+                };
         )();
     </script>
 </head>
 <body>
 </body>
 </html>
-]]></code>
-    </section>
-</template>
+]]></code></section></template>
