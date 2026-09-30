@@ -2164,7 +2164,8 @@ state awaitArticleSave
                         <script>
                          const {outerDiv}       = require('dataID');
                          const {model, Article} = require('model, Article');
-                         const {deferEvent,publish,subscribe}     = require('controller');
+                         const controller = require('controller');
+                         const {deferEvent,publish,subscribe} = controller;
                          const iView            = this;
 
                          function articleNodeFromClick(event){
@@ -2181,14 +2182,22 @@ state awaitArticleSave
                              });
                              return result;
                          }
+                         function selectArticle(articleNode){
+                             controller.currentArticle = articleNode;
+                             articleNode.focus();
+                             iView.eventPublish("SelectArticle", articleNode);
+                             deferEvent(document, 'lp5SelectArticle', articleNode.id);
+                         }
                          function navSelectHandler(event){
                              console.log("source pane navSelectHandler",
                                          event, event.detail);
                              let pattern = 'article#'+ CSS.escape(event.detail);
                              let match = outerDiv.querySelector(pattern);
                              console.log("match = ", match);
-                             if(match)
+                             if(match){
+                                 selectArticle(match);
                                  match.scrollIntoView(true);
+                             }
                          }
                          function contextMenuHandler(event){
                              const referenceNode = event.composedPath().find(node =>
@@ -2214,10 +2223,8 @@ state awaitArticleSave
                          function clickHandler(event){
                              const articleNode = articleNodeFromClick(event);
                              if(articleNode){
-                                 articleNode.focus();
                                  console.log(" clicked article ", articleNode, iView);
-                                 iView.eventPublish("SelectArticle", articleNode);
-                                 deferEvent(document, 'lp5SelectArticle', articleNode.id);
+                                 selectArticle(articleNode);
                              }
                              else
                                  console.log(articleNode, "??? missing article node"); // ??? really does happen.
@@ -2483,16 +2490,26 @@ state awaitArticleSave
                         <script>
                          let model       = require('model');
                          let {outputDiv} = require('dataID');
+                         const {publish} = require('controller');
                          const createFreeElement = require('createFreeElement');
 
                          let startTagRegex = /<lp5\s*((\/>)|(>)|([A-Za-z_]))/g;
                          let attributeRegex = null;
+                         function clickHandler(event){
+                             const referenceSpan = event.composedPath().find(node =>
+                                 node instanceof Element
+                                 && node.matches('span[data-ref]'));
+                             if(referenceSpan)
+                                 publish('lp5NavSelect', referenceSpan.dataset.ref);
+                         }
                          function init(iView){
                              let id    = "[_a-zA-Z]\w*";
                              let dval  = '"[^"\n\r]*"';
                              let sval  = "'[^'\n\r]*'";
                              let value = `(?:${sval}|${dval})`;
                              attributeRegex  = new RegExp(`^\s*(${id})=(${value})\s*`);
+                             outputDiv.addEventListener('click', clickHandler,
+                                                       { composed: true, bubble: true });
                          }
                          function indexArticles(){
                              const result = {}
