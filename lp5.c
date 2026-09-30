@@ -866,10 +866,21 @@ static int transform_file(xsltStylesheetPtr stylesheet, const char *filename,
         clear_source_map_sources();
     }
     if (document == NULL) {
+        FILE *input = fopen(filename, "rb");
+        if (input == NULL) {
+            fprintf(stderr, "lp5: cannot load XML file '%s': %s\n",
+                filename, strerror(errno));
+            if (source_map_filename != NULL) {
+                clear_source_map_sources();
+            }
+            return 1;
+        }
+        fclose(input);
+
         document = xmlReadFile(filename, NULL, XML_PARSE_NONET);
     }
     if (document == NULL) {
-        fprintf(stderr, "lp5: cannot load XML file '%s'\n", filename);
+        fprintf(stderr, "lp5: cannot parse XML file '%s'\n", filename);
         if (source_map_filename != NULL) {
             clear_source_map_sources();
         }
