@@ -2472,6 +2472,9 @@ state awaitArticleSave
                     <template data-name="outputDiv" id="LP5-Output">
                         <style>
                          #root { display: flex; flex-direction: column; }
+                         span[data-ref]:hover:not(:has(span[data-ref]:hover)) {
+                             background-color: #ffe58a;
+                         }
                         </style>
                         <div id="root">
                             <div data-id="outputDiv">
