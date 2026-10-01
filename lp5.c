@@ -3,6 +3,12 @@
  *     gcc -std=c99 -Wall -Wextra -pedantic -o lp5 lp5.c $(xslt-config --cflags --libs) -lexslt
  */
 
+#ifndef _WIN32
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200809L
+#endif
+#endif
+
 #include <libexslt/exslt.h>
 #include <libxml/parser.h>
 #include <libxml/xpathInternals.h>
@@ -1315,6 +1321,19 @@ static int is_stylesheet_name(const char *name)
     return ends_with(name, ".xsl") || ends_with(name, ".xslt");
 }
 
+static int is_weave_stylesheet(const char *name)
+{
+    const char *basename = strrchr(name, '/');
+    const char *backslash = strrchr(name, '\\');
+
+    if (basename == NULL || (backslash != NULL && backslash > basename)) {
+        basename = backslash;
+    }
+    basename = basename == NULL ? name : basename + 1;
+    return strcmp(basename, "weave.xsl") == 0 ||
+        strcmp(basename, "weave.xslt") == 0;
+}
+
 static const struct command_entry *find_command(const char *name)
 {
     size_t i;
@@ -1364,6 +1383,227 @@ static int run_command(const struct command_entry *command, int argc,
     return status;
 }
 
+static int compare_modification_times(const struct stat *left,
+        const struct stat *right)
+{
+    /* Keep POSIX nanosecond fields isolated from the Windows stat fallback. */
+#ifdef _WIN32
+    if (left->st_mtime < right->st_mtime) return -1;
+    if (left->st_mtime > right->st_mtime) return 1;
+#else
+    if (left->st_mtim.tv_sec < right->st_mtim.tv_sec) return -1;
+    if (left->st_mtim.tv_sec > right->st_mtim.tv_sec) return 1;
+    if (left->st_mtim.tv_nsec < right->st_mtim.tv_nsec) return -1;
+    if (left->st_mtim.tv_nsec > right->st_mtim.tv_nsec) return 1;
+#endif
+    return 0;
+}
+
+/* Directory time catches added/removed files; article times catch edits. */
+static char *source_entry_path(const char *directory, const char *filename)
+{
+    size_t directory_length = strlen(directory);
+    size_t filename_length = strlen(filename);
+    int needs_separator = directory_length > 0 &&
+        directory[directory_length - 1] != '/' &&
+        directory[directory_length - 1] != '\\';
+    size_t maximum_length = (size_t) -1;
+    char *path;
+
+    if (filename_length > maximum_length - (size_t) needs_separator - 1 ||
+            directory_length > maximum_length - filename_length -
+                (size_t) needs_separator - 1) {
+        return NULL;
+    }
+    path = (char *) malloc(directory_length + (size_t) needs_separator +
+        filename_length + 1);
+    if (path == NULL) {
+        return NULL;
+    }
+    memcpy(path, directory, directory_length);
+    if (needs_separator) {
+        path[directory_length++] = '/';
+    }
+    memcpy(path + directory_length, filename, filename_length + 1);
+    return path;
+}
+
+static int update_latest_article_time(const char *filename,
+        struct stat *latest_time)
+{
+    struct stat article_time;
+
+    if (!ends_with(filename, ".lp5")) {
+        return 0;
+    }
+    {
+        char *path = source_entry_path(LP5Source, filename);
+        if (path == NULL) {
+            fprintf(stderr, "lp5: out of memory\n");
+            return 1;
+        }
+        if (stat(path, &article_time) != 0) {
+            fprintf(stderr, "lp5: cannot inspect source article '%s': %s\n",
+                path, strerror(errno));
+            free(path);
+            return 1;
+        }
+        free(path);
+    }
+
+    if (!LP5_ISDIR(article_time.st_mode) &&
+            compare_modification_times(&article_time, latest_time) > 0) {
+        *latest_time = article_time;
+    }
+    return 0;
+}
+
+static int latest_source_time(struct stat *latest_time)
+{
+    struct stat directory_time;
+
+    if (stat(LP5Source, &directory_time) != 0) {
+        fprintf(stderr, "lp5: cannot inspect source directory '%s': %s\n",
+            LP5Source, strerror(errno));
+        return 1;
+    }
+    if (!LP5_ISDIR(directory_time.st_mode)) {
+        fprintf(stderr, "lp5: source path '%s' is not a directory\n", LP5Source);
+        return 1;
+    }
+    *latest_time = directory_time;
+
+#ifdef _WIN32
+    {
+        struct _finddata_t entry;
+        intptr_t search;
+        size_t directory_length = strlen(LP5Source);
+        int needs_separator = directory_length > 0 &&
+            LP5Source[directory_length - 1] != '/' &&
+            LP5Source[directory_length - 1] != '\\';
+        char *pattern = (char *) malloc(directory_length +
+            (size_t) needs_separator + 2);
+
+        if (pattern == NULL) {
+            fprintf(stderr, "lp5: out of memory\n");
+            return 1;
+        }
+        memcpy(pattern, LP5Source, directory_length);
+        if (needs_separator) {
+            pattern[directory_length++] = '\\';
+        }
+        pattern[directory_length++] = '*';
+        pattern[directory_length] = '\0';
+        search = _findfirst(pattern, &entry);
+        free(pattern);
+        if (search == -1) {
+            fprintf(stderr, "lp5: cannot scan source directory '%s'\n",
+                LP5Source);
+            return 1;
+        }
+        do {
+            if (update_latest_article_time(entry.name, latest_time) != 0) {
+                _findclose(search);
+                return 1;
+            }
+        } while (_findnext(search, &entry) == 0);
+        _findclose(search);
+    }
+#else
+    {
+        DIR *directory_stream = opendir(LP5Source);
+        struct dirent *entry;
+
+        if (directory_stream == NULL) {
+            fprintf(stderr, "lp5: cannot scan source directory '%s': %s\n",
+                LP5Source, strerror(errno));
+            return 1;
+        }
+        for (;;) {
+            errno = 0;
+            entry = readdir(directory_stream);
+            if (entry == NULL) {
+                if (errno != 0) {
+                    fprintf(stderr,
+                        "lp5: cannot read source directory '%s': %s\n",
+                        LP5Source, strerror(errno));
+                    closedir(directory_stream);
+                    return 1;
+                }
+                break;
+            }
+            if (strcmp(entry->d_name, ".") == 0 ||
+                    strcmp(entry->d_name, "..") == 0) {
+                continue;
+            }
+            if (update_latest_article_time(entry->d_name, latest_time) != 0) {
+                closedir(directory_stream);
+                return 1;
+            }
+        }
+        closedir(directory_stream);
+    }
+#endif
+
+    if (stat(LP5Source, &directory_time) != 0) {
+        fprintf(stderr, "lp5: cannot recheck source directory '%s': %s\n",
+            LP5Source, strerror(errno));
+        return 1;
+    }
+    if (compare_modification_times(&directory_time, latest_time) > 0) {
+        *latest_time = directory_time;
+    }
+    return 0;
+}
+
+static int weave_is_current(const struct stat *latest_source_time)
+{
+    struct stat weave_time;
+
+    if (stat("weave.xml", &weave_time) != 0 ||
+            LP5_ISDIR(weave_time.st_mode)) {
+        return 0;
+    }
+    return compare_modification_times(latest_source_time, &weave_time) < 0;
+}
+
+static int refresh_weave(void)
+{
+    const struct command_entry *weave_command = find_command("weave");
+    const char *saved_output_name = LP5OutputName;
+    char *weave_arguments[] = {(char *) "lp5", (char *) "weave", NULL};
+    int status;
+
+    if (weave_command == NULL) {
+        fprintf(stderr, "lp5: internal error: missing weave command\n");
+        return 1;
+    }
+
+    LP5OutputName = "weave.xml";
+    status = run_command(weave_command, 2, weave_arguments, 1);
+    status = finish_output(status);
+    LP5OutputName = saved_output_name;
+    if (status != 0) {
+        fprintf(stderr,
+            "lp5: could not refresh weave.xml; requested command was not run\n");
+        return 1;
+    }
+    return 0;
+}
+
+static int ensure_weave_current(void)
+{
+    struct stat latest_time;
+
+    if (latest_source_time(&latest_time) != 0) {
+        return 1;
+    }
+    if (weave_is_current(&latest_time)) {
+        return 0;
+    }
+    return refresh_weave();
+}
+
 static void print_usage(const char *program)
 {
     fprintf(stderr,
@@ -1410,6 +1650,9 @@ int main(int argc, char *argv[])
             fprintf(stderr, "lp5: -m is only valid with the tangle command\n");
             return finish_output(1);
         }
+        if (command->function != command_weave && ensure_weave_current() != 0) {
+            return finish_output(1);
+        }
         status = run_command(command, argc, argv, first_argument);
         return finish_output(status);
     }
@@ -1417,6 +1660,11 @@ int main(int argc, char *argv[])
     if (LP5MapName != NULL) {
         fprintf(stderr, "lp5: -m is only valid with the tangle command\n");
         return 1;
+    }
+
+    if (!is_weave_stylesheet(argv[first_argument]) &&
+            ensure_weave_current() != 0) {
+        return finish_output(1);
     }
 
     xmlInitParser();
