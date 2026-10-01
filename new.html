@@ -2696,6 +2696,9 @@ state awaitArticleSave
                              }
                              emit.next(null); // finalize span
                              span.dataset.ref = article.URL;
+                             const codeName = article.getCodeName();
+                             if(codeName)
+                                 span.title = codeName;
                              return span;
                          }
                          // render entire LP5-Output div from scratch.
