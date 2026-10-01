@@ -1797,11 +1797,6 @@ state awaitArticleSave
         </template>
         <template data-name="home"> <!-- home page UI -->
             <style>
-             article:focus {
-                 outline: 3px solid orange;
-             }
-             article:focus { background-color: yellow; }
-
              .lp5-body {
                  display: flex;
                  flex-direction: column;
@@ -2064,8 +2059,18 @@ state awaitArticleSave
                     </template>
                     <template data-name="sourceDiv" id="LP5-Source">
                         <style>
-                         article:focus {
-                             outline: 3px solid orange;
+                         article {
+                             position: relative;
+                             margin-left: 4px;
+                         }
+                         article.lp5-selected::before {
+                             content: "";
+                             position: absolute;
+                             left: -4px;
+                             top: 0;
+                             bottom: 0;
+                             width: 2px;
+                             background-color: black;
                          }
 
                          .LP5-Section{
@@ -2183,6 +2188,9 @@ state awaitArticleSave
                              return result;
                          }
                          function selectArticle(articleNode){
+                             outerDiv.querySelectorAll('article.lp5-selected')
+                                 .forEach(node => node.classList.remove('lp5-selected'));
+                             articleNode.classList.add('lp5-selected');
                              controller.currentArticle = articleNode;
                              articleNode.focus();
                              iView.eventPublish("SelectArticle", articleNode);
@@ -5057,5 +5065,6 @@ return {
         </script>
     </body>
 </html>
+
 
 
