@@ -1057,8 +1057,9 @@ static int command_tangle(xsltStylesheetPtr stylesheet, int argc, char *argv[])
 {
     static const char default_input[] = "lp5.lp5/lp5.lp5";
     const char *input_filename = default_input;
-    struct xslt_parameter parameters[3];
+    struct xslt_parameter parameters[4];
     xmlDocPtr document;
+    char *directory;
 
     if (argc > 2) {
         fprintf(stderr, "lp5: tangle accepts at most one root-article argument.\n");
@@ -1074,25 +1075,36 @@ static int command_tangle(xsltStylesheetPtr stylesheet, int argc, char *argv[])
         return 1;
     }
     document = read_tangle_root_article(input_filename);
+    directory = input_directory(input_filename);
+    if (directory == NULL) {
+        fprintf(stderr, "lp5: out of memory\n");
+        xmlFreeDoc(document);
+        return 1;
+    }
     parameters[0].name = "root-location";
     parameters[0].value = input_filename;
-    parameters[1].name = "source-map-enabled";
-    parameters[1].value = LP5MapName == NULL ? "false" : "true";
+    parameters[1].name = "source-directory";
+    parameters[1].value = directory;
+    parameters[2].name = "source-map-enabled";
+    parameters[2].value = LP5MapName == NULL ? "false" : "true";
     {
         char marker_name[64];
         static unsigned long marker_sequence;
         const char *marker_name_parameter = NULL;
-        size_t parameter_count = LP5MapName == NULL ? 2 : 3;
+        size_t parameter_count = LP5MapName == NULL ? 3 : 4;
+        int status;
 
         if (LP5MapName != NULL) {
             snprintf(marker_name, sizeof(marker_name), "lp5sm%lx%lx",
                 (unsigned long) time(NULL), marker_sequence++);
-            parameters[2].name = "source-map-marker-name";
-            parameters[2].value = marker_name;
+            parameters[3].name = "source-map-marker-name";
+            parameters[3].value = marker_name;
             marker_name_parameter = marker_name;
         }
-        return transform_file(stylesheet, input_filename, parameters,
+        status = transform_file(stylesheet, input_filename, parameters,
             parameter_count, document, LP5MapName, marker_name_parameter);
+        free(directory);
+        return status;
     }
 }
 

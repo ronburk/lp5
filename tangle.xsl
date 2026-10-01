@@ -11,25 +11,32 @@
 
     <!-- Override when tangling a root article outside the project convention. -->
     <xsl:param name="root-location" select="'lp5.lp5/lp5.lp5'"/>
+    <xsl:param name="source-directory" select="'.'"/>
     <xsl:param name="source-map-enabled" select="'false'"/>
     <xsl:param name="source-map-marker-name" select="'lp5-source'"/>
 
     <xsl:template match="/">
+        <!-- lp5.c's my:ls inventory lets us skip absent links before document(). -->
+        <xsl:variable name="available-articles"
+            select="my:ls($source-directory)[@type = 'file']"/>
         <xsl:call-template name="validate-article-tree">
             <xsl:with-param name="document" select="."/>
             <xsl:with-param name="location" select="$root-location"/>
             <xsl:with-param name="visited" select="'|'"/>
+            <xsl:with-param name="available-articles" select="$available-articles"/>
         </xsl:call-template>
         <xsl:call-template name="emit-document">
             <xsl:with-param name="document" select="."/>
             <xsl:with-param name="root" select="."/>
             <xsl:with-param name="location" select="$root-location"/>
             <xsl:with-param name="source-map-enabled" select="$source-map-enabled"/>
+            <xsl:with-param name="available-articles" select="$available-articles"/>
         </xsl:call-template>
         <xsl:call-template name="warn-about-scripts">
             <xsl:with-param name="document" select="."/>
             <xsl:with-param name="location" select="$root-location"/>
             <xsl:with-param name="visited" select="'|'"/>
+            <xsl:with-param name="available-articles" select="$available-articles"/>
         </xsl:call-template>
     </xsl:template>
 
@@ -37,6 +44,7 @@
         <xsl:param name="document"/>
         <xsl:param name="location"/>
         <xsl:param name="visited"/>
+        <xsl:param name="available-articles"/>
 
         <xsl:variable name="document-id" select="generate-id($document)"/>
         <xsl:if test="not(contains($visited, concat('|', $document-id, '|')))">
@@ -58,15 +66,29 @@
                     </xsl:if>
                     <xsl:value-of select="@id"/>
                 </xsl:variable>
-                <xsl:variable name="child" select="document(string(@id), .)"/>
+                <xsl:variable name="child-id" select="string(@id)"/>
                 <xsl:choose>
-                    <xsl:when test="$child/*">
-                        <xsl:call-template name="validate-article-tree">
-                            <xsl:with-param name="document" select="$child"/>
-                            <xsl:with-param name="location" select="string($child-location)"/>
-                            <xsl:with-param name="visited"
-                                select="concat($visited, $document-id, '|')"/>
-                        </xsl:call-template>
+                    <xsl:when test="$available-articles[@name = $child-id]">
+                        <xsl:variable name="child" select="document($child-id, .)"/>
+                        <xsl:choose>
+                            <xsl:when test="$child/*">
+                                <xsl:call-template name="validate-article-tree">
+                                    <xsl:with-param name="document" select="$child"/>
+                                    <xsl:with-param name="location" select="string($child-location)"/>
+                                    <xsl:with-param name="visited"
+                                        select="concat($visited, $document-id, '|')"/>
+                                    <xsl:with-param name="available-articles"
+                                        select="$available-articles"/>
+                                </xsl:call-template>
+                            </xsl:when>
+                            <xsl:otherwise>
+                                <xsl:message>
+                                    <xsl:text>Warning: linked article '</xsl:text>
+                                    <xsl:value-of select="$child-location"/>
+                                    <xsl:text>' is unavailable; skipping it.</xsl:text>
+                                </xsl:message>
+                            </xsl:otherwise>
+                        </xsl:choose>
                     </xsl:when>
                     <xsl:otherwise>
                         <xsl:message>
@@ -185,6 +207,7 @@
         <xsl:param name="document"/>
         <xsl:param name="location"/>
         <xsl:param name="visited"/>
+        <xsl:param name="available-articles"/>
 
         <xsl:variable name="document-id" select="generate-id($document)"/>
         <xsl:if test="not(contains($visited, concat('|', $document-id, '|')))">
@@ -209,13 +232,18 @@
                     </xsl:if>
                     <xsl:value-of select="@id"/>
                 </xsl:variable>
-                <xsl:variable name="child" select="document(string(@id), .)"/>
-                <xsl:call-template name="warn-about-scripts">
-                    <xsl:with-param name="document" select="$child"/>
-                    <xsl:with-param name="location" select="string($child-location)"/>
-                    <xsl:with-param name="visited"
-                        select="concat($visited, $document-id, '|')"/>
-                </xsl:call-template>
+                <xsl:variable name="child-id" select="string(@id)"/>
+                <xsl:if test="$available-articles[@name = $child-id]">
+                    <xsl:variable name="child" select="document($child-id, .)"/>
+                    <xsl:call-template name="warn-about-scripts">
+                        <xsl:with-param name="document" select="$child"/>
+                        <xsl:with-param name="location" select="string($child-location)"/>
+                        <xsl:with-param name="visited"
+                            select="concat($visited, $document-id, '|')"/>
+                        <xsl:with-param name="available-articles"
+                            select="$available-articles"/>
+                    </xsl:call-template>
+                </xsl:if>
             </xsl:for-each>
         </xsl:if>
     </xsl:template>
@@ -245,6 +273,7 @@
         <xsl:param name="root"/>
         <xsl:param name="location"/>
         <xsl:param name="source-map-enabled"/>
+        <xsl:param name="available-articles"/>
 
         <xsl:for-each select="$document/template/section[@data-lp5-kind = 'code'][not(normalize-space(name))]/code">
             <xsl:apply-templates select="node()" mode="emit-code">
@@ -252,6 +281,7 @@
                 <xsl:with-param name="stack" select="'|'"/>
                 <xsl:with-param name="source-location" select="$location"/>
                 <xsl:with-param name="source-map-enabled" select="$source-map-enabled"/>
+                <xsl:with-param name="available-articles" select="$available-articles"/>
             </xsl:apply-templates>
         </xsl:for-each>
 
@@ -268,15 +298,35 @@
                 </xsl:if>
                 <xsl:value-of select="@id"/>
             </xsl:variable>
-            <xsl:variable name="child" select="document(string(@id), .)"/>
+            <xsl:variable name="child-id" select="string(@id)"/>
             <xsl:choose>
-                <xsl:when test="$child/*">
-                    <xsl:call-template name="emit-document">
-                        <xsl:with-param name="document" select="$child"/>
-                        <xsl:with-param name="root" select="$root"/>
-                        <xsl:with-param name="location" select="string($child-location)"/>
-                        <xsl:with-param name="source-map-enabled" select="$source-map-enabled"/>
-                    </xsl:call-template>
+                <xsl:when test="$available-articles[@name = $child-id]">
+                    <xsl:variable name="child" select="document($child-id, .)"/>
+                    <xsl:choose>
+                        <xsl:when test="$child/*">
+                            <xsl:call-template name="emit-document">
+                                <xsl:with-param name="document" select="$child"/>
+                                <xsl:with-param name="root" select="$root"/>
+                                <xsl:with-param name="location" select="string($child-location)"/>
+                                <xsl:with-param name="source-map-enabled" select="$source-map-enabled"/>
+                                <xsl:with-param name="available-articles"
+                                    select="$available-articles"/>
+                            </xsl:call-template>
+                        </xsl:when>
+                        <xsl:otherwise>
+                            <xsl:if test="$source-map-enabled = 'true'">
+                                <xsl:copy-of select="my:source-marker($location,
+                                        $source-map-marker-name)"/>
+                            </xsl:if>
+                            <xsl:text>&#10;[[ERROR: MISSING ARTICLE '</xsl:text>
+                            <xsl:value-of select="translate($child-location,
+                                    'abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ')"/>
+                            <xsl:text>' REFERENCED FROM '</xsl:text>
+                            <xsl:value-of select="translate($location,
+                                    'abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ')"/>
+                            <xsl:text>']]&#10;</xsl:text>
+                        </xsl:otherwise>
+                    </xsl:choose>
                 </xsl:when>
                 <xsl:otherwise>
                     <xsl:if test="$source-map-enabled = 'true'">
@@ -312,6 +362,7 @@
         <xsl:param name="stack"/>
         <xsl:param name="source-location"/>
         <xsl:param name="source-map-enabled"/>
+        <xsl:param name="available-articles"/>
         <xsl:choose>
             <xsl:when test="self::lp5-">
                 <xsl:call-template name="emit-reference">
@@ -319,6 +370,7 @@
                     <xsl:with-param name="name" select="normalize-space(@ref)"/>
                     <xsl:with-param name="stack" select="$stack"/>
                     <xsl:with-param name="source-map-enabled" select="$source-map-enabled"/>
+                    <xsl:with-param name="available-articles" select="$available-articles"/>
                 </xsl:call-template>
             </xsl:when>
             <xsl:otherwise>
@@ -332,6 +384,7 @@
                         <xsl:with-param name="stack" select="$stack"/>
                         <xsl:with-param name="source-location" select="$source-location"/>
                         <xsl:with-param name="source-map-enabled" select="$source-map-enabled"/>
+                        <xsl:with-param name="available-articles" select="$available-articles"/>
                     </xsl:apply-templates>
                 </xsl:copy>
             </xsl:otherwise>
@@ -347,6 +400,7 @@
         <xsl:param name="name"/>
         <xsl:param name="stack"/>
         <xsl:param name="source-map-enabled"/>
+        <xsl:param name="available-articles"/>
 
         <xsl:if test="not(string-length($name))">
             <xsl:message terminate="yes">A code reference has no name.</xsl:message>
@@ -362,6 +416,7 @@
             <xsl:call-template name="count-named-fragments">
                 <xsl:with-param name="document" select="$root"/>
                 <xsl:with-param name="name" select="$name"/>
+                <xsl:with-param name="available-articles" select="$available-articles"/>
             </xsl:call-template>
         </xsl:variable>
         <xsl:if test="not(string-length(string($matches)))">
@@ -379,22 +434,28 @@
             <xsl:with-param name="stack" select="concat($stack, $name, '|')"/>
             <xsl:with-param name="location" select="$root-location"/>
             <xsl:with-param name="source-map-enabled" select="$source-map-enabled"/>
+            <xsl:with-param name="available-articles" select="$available-articles"/>
         </xsl:call-template>
     </xsl:template>
 
     <xsl:template name="count-named-fragments">
         <xsl:param name="document"/>
         <xsl:param name="name"/>
+        <xsl:param name="available-articles"/>
 
         <xsl:for-each select="$document/template/section[@data-lp5-kind = 'code'][normalize-space(name) = $name]">
             <xsl:text>x</xsl:text>
         </xsl:for-each>
         <xsl:for-each select="$document/template/children/li">
-            <xsl:variable name="child" select="document(string(@id), .)"/>
-            <xsl:call-template name="count-named-fragments">
-                <xsl:with-param name="document" select="$child"/>
-                <xsl:with-param name="name" select="$name"/>
-            </xsl:call-template>
+            <xsl:variable name="child-id" select="string(@id)"/>
+            <xsl:if test="$available-articles[@name = $child-id]">
+                <xsl:variable name="child" select="document($child-id, .)"/>
+                <xsl:call-template name="count-named-fragments">
+                    <xsl:with-param name="document" select="$child"/>
+                    <xsl:with-param name="name" select="$name"/>
+                    <xsl:with-param name="available-articles" select="$available-articles"/>
+                </xsl:call-template>
+            </xsl:if>
         </xsl:for-each>
     </xsl:template>
 
@@ -405,6 +466,7 @@
         <xsl:param name="stack"/>
         <xsl:param name="location"/>
         <xsl:param name="source-map-enabled"/>
+        <xsl:param name="available-articles"/>
 
         <xsl:for-each select="$document/template/section[@data-lp5-kind = 'code'][normalize-space(name) = $name]/code">
             <xsl:apply-templates select="node()" mode="emit-code">
@@ -412,6 +474,7 @@
                 <xsl:with-param name="stack" select="$stack"/>
                 <xsl:with-param name="source-location" select="$location"/>
                 <xsl:with-param name="source-map-enabled" select="$source-map-enabled"/>
+                <xsl:with-param name="available-articles" select="$available-articles"/>
             </xsl:apply-templates>
         </xsl:for-each>
         <xsl:for-each select="$document/template/children/li">
@@ -427,15 +490,19 @@
                 </xsl:if>
                 <xsl:value-of select="@id"/>
             </xsl:variable>
-            <xsl:variable name="child" select="document(string(@id), .)"/>
-            <xsl:call-template name="emit-named-fragments">
-                <xsl:with-param name="document" select="$child"/>
-                <xsl:with-param name="root" select="$root"/>
-                <xsl:with-param name="name" select="$name"/>
-                <xsl:with-param name="stack" select="$stack"/>
-                <xsl:with-param name="location" select="string($child-location)"/>
-                <xsl:with-param name="source-map-enabled" select="$source-map-enabled"/>
-            </xsl:call-template>
+            <xsl:variable name="child-id" select="string(@id)"/>
+            <xsl:if test="$available-articles[@name = $child-id]">
+                <xsl:variable name="child" select="document($child-id, .)"/>
+                <xsl:call-template name="emit-named-fragments">
+                    <xsl:with-param name="document" select="$child"/>
+                    <xsl:with-param name="root" select="$root"/>
+                    <xsl:with-param name="name" select="$name"/>
+                    <xsl:with-param name="stack" select="$stack"/>
+                    <xsl:with-param name="location" select="string($child-location)"/>
+                    <xsl:with-param name="source-map-enabled" select="$source-map-enabled"/>
+                    <xsl:with-param name="available-articles" select="$available-articles"/>
+                </xsl:call-template>
+            </xsl:if>
         </xsl:for-each>
     </xsl:template>
 
