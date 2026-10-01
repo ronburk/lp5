@@ -1664,61 +1664,122 @@ state awaitArticleDelete
 
         <template data-custom="lp5-editarticle">
             <style>
-             .table { display: table; }
-             p      { display: table-row; }
-             label  { display: table-cell; vertical-align: text-top;}
-             input  { display: table-cell; }
-             button { display: table-cell; }
-             textarea { display: table-cell; vertical-align: text-top; width: 100%;}
-             .col1 { display: table-column; }
-             .col2 { display: table-column; }
-             .dialog-header {
-                 display: flex;
-                 align-items: center;
-                 justify-content: space-between;
-                 gap: 1em;
-                 margin-bottom: .5em;
+             dialog {
+                 box-sizing: border-box;
+                 width: min(54rem, calc(100vw - 2rem));
+                 max-width: none;
+                 max-height: calc(100vh - 2rem);
+                 overflow: hidden;
+                 padding: 0;
+                 border: 1px solid #b8bec7;
+                 border-radius: .5rem;
+                 box-shadow: 0 1rem 3rem rgb(0 0 0 / 22%);
+                 color: #20242a;
+                 font: .9375rem/1.4 system-ui, sans-serif;
              }
-             .dialog-actions { display: flex; gap: .5em; }
-             .dialog-header button { display: inline-block; }
-             .article-filename {
-                 font-family: monospace;
-                 font-weight: bold;
-                 text-align: right;
+             dialog[open] { display: flex; flex-direction: column; }
+             dialog::backdrop { background: rgb(18 24 32 / 48%); }
+             .dialog-header { flex-shrink: 0; padding: .875rem 1.25rem; border-bottom: 1px solid #d8dde4; }
+             .dialog-title { margin: 0; font-size: 1.25rem; line-height: 1.3; }
+             .article-filename { margin: .25rem 0 0; color: #5c6673; font: .875rem/1.4 ui-monospace, monospace; }
+             .dialog-content {
+                 display: grid;
+                 grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+                 gap: 1.25rem;
+                 min-height: 0;
+                 overflow-y: auto;
+                 padding: 1rem 1.25rem;
+             }
+             .field-group { min-width: 0; }
+             .field-group + .field-group { padding-left: 1.25rem; border-left: 1px solid #e1e5ea; }
+             .field-group h3 { margin: 0 0 .625rem; font-size: 1rem; }
+             .field { margin: 0 0 .75rem; }
+             .field:last-child { margin-bottom: 0; }
+             label { display: block; margin-bottom: .25rem; font-weight: 600; }
+             .hint { margin: .25rem 0 0; color: #5c6673; font-size: .875rem; }
+             input, textarea {
+                 box-sizing: border-box;
+                 display: block;
+                 width: 100%;
+                 padding: .4rem .5rem;
+                 border: 1px solid #8b949e;
+                 border-radius: .25rem;
+                 background: white;
+                 color: inherit;
+                 font: inherit;
+             }
+             input:focus, textarea:focus { outline: 2px solid #1769aa; outline-offset: 1px; }
+             textarea { resize: vertical; }
+             .code-input { font: .9rem/1.45 ui-monospace, monospace; }
+             .dialog-footer {
+                 display: flex;
+                 flex-shrink: 0;
+                 justify-content: flex-end;
+                 gap: .625rem;
+                 padding: .75rem 1.25rem;
+                 border-top: 1px solid #d8dde4;
+                 background: #f7f8fa;
+             }
+             button {
+                 padding: .55rem 1rem;
+                 border: 1px solid #7d8793;
+                 border-radius: .3rem;
+                 background: white;
+                 color: #20242a;
+                 font: 600 .95rem/1.3 system-ui, sans-serif;
+                 cursor: pointer;
+             }
+             button:hover { background: #eef1f4; }
+             button:focus-visible { outline: 2px solid #1769aa; outline-offset: 2px; }
+             button[data-id="save"] { border-color: #185a36; background: #216e42; color: white; }
+             button[data-id="save"]:hover { background: #185a36; }
+             @media (max-width: 48rem) {
+                 .dialog-content { grid-template-columns: minmax(0, 1fr); }
+                 .field-group + .field-group { padding: .875rem 0 0; border-left: 0; border-top: 1px solid #e1e5ea; }
+                 .dialog-header, .dialog-content { padding-right: 1rem; padding-left: 1rem; }
+                 .dialog-footer { padding-right: 1rem; padding-left: 1rem; }
              }
             </style>
-            <dialog data-id="dialog">
-                <div class="dialog-header">
-                    <div class="dialog-actions">
-                        <button data-id="save">Save</button>
-                        <button data-id="cancel">Cancel</button>
-                    </div>
-                    <span data-id="articleFilename" class="article-filename"></span>
+            <dialog data-id="dialog" aria-labelledby="edit-article-title">
+                <header class="dialog-header">
+                    <h2 id="edit-article-title" data-id="dialogTitle" class="dialog-title"></h2>
+                    <p data-id="articleFilename" class="article-filename"></p>
+                </header>
+                <div class="dialog-content">
+                    <section class="field-group" aria-labelledby="article-fields-title">
+                        <h3 id="article-fields-title">Article</h3>
+                        <div class="field">
+                            <label for="article-title">Title</label>
+                            <textarea id="article-title" data-id="articleTitle" rows="1" autofocus aria-describedby="article-title-hint"></textarea>
+                            <p id="article-title-hint" class="hint">HTML markup is allowed.</p>
+                        </div>
+                        <div class="field">
+                            <label for="article-explanation">Explanation</label>
+                            <textarea id="article-explanation" data-id="docText" rows="7"></textarea>
+                        </div>
+                        <div class="field">
+                            <label for="article-keywords">Keywords</label>
+                            <textarea id="article-keywords" data-id="keywordText" rows="2" aria-describedby="article-keywords-hint"></textarea>
+                            <p id="article-keywords-hint" class="hint">Enter one keyword per line.</p>
+                        </div>
+                    </section>
+                    <section class="field-group" aria-labelledby="code-fields-title">
+                        <h3 id="code-fields-title">Code</h3>
+                        <div class="field">
+                            <label for="article-code-name">Name</label>
+                            <input id="article-code-name" data-id="codeName" type="text" aria-describedby="article-code-name-hint">
+                            <p id="article-code-name-hint" class="hint">Leave blank for an unnamed code section.</p>
+                        </div>
+                        <div class="field">
+                            <label for="article-code">Code</label>
+                            <textarea id="article-code" data-id="codeText" class="code-input" rows="12" spellcheck="false"></textarea>
+                        </div>
+                    </section>
                 </div>
-                <div class="table">
-                    <div class="col1"></div>
-                    <div class="col2"></div>
-                    <p>
-                        <label>title (HTML markup):</label>
-                        <textarea data-id="articleTitle" rows="3" cols="60"></textarea>
-                    </p>
-                    <p>
-                        <label>documentation:</label>
-                        <textarea data-id="docText" rows="10" cols="60"></textarea>
-                    </p>
-                    <p>
-                        <label>keywords (one per line):</label>
-                        <textarea data-id="keywordText" rows="4" cols="60"></textarea>
-                    </p>
-                    <p>
-                        <label>name:</label>
-                        <input data-id="codeName" type="text">
-                    </p>
-                    <p>
-                        <label>code:</label>
-                        <textarea data-id="codeText" rows="10" cols="60"></textarea>
-                    </p>
-                </div>
+                <footer class="dialog-footer">
+                    <button data-id="cancel" type="button">Cancel</button>
+                    <button data-id="save" type="button">Save</button>
+                </footer>
             </dialog>
             <script>
              const {deferEvent} = require('controller');
@@ -1760,6 +1821,8 @@ state awaitArticleDelete
                      super.connectedCallback();
                      renderDialog(this.#article, this.template.namedNodes,
                                   this.#options.codeName);
+                     this.template.namedNodes.dialogTitle.textContent =
+                         this.isNewArticle() ? 'Create article' : 'Edit article';
                      this.template.namedNodes.dialog.showModal();
                  }
                  disconnectedCallback(){
