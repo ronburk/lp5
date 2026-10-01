@@ -2479,7 +2479,7 @@ state awaitArticleSave
                     <template data-name="outputDiv" id="LP5-Output">
                         <style>
                          #root { display: flex; flex-direction: column; }
-                         span[data-ref]:hover:not(:has(span[data-ref]:hover)) {
+                         span[data-ref]:hover:not(:has(span[data-ref]:hover)) > .lp5-output-text {
                              background-color: #ffe58a;
                          }
                         </style>
@@ -2533,7 +2533,11 @@ state awaitArticleSave
                              let text = "";
                              function emitAccumulated(){
                                  if(text.length){
-                                     span.append(text);
+                                     const textRun = createFreeElement('SPAN', {
+                                         className: 'lp5-output-text'
+                                     });
+                                     textRun.append(text);
+                                     span.append(textRun);
                                      text = "";
                                  }
                              }
