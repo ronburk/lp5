@@ -23,6 +23,7 @@
                 <button type="button" data-action="add-after-0">Add after article 0</button>
                 <button type="button" data-action="add-root-child">Add root child</button>
                 <button type="button" data-action="export">Export output</button>
+                <button type="button" data-action="test-moves">Test article moves</button>
                 <button type="button" data-action="inspect-storage">Inspect storage</button>
             </div>
             <output aria-live="polite" data-status>Ready</output>
@@ -91,6 +92,11 @@
                     views.render();
                     await model.project.write("lp5.html", model.outputText || "");
                     return "Export captured in memory";
+                });
+            else if(action === "test-moves")
+                void run("Article move tests", async () => {
+                    const {run_move_article_tests} = await import('./move_article.js');
+                    return await run_move_article_tests(model);
                 });
             else if(action === "inspect-storage"){
                 const storage = panel.querySelector('[data-storage]');
