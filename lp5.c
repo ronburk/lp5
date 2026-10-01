@@ -11,6 +11,7 @@
 
 #include <libexslt/exslt.h>
 #include <libxml/parser.h>
+#include <libxml/chvalid.h>
 #include <libxml/xpathInternals.h>
 #include <libxslt/extensions.h>
 #include <libxslt/transform.h>
@@ -958,7 +959,12 @@ static int remove_global_options(int *argc, char *argv[])
     int write_argument = 1;
 
     while (read_argument < *argc) {
-        if (strcmp(argv[read_argument], "-s") == 0) {
+        /* Preserve the separator and all later arguments as literal data. */
+        if (strcmp(argv[read_argument], "--") == 0) {
+            while (read_argument < *argc) {
+                argv[write_argument++] = argv[read_argument++];
+            }
+        } else if (strcmp(argv[read_argument], "-s") == 0) {
             if (read_argument + 1 >= *argc) {
                 fprintf(stderr, "lp5: -s requires a source directory\n");
                 return 1;
@@ -1311,12 +1317,136 @@ static int command_show_bundle(xsltStylesheetPtr stylesheet, int argc,
         NULL, NULL, NULL);
 }
 
+/* Check strict UTF-8 and XML 1.0 characters before creating text nodes. */
+static int valid_xml_text(const char *text)
+{
+    const unsigned char *p = (const unsigned char *) text;
+
+    while (*p != 0) {
+        unsigned int value;
+        unsigned int length;
+        unsigned int i;
+
+        if (*p < 0x80) {
+            value = *p;
+            length = 1;
+        } else if (*p >= 0xc2 && *p <= 0xdf) {
+            value = *p & 0x1f;
+            length = 2;
+        } else if (*p >= 0xe0 && *p <= 0xef) {
+            value = *p & 0x0f;
+            length = 3;
+        } else if (*p >= 0xf0 && *p <= 0xf4) {
+            value = *p & 0x07;
+            length = 4;
+        } else {
+            return 0;
+        }
+        for (i = 1; i < length; ++i) {
+            if (p[i] < 0x80 || p[i] > 0xbf) {
+                return 0;
+            }
+            value = (value << 6) | (p[i] & 0x3f);
+        }
+        if ((length == 3 && value < 0x800) ||
+                (length == 4 && value < 0x10000) || !xmlIsCharQ(value)) {
+            return 0;
+        }
+        p += length;
+    }
+    return 1;
+}
+
+static int command_search_keywords(xsltStylesheetPtr stylesheet, int argc,
+        char *argv[])
+{
+    int argument = 1;
+    int all = 0;
+    int i;
+    xmlDocPtr input;
+    xmlDocPtr weave;
+    xmlNodePtr root;
+    xmlNodePtr query;
+    xmlNodePtr copied_weave;
+
+    while (argument < argc && strcmp(argv[argument], "--") != 0) {
+        if (strcmp(argv[argument], "--all") != 0 || all) {
+            fprintf(stderr, "lp5: search-keywords: unexpected argument '%s'\n",
+                argv[argument]);
+            return 1;
+        }
+        all = 1;
+        ++argument;
+    }
+    if (argument == argc || argument + 1 == argc) {
+        fprintf(stderr,
+            "Usage: lp5 search-keywords [--all] -- KEYWORD [KEYWORD ...]\n");
+        return 1;
+    }
+    ++argument;
+    for (i = argument; i < argc; ++i) {
+        if (!valid_xml_text(argv[i])) {
+            fprintf(stderr, "lp5: keyword %d is not valid UTF-8/XML 1.0 text\n",
+                i - argument + 1);
+            return 1;
+        }
+        if (argv[i][strspn(argv[i], " \t\r\n")] == '\0') {
+            fprintf(stderr, "lp5: keyword %d is empty after normalization\n",
+                i - argument + 1);
+            return 1;
+        }
+    }
+
+    input = xmlNewDoc(BAD_CAST "1.0");
+    root = xmlNewNode(NULL, BAD_CAST "lp5-search-input");
+    if (input == NULL || root == NULL) {
+        xmlFreeNode(root);
+        xmlFreeDoc(input);
+        fprintf(stderr, "lp5: out of memory\n");
+        return 1;
+    }
+    xmlDocSetRootElement(input, root);
+    if (xmlNewProp(root, BAD_CAST "mode", BAD_CAST (all ? "all" : "any")) == NULL) {
+        goto out_of_memory;
+    }
+    query = xmlNewChild(root, NULL, BAD_CAST "query", NULL);
+    if (query == NULL) {
+        goto out_of_memory;
+    }
+    for (i = argument; i < argc; ++i) {
+        /* xmlNewTextChild keeps entity-like strings literal, including '&'. */
+        if (xmlNewTextChild(query, NULL, BAD_CAST "keyword", BAD_CAST argv[i]) == NULL) {
+            goto out_of_memory;
+        }
+    }
+    weave = xmlReadFile("weave.xml", NULL, XML_PARSE_NONET);
+    if (weave == NULL) {
+        fprintf(stderr, "lp5: cannot read weave.xml for keyword search\n");
+        xmlFreeDoc(input);
+        return 1;
+    }
+    copied_weave = xmlDocCopyNode(xmlDocGetRootElement(weave), input, 1);
+    xmlFreeDoc(weave);
+    if (copied_weave == NULL) {
+        goto out_of_memory;
+    }
+    xmlAddChild(root, copied_weave);
+    /* transform_file owns and frees the supplied input document. */
+    return transform_file(stylesheet, "weave.xml", NULL, 0, input, NULL, NULL);
+
+out_of_memory:
+    fprintf(stderr, "lp5: out of memory\n");
+    xmlFreeDoc(input);
+    return 1;
+}
+
 static const struct command_entry commands[] = {
     {"tangle", command_tangle},
     {"check", command_check},
     {"weave", command_weave},
     {"add-article", command_add_article},
-    {"show-bundle", command_show_bundle}
+    {"show-bundle", command_show_bundle},
+    {"search-keywords", command_search_keywords}
 };
 
 static int ends_with(const char *text, const char *suffix)
@@ -1620,13 +1750,14 @@ static void print_usage(const char *program)
 {
     fprintf(stderr,
         "Usage: %s [-s source-dir] [-o output-file] [-m map-file] <command> [args...]\n"
-        "       Commands: tangle, check, weave, add-article, show-bundle\n"
+        "       Commands: tangle, check, weave, add-article, show-bundle, search-keywords\n"
         "       %s tangle [xml-file]\n"
+        "       %s search-keywords [--all] -- KEYWORD [KEYWORD ...]\n"
         "       %s [-s source-dir] [-o output-file] <stylesheet.xsl|stylesheet.xslt> [xml-file] [other args...]\n"
         "       Source directory defaults to lp5.lp5; LP5Source sets the environment default.\n"
-        "       -s, -o, and -m options may appear anywhere; they are removed before command dispatch.\n"
+        "       -s, -o, and -m options may appear anywhere before --; they are removed before command dispatch.\n"
         "       -m map-file applies only to tangle.\n",
-        program, program, program);
+        program, program, program, program);
 }
 
 int main(int argc, char *argv[])
