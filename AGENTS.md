@@ -72,6 +72,9 @@ from the same snapshot. See [LIST_KEYWORDS.md](LIST_KEYWORDS.md) for its contrac
 template; omitting the filename selects `lp5.lp5` under `LP5Source`.
 See [SHOW_ARTICLE.md](SHOW_ARTICLE.md) for its XML contract and navigation.
 
+`./lp5 show-bundle` lists all bundle names. Supply a name to read its code sections
+from `weave.xml`, or `""` for unnamed code. See [SHOW_BUNDLE.md](SHOW_BUNDLE.md).
+
 ## Check one article
 
 Use the `check` command to validate one article without tangling the whole
