@@ -1451,6 +1451,33 @@ static int command_list_keywords(xsltStylesheetPtr stylesheet, int argc,
     return transform_file(stylesheet, "weave.xml", NULL, 0, NULL, NULL, NULL);
 }
 
+static int command_show_article(xsltStylesheetPtr stylesheet, int argc,
+        char *argv[])
+{
+    const char *filename = argc == 1 ? "lp5.lp5" : argv[1];
+    struct xslt_parameter parameter;
+    char *path;
+    size_t length;
+    int status;
+
+    length = strlen(filename);
+    if (argc > 2 || !valid_xml_text(filename) || has_path_separator(filename) || length <= 4 ||
+            strcmp(filename + length - 4, ".lp5") != 0) {
+        fprintf(stderr, "Usage: lp5 show-article [article-file.lp5]\n");
+        return 1;
+    }
+    path = check_source_path(filename);
+    if (path == NULL) {
+        fprintf(stderr, "lp5: out of memory\n");
+        return 1;
+    }
+    parameter.name = "article-file";
+    parameter.value = filename;
+    status = transform_file(stylesheet, path, &parameter, 1, NULL, NULL, NULL);
+    free(path);
+    return status;
+}
+
 static const struct command_entry commands[] = {
     {"tangle", command_tangle},
     {"check", command_check},
@@ -1458,7 +1485,8 @@ static const struct command_entry commands[] = {
     {"add-article", command_add_article},
     {"show-bundle", command_show_bundle},
     {"search-keywords", command_search_keywords},
-    {"list-keywords", command_list_keywords}
+    {"list-keywords", command_list_keywords},
+    {"show-article", command_show_article}
 };
 
 static int ends_with(const char *text, const char *suffix)
@@ -1762,15 +1790,16 @@ static void print_usage(const char *program)
 {
     fprintf(stderr,
         "Usage: %s [-s source-dir] [-o output-file] [-m map-file] <command> [args...]\n"
-        "       Commands: tangle, check, weave, add-article, show-bundle, search-keywords, list-keywords\n"
+        "       Commands: tangle, check, weave, add-article, show-bundle, search-keywords, list-keywords, show-article\n"
         "       %s tangle [xml-file]\n"
         "       %s search-keywords [--all] -- KEYWORD [KEYWORD ...]\n"
         "       %s list-keywords\n"
+        "       %s show-article [article-file.lp5]\n"
         "       %s [-s source-dir] [-o output-file] <stylesheet.xsl|stylesheet.xslt> [xml-file] [other args...]\n"
         "       Source directory defaults to lp5.lp5; LP5Source sets the environment default.\n"
         "       -s, -o, and -m options may appear anywhere before --; they are removed before command dispatch.\n"
         "       -m map-file applies only to tangle.\n",
-        program, program, program, program, program);
+        program, program, program, program, program, program);
 }
 
 int main(int argc, char *argv[])
