@@ -39,6 +39,7 @@
             document.body.append(editor);
         }
         let pendingCodeReferenceContext = null;
+        let pendingArticleContext = null;
 state load
         views.loadTemplates();
         views.change('home');
@@ -73,6 +74,13 @@ state awaitProjectLoad
     ->  home
 
 state home
+    on  lp5ArticleContext
+        pendingArticleContext = event.detail;
+        const menu = elementFoundry['lp5-articlecontextmenu'];
+        menu.setContext(event.detail);
+        document.body.append(menu);
+        menu.showAt(event.detail.x, event.detail.y);
+    -> articleContextMenu
     on  lp5CodeReferenceContext
         pendingCodeReferenceContext = event.detail;
         const menu = elementFoundry['lp5-referencecontextmenu'];
@@ -115,13 +123,29 @@ state referenceContextMenu
         pendingCodeReferenceContext = null;
     -> home
 
+state articleContextMenu
+    on  command
+        console.assert(event.detail[0] === 'createArticle');
+        console.assert(pendingArticleContext);
+        openArticleEditor(null, {
+            isNew:true,
+            sourceURL:pendingArticleContext.articleURL,
+            insertPosition:Number(event.detail[1])
+        });
+        pendingArticleContext = null;
+    -> editingArticle
+    on  lp5ContextMenuDismiss
+        pendingArticleContext = null;
+    -> home
+
 state editingArticle
     on  lp5DialogSave
         const editor = event.detail;
         asyncSchedule(async () => {
             if(editor.isNewArticle()) {
-                await model.saveNewArticleAfterReference(
+                await model.saveNewArticleAtPosition(
                     editor.sourceArticleURL(),
+                    editor.insertionPosition(),
                     URL => editor.getArticleRevision(URL).toString(),
                     editor.setArticleFilename.bind(editor));
             } else {
@@ -134,6 +158,8 @@ state editingArticle
             editor.closeEditor();
         });
     -> awaitArticleSave
+    on  lp5ContextMenuDismiss
+    -> editingArticle
     on  lp5DialogCancel
         event.detail.closeEditor();
     -> home
@@ -758,7 +784,7 @@ state awaitArticleSave
             <p><strong>Selected Item:</strong> <span id="selected-item">None</span></p>
 
             <script>
-             const {deferShadowEvent} = require('controller');
+             const {deferShadowEvent, publish} = require('controller');
 
              function makeAllLiDraggable(ancestor, ){
                  const items = ancestor.querySelectorAll('li');
@@ -789,7 +815,18 @@ state awaitArticleSave
                      }
                  }
                  #contextMenuHandler(event){
-                     console.error("TreeView contextMenuHandler!!!!!", event);
+                     const articleItem = event.composedPath().find(node =>
+                         node?.tagName === 'LI');
+                     const articleURL = articleItem?.id || articleItem?.querySelector(
+                         ':scope > span > a')?.getAttribute('href');
+                     if(articleURL){
+                         event.preventDefault();
+                         publish('lp5ArticleContext', {
+                             articleURL,
+                             x: event.clientX,
+                             y: event.clientY
+                         });
+                     }
                  }
                  #clickHandler(event){
                      event.preventDefault();
@@ -834,7 +871,7 @@ state awaitArticleSave
                      this.#treeview = this.#template.namedNodes["lp5-treeview"];
                      console.assert(this.#treeview, "Missing <ul data-id='lp5-treeview'>");
                      this.#treeview.addEventListener('click', event=>this.#clickHandler(event), true);
-                     this.#treeview.addEventListener('contextmenu', event=>this.#contextMenuHandler(event), true);
+                     this.addEventListener('contextmenu', event=>this.#contextMenuHandler(event), true);
                      //??? must put directly on slot node!
                      this.#treeview.addEventListener('slotchange', event=>this.#handleSlotChange(event), true);
                      this.render();
@@ -1001,6 +1038,7 @@ state awaitArticleSave
                  padding: .1em;
                  margin: 0;
              }
+             .lp5-context ul li[hidden] { display: none; }
              .lp5-context ul li:hover {
                  background-color: #eee;
              }
@@ -1232,10 +1270,10 @@ state awaitArticleSave
         </template>
 
         <template data-custom="lp5-articlecontextmenu" data-extends="lp5-contextmenu">
-            <ul data-id="ul">
-                <li data-cmd="createArticle -1">Insert New Article Before</li>
-                <li data-cmd="createArticle  1">Append New Article After</li>
-                <li data-id="childOption" data-cmd="createArticle  0">Create First Child Article</li>
+            <ul data-id="ul" role="menu" aria-label="Article actions">
+                <li data-position="-1" data-cmd="createArticle -1" role="menuitem" tabindex="-1">Insert New Article Before</li>
+                <li data-position="1" data-cmd="createArticle 1" role="menuitem" tabindex="-1">Append New Article After</li>
+                <li data-position="0" data-cmd="createArticle 0" role="menuitem" tabindex="-1">Create First Child Article</li>
             </ul>
             <script>
              class LP5ArticleContextMenu extends LP5Element {
@@ -1252,6 +1290,23 @@ state awaitArticleSave
 */
                  getMenuItems(){ // called by LP5ContextMenu.connectedCallback()
                      return this.#template.namedNodes.ul;
+                 }
+                 setContext(context){
+                     super.setContext(context);
+                     this.#updatePositionOptions();
+                 }
+                 connectedCallback(){
+                     super.connectedCallback();
+                     this.#updatePositionOptions();
+                 }
+                 #updatePositionOptions(){
+                     const article = window.LP5.model.articleFromURL(
+                         this.context?.articleURL);
+                     const isRoot = Boolean(article && article.parentURL == null);
+                     // The root has no siblings, so only first-child insertion applies.
+                     for(const item of this.#template.namedNodes.ul.querySelectorAll(
+                         '[data-position="-1"], [data-position="1"]'))
+                         item.hidden = isRoot;
                  }
                  selectEvent(menuItem){ // called by LP5ContextMenu on click
                      let close = true;
@@ -1521,6 +1576,9 @@ state awaitArticleSave
                  }
                  sourceArticleURL(){
                      return this.#options.sourceURL;
+                 }
+                 insertionPosition(){
+                     return this.#options.insertPosition ?? 1;
                  }
                  setArticleFilename(filename){
                      this.template.namedNodes.articleFilename.textContent = filename;
@@ -2019,6 +2077,7 @@ state awaitArticleSave
                                  const {li,span,a} = elementFoundry;
                                  li.classList.add('lp5-treeview');
                                  let id            = entry.getAttribute('id');
+                                 li.id = id;
 
                                  span.appendChild(a);
                                  li.appendChild(span);
@@ -2228,7 +2287,11 @@ state awaitArticleSave
                              }
                              const articleNode = articleNodeFromClick(event);
                              if(articleNode){
-                                 publish('lp5ArticleContext', articleNode.id);
+                                 publish('lp5ArticleContext', {
+                                     articleURL: articleNode.id,
+                                     x: event.clientX,
+                                     y: event.clientY
+                                 });
                              }
                              event.preventDefault();
                          }
@@ -4685,24 +4748,31 @@ state awaitArticleSave
                  return name;
              };
 
-             model.saveNewArticleAfterReference = async function(
-                 sourceURL, makeArticleSerial, setFilename){
+             model.saveNewArticleAtPosition = async function(
+                 sourceURL, position, makeArticleSerial, setFilename){
                  const source = this.articleFromURL(sourceURL);
                  if(!source)
                      throw new Error(`Cannot add article: source article not found: ${sourceURL}`);
+                 if(![-1, 0, 1].includes(position))
+                     throw new Error(`Cannot add article: invalid insertion position: ${position}`);
 
                  const isRoot = source.URL === this.rootTOC.URL;
-                 const parent = isRoot ? source : source.parentURL;
-                 if(!parent)
-                     throw new Error(`Cannot add article after '${sourceURL}': parent article is unavailable`);
-
-                 let childList = parent.sections.children;
+                 let parent = null;
                  let sourceLink = null;
-                 if(!isRoot){
+                 // The root's legacy “after” insertion means append to its children.
+                 if(position === 0 || (isRoot && position === 1))
+                     parent = source;
+                 else if(isRoot)
+                     throw new Error('Cannot insert an article before the root article');
+                 else {
+                     parent = source.parentURL;
+                     if(!parent)
+                         throw new Error(`Cannot add article around '${sourceURL}': parent article is unavailable`);
+                     const childList = parent.sections.children;
                      sourceLink = Array.from(childList?.children ?? []).find(
                          child => child.tagName === 'li' && child.getAttribute('id') === source.URL);
                      if(!sourceLink)
-                         throw new Error(`Cannot add article after '${sourceURL}': parent link is unavailable`);
+                         throw new Error(`Cannot add article around '${sourceURL}': parent link is unavailable`);
                  }
 
                  const URL = await this.createUniqueArticle();
@@ -4711,6 +4781,7 @@ state awaitArticleSave
                  setFilename(URL);
                  await this.project.write(URL, makeArticleSerial(URL));
 
+                 let childList = parent.sections.children;
                  if(!childList){
                      childList = parent.template.ownerDocument.createElement('children');
                      parent.template.append(childList);
@@ -4718,8 +4789,12 @@ state awaitArticleSave
                  }
                  const link = parent.template.ownerDocument.createElement('li');
                  link.setAttribute('id', URL);
-                 if(isRoot)
+                 if(position === 0)
+                     childList.prepend(link);
+                 else if(isRoot)
                      childList.append(link);
+                 else if(position === -1)
+                     sourceLink.before(link);
                  else
                      sourceLink.after(link);
                  await this.project.write(parent.URL, parent.toString());
@@ -5072,8 +5147,6 @@ return {
         </script>
     </body>
 </html>
-
-
 
 
 
