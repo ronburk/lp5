@@ -94,12 +94,33 @@ check the visible UI with `/new.html?test=1`:
    rows, and a completely empty article uses `(empty article)`.
 5. Open **Move Article** from the root. The root should appear selected, and
    the root context menu should still hide sibling insertion and deletion.
-6. Inspect storage before and after browsing the dialog. Saved contents and
-   removed filenames must be identical. Dialog rows have no `draggable="true"`
-   attribute, and right-clicking them must not open article mutation menus.
+6. Drag a child onto the middle of another row. Confirm it becomes the first
+   child, the dialog reports **Move saved**, and the moved article stays selected.
+   Drop on the top/bottom third of a row to insert before/after it. Moving an
+   article carries its descendants; article filenames and contents are retained.
+7. Try dragging the root, dropping an article on itself or a descendant, and
+   dropping beside the root. These must leave the hierarchy unchanged. A
+   repeated move to the existing position must not write any files.
+8. Close the dialog and click **Reload project**. Confirm the saved order and
+   nesting remain in the source and navigation panes. **Inspect storage** shows
+   the changed parent child lists; no article files are removed.
+9. Click **Test article moves**. The browser runs `test/move_article.js` against
+   the actual model operation with real XML DOMs and isolated in-memory stores.
+   Expect **26 article move checks passed**. These cover all placements,
+   subtree/content preservation, no-ops, invalid destinations, and rejected
+   writes that have already modified their file, including restoration failures.
+10. Open a fresh `/new.html?test=1&fail-write=2&write-delay=1500` tab. Move
+    `0.lp5` into `1.lp5`. While saving, Close is disabled and Escape must not
+    dismiss the dialog. The second parent write fails; the error is shown and
+    the original hierarchy is restored. Repeat the drag; the one-time failure
+    has passed and the move should succeed. The delay is in milliseconds and
+    is capped at 5000; `fail-write` is the one-based write attempt to reject.
 
-This first cut displays the article hierarchy only. It does not choose a move
-destination or modify article links, files, or code references.
+Each successful drop saves immediately. Same-parent moves write one article;
+reparenting writes the destination parent first, then the old parent. On error,
+all attempted writes are restored in reverse order from their original stored
+text. Restoration failures identify the affected files and block further moves
+in that dialog. The filesystem API cannot make the two writes crash-atomic.
 
 ## Validation boundaries
 

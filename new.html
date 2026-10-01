@@ -184,11 +184,36 @@ state editingArticle
     -> home
 
 state viewingArticleHierarchy
+    on  lp5MoveArticle
+        const {viewer, source_url, target_url, position} = event.detail;
+        asyncSchedule(async () => {
+            let saved = false;
+            try {
+                await model.move_article(source_url, target_url, position);
+                saved = true;
+                await model.openProject(model.projectName);
+                model.updateDerivedState();
+                views.render();
+                viewer.setArticle(model.articleFromURL(source_url));
+                viewer.finish_move();
+            } catch(error) {
+                if(saved) {
+                    error = new Error(`Move saved, but refreshing the project failed: ${error.message}. Close and reopen the project before continuing.`);
+                    error.reopen_required = true;
+                }
+                viewer.finish_move(error);
+            }
+        });
+    -> awaitArticleMove
     on  lp5ContextMenuDismiss
     -> viewingArticleHierarchy
     on  lp5DialogCancel
         event.detail.closeEditor();
     -> home
+
+state awaitArticleMove
+    on  lp5AsyncComplete
+    -> viewingArticleHierarchy
 
 state editingView
     on  close
@@ -228,6 +253,7 @@ state awaitArticleDelete
              'lp5CreateProject',
              'lp5DialogSave',
              'lp5DialogCancel',
+             'lp5MoveArticle',
              'lp5EditArticle',
              'lp5NavSelect',
              'lp5SelectProject',
@@ -762,18 +788,18 @@ state awaitArticleDelete
              }
 
              /* Horizontal line indicating where the dragged item will go */
-             li.drop-target-before {
+             li.drop-target-before > span {
                  box-shadow: inset 0 2px 0 0 rgba(0, 123, 255, 0.5); /* Shadow on the top of the element */
              }
 
              /* Horizontal line indicating the "after" drop location */
-             li.drop-target-after {
+             li.drop-target-after > span {
                  box-shadow: inset 0 -2px 0 0 rgba(0, 123, 255, 0.5); /* Shadow on the bottom of the element */
              }
 
              /* Highlight the target area while dragging */
-             li.over {
-                 border: 2px dashed #007bff; /* Adds a dashed border to indicate a valid drop area */
+             li.over > span {
+                 outline: 2px dashed #007bff;
                  background-color: #f0f8ff;  /* Light background to highlight the target */
              }
 
@@ -803,6 +829,11 @@ state awaitArticleDelete
                  font-weight: bold;
              }
 
+             li > span {
+                 display: inline-block;
+                 min-height: 1.5em;
+                 min-width: 12em;
+             }
              span {
                  font-size: 1rem; /* Use rem for text size */
              }
@@ -818,15 +849,6 @@ state awaitArticleDelete
             <script>
              const {deferShadowEvent, publish} = require('controller');
 
-             function makeAllLiDraggable(ancestor, ){
-                 const items = ancestor.querySelectorAll('li');
-                 items.forEach(item => {
-                     item.setAttribute('draggable', 'true');
-                 });
-             }
-             // Add an event listener on the UL element (capture phase)
-             //             treeView.addEventListener('click', function(event) {
-
              class TreeView extends LP5Element {
                  #treeview    = null;
                  #dirty       = true;
@@ -834,6 +856,8 @@ state awaitArticleDelete
                  #selectEvent = "lp5-treeview:select";
                  #template;
                  #selected = null;
+                 #drag_source = null;
+                 #drop_row = null;
                  constructor(){
                      super();
                      this.#template = new LP5Element.TemplateInstance();
@@ -914,112 +938,77 @@ state awaitArticleDelete
                      this.addEventListener('contextmenu', event=>this.#contextMenuHandler(event), true);
                      //??? must put directly on slot node!
                      this.#treeview.addEventListener('slotchange', event=>this.#handleSlotChange(event), true);
+                     for(const name of ['dragstart', 'dragover', 'drop', 'dragend', 'dragleave'])
+                         this.#treeview.addEventListener(name, event => this.#drag_event(event));
                      this.render();
+                 }
+                 #clear_drop() {
+                     this.#drop_row?.classList.remove('drop-target-before', 'drop-target-after', 'over');
+                     this.#drop_row = null;
+                 }
+                 #drag_event(event) {
+                     if(!this.hasAttribute('movable') || this.hasAttribute('busy')) {
+                         if(event.type === 'dragstart') event.preventDefault();
+                         return;
+                     }
+                     const row = event.target.closest('li');
+                     if(event.type === 'dragstart') {
+                         if(!row || row.dataset.root === 'true') {
+                             event.preventDefault();
+                             return;
+                         }
+                         this.#drag_source = row;
+                         row.classList.add('dragging');
+                         event.dataTransfer.effectAllowed = 'move';
+                         event.dataTransfer.setData('text/plain', row.id);
+                         return;
+                     }
+                     if(event.type === 'dragend') {
+                         this.#drag_source?.classList.remove('dragging');
+                         this.#drag_source = null;
+                         this.#clear_drop();
+                         return;
+                     }
+                     if(event.type === 'dragleave') {
+                         if(!this.#treeview.contains(event.relatedTarget)) this.#clear_drop();
+                         return;
+                     }
+                     this.#clear_drop();
+                     const source = this.#drag_source;
+                     if(!source || !row || source.contains(row)) return;
+                     const rect = row.querySelector(':scope > span').getBoundingClientRect();
+                     const fraction = (event.clientY - rect.top) / rect.height;
+                     if(fraction < 0 || fraction > 1) return;
+                     const position = fraction < 1/3 ? -1 : fraction > 2/3 ? 1 : 0;
+                     if(row.dataset.root === 'true' && position !== 0) return;
+                     event.preventDefault();
+                     event.dataTransfer.dropEffect = 'move';
+                     if(event.type === 'dragover') {
+                         this.#drop_row = row;
+                         row.classList.add(position < 0 ? 'drop-target-before'
+                             : position > 0 ? 'drop-target-after' : 'over');
+                     } else if(event.type === 'drop') {
+                         const detail = {source_url:source.id, target_url:row.id, position};
+                         source.classList.remove('dragging');
+                         this.#drag_source = null;
+                         deferShadowEvent(this, 'lp5-treeview:move', detail);
+                     }
                  }
                  setContent(nodes){
                  }
                  render(){
                      if(this.#dirty){
                          this.#wrapSlotContent();
-                         if(!this.hasAttribute('readonly'))
-                             makeAllLiDraggable(this.#treeview);
+                         if(this.hasAttribute('movable')) {
+                             for(const row of this.#treeview.querySelectorAll('li'))
+                                 row.draggable = row.dataset.root !== 'true';
+                         }
                          const initial_selection = this.#treeview.querySelector('li.selected');
                          if(initial_selection)
                              this.#selectItem(initial_selection);
                      }
                      this.#dirty = false;
                  }
-             }
-             if(false) if(treeView.dataset.drag){
-                 const items = treeView.querySelectorAll('li');
-                 items.forEach(item => {
-                     item.setAttribute('draggable', 'true');
-                 });
-
-             }
-
-             function move(liFrom, liTo, relPos){
-                 console.log("move", liFrom, liTo, relPos);
-             }
-
-             // drag-and-drop code
-             let previousTarget     = null;  // Store the last hovered element
-             let currentTarget      = null;
-
-             function dragAndDrop(){
-                 let currentDragSource  = null;
-                 let currentDropTarget  = null;
-                 let undo               = () => null;
-                 let relPos             = null;
-                 const api              = {}
-
-                 //                 treeView.addEventListener('dragstart', function(event) {
-                 api.dragstart = function dragstart(event) {
-                     const li = event.target.closest('li');
-                     console.log("dragstart", li);
-                     if(li){
-                         li.classList.add('dragging');
-                         currentDragSource = li;
-                         event.dataTransfer.dropEffect    = "move";
-                         event.dataTransfer.effectAllowed = "move";
-                     }
-                 }
-
-                 //                 treeView.addEventListener('dragenter', function(event) {
-                 api.dragenter = function dragenter(event){
-                     event.preventDefault();  // Allow the drop
-                 }
-                 api.dragover = function dragover(event){
-                     event.preventDefault();  // Allow the drop
-                     const li = event.target.closest('li');
-
-                     if (li){
-                         undo();
-                         if(!li.classList.contains('dragging')){
-                             const rect    = li.getBoundingClientRect();
-                             const upper   = event.clientY < rect.top + rect.height / 2;
-                             relPos = upper ? 'before' : 'after';
-                             const dropClass = 'drop-target-' + relPos;
-                             li.classList.add(dropClass);
-                             undo =  () => li.classList.remove(dropClass);
-                         } else
-                             undo = () => null;
-                         currentDropTarget = li;
-                     }
-                 }
-
-                 // Event listener for dragend (cleanup after the drag is done)
-                 api.dragend = function dragend(event){
-                     const draggedItem = event.target;
-                     if (draggedItem.tagName === 'LI')
-                         draggedItem.classList.remove('dragging');
-                     undo();
-                 }
-
-
-                 // Event listener for drop events on the parent UL element
-                 api.drop = function drop(event){
-                     event.preventDefault();
-                     const target = event.target.closest('li');
-                     console.log("drop", target);
-
-                     target.classList.remove('over');
-                     currentTarget = null;
-
-                     api.move(currentDragSource, currentDropTarget, relPos);
-                 }
-                 return  api;
-             }
-             const dragApi = dragAndDrop();
-
-             // Toggle expand/collapse for nested lists
-
-             // Function to select an item and highlight it
-
-             // On page load, ensure no nested lists are visible initially
-             window.onload = function() {
-                 //             const nestedLists = document.querySelectorAll('.nested');
-                 //             nestedLists.forEach(nested => nested.classList.remove('active')); // Ensures all nested lists are collapsed initially
              }
              return TreeView;
              function init(){}
@@ -1465,7 +1454,8 @@ state awaitArticleDelete
             <dialog data-id="dialog" aria-labelledby="move-title">
                 <h2 id="move-title">Move Article</h2>
                 <p data-id="source"></p>
-                <p>Article hierarchy. Moving articles is not available yet.</p>
+                <p>Drag an article to move it with its children. Drop at the top or bottom of a row to place it before or after; drop in the middle to make it the first child. Each drop saves immediately.</p>
+                <p data-id="status" role="status"></p>
                 <div class="hierarchy" data-id="hierarchy"></div>
                 <button data-id="close" type="button">Close</button>
             </dialog>
@@ -1490,6 +1480,7 @@ state awaitArticleDelete
                 function hierarchy_row(article, source_url, ancestors = new Set()) {
                     const li = document.createElement('li');
                     li.id = article.URL;
+                    li.dataset.root = String(article.URL === model.rootTOC.URL);
                     const span = document.createElement('span');
                     span.textContent = article_label(article);
                     li.append(span);
@@ -1515,6 +1506,8 @@ state awaitArticleDelete
 
                 class MoveArticle extends LP5Element {
                     #template;
+                    #busy = false;
+                    #blocked = false;
                     constructor() {
                         super();
                         this.#template = new LP5Element.TemplateInstance();
@@ -1532,14 +1525,42 @@ state awaitArticleDelete
                         source.textContent = `Selected article: ${article_label(article)}`;
                         const tree = document.createElement('lp5-treeview');
                         tree.setAttribute('readonly', '');
+                        tree.setAttribute('movable', '');
+                        tree.addEventListener('lp5-treeview:move', event => {
+                            if(this.#busy || this.#blocked) return;
+                            this.#busy = true;
+                            tree.setAttribute('busy', '');
+                            this.#template.namedNodes.close.disabled = true;
+                            this.#template.namedNodes.status.textContent = 'Saving move…';
+                            deferEvent(document, 'lp5MoveArticle', {
+                                detail:{viewer:this, ...event.detail}
+                            });
+                        });
                         tree.append(hierarchy_row(model.rootTOC, article.URL));
                         hierarchy.replaceChildren(tree);
+                        this.#scroll_selection();
+                    }
+                    #scroll_selection() {
+                        this.#template.namedNodes.hierarchy.querySelector('lp5-treeview')
+                            ?.shadowRoot.querySelector('li.selected > span')
+                            ?.scrollIntoView({block:'nearest'});
                     }
                     connectedCallback() {
                         super.connectedCallback();
                         this.#template.namedNodes.dialog.showModal();
+                        this.#scroll_selection();
+                    }
+                    finish_move(error) {
+                        this.#busy = false;
+                        this.#blocked = Boolean(error?.rollback_failed || error?.reopen_required);
+                        const {hierarchy, close, status} = this.#template.namedNodes;
+                        close.disabled = false;
+                        if(!this.#blocked)
+                            hierarchy.querySelector('lp5-treeview').removeAttribute('busy');
+                        status.textContent = error ? `Move failed: ${error.message}` : 'Move saved.';
                     }
                     #requestClose() {
+                        if(this.#busy) return;
                         deferEvent(document, 'lp5DialogCancel', {detail:this});
                     }
                     closeEditor() {
@@ -3252,6 +3273,10 @@ state awaitArticleDelete
                  const removed = new Set();
                  const failedRead = new URL(location.href).searchParams.get("fail");
                  const failedRemove = new URL(location.href).searchParams.get("fail-remove");
+                 const failed_write = Number(new URL(location.href).searchParams.get('fail-write'));
+                 const write_delay = Math.min(5000, Math.max(0,
+                     Number(new URL(location.href).searchParams.get('write-delay')) || 0));
+                 let write_count = 0;
                  const state = {
                      lastGeneratedOutput: null,
                      lastParent: "lp5-test-parent",
@@ -3276,6 +3301,9 @@ state awaitArticleDelete
                          return await response.text();
                      }
                      async write(name, text){
+                         if(write_delay) await new Promise(resolve => setTimeout(resolve, write_delay));
+                         if(++write_count === failed_write)
+                             throw new Error(`Controlled fixture write failure: ${name}`);
                          removed.delete(name);
                          writes.set(name, String(text));
                          if(name === "lp5.html")
@@ -4987,6 +5015,79 @@ state awaitArticleDelete
                      this.nextArticleID = 1 + name.slice(0,dotPos);
                  }
                  return name;
+             };
+
+             model.move_article = async function(source_url, target_url, position) {
+                 const source = this.articleFromURL(source_url);
+                 const target = this.articleFromURL(target_url);
+                 if(!source || !target || ![-1, 0, 1].includes(position))
+                     throw new Error('Invalid article move');
+                 if(!source.parentURL || source === this.rootTOC)
+                     throw new Error('Cannot move the LP5 root article');
+                 if(position !== 0 && !target.parentURL)
+                     throw new Error('Cannot insert a sibling of the root article');
+                 for(let ancestor = target; ancestor; ancestor = ancestor.parentURL) {
+                     if(ancestor === source)
+                         throw new Error('Cannot move an article into itself or its descendants');
+                 }
+                 const old_parent = source.parentURL;
+                 const new_parent = position === 0 ? target : target.parentURL;
+                 const old_copy = old_parent.template.cloneNode(true);
+                 const new_copy = old_parent === new_parent ? old_copy : new_parent.template.cloneNode(true);
+                 const children = node => Array.from(node.children).find(child => child.tagName === 'children');
+                 const links = node => Array.from(node?.children ?? []).filter(child => child.tagName === 'li');
+                 const old_list = children(old_copy);
+                 const source_links = links(old_list).filter(link => link.getAttribute('id') === source_url);
+                 if(source_links.length !== 1)
+                     throw new Error('Source article must have exactly one parent link');
+                 let new_list = children(new_copy);
+                 if(!new_list) {
+                     new_list = new_copy.ownerDocument.createElement('children');
+                     new_copy.append(new_list);
+                 }
+                 const before = links(new_list).map(link => link.getAttribute('id')).join('\n');
+                 const link = source_links[0];
+                 link.remove();
+                 const moved_link = new_copy.ownerDocument.importNode(link, true);
+                 if(position === 0)
+                     new_list.prepend(moved_link);
+                 else {
+                     const targets = links(new_list).filter(item => item.getAttribute('id') === target_url);
+                     if(targets.length !== 1)
+                         throw new Error('Destination article must have exactly one parent link');
+                     if(position < 0) targets[0].before(moved_link);
+                     else targets[0].after(moved_link);
+                 }
+                 const after = links(new_list).map(item => item.getAttribute('id')).join('\n');
+                 if(old_parent === new_parent && before === after) return false;
+                 const serializer = new XMLSerializer();
+                 const changes = [{url:new_parent.URL, serial:serializer.serializeToString(new_copy)}];
+                 if(old_parent !== new_parent)
+                     changes.push({url:old_parent.URL, serial:serializer.serializeToString(old_copy)});
+                 for(const change of changes)
+                     change.original = await this.project.read(change.url);
+                 const attempted = [];
+                 try {
+                     // Link at the destination before unlinking the old parent.
+                     for(const change of changes) {
+                         attempted.push(change);
+                         await this.project.write(change.url, change.serial);
+                     }
+                 } catch(error) {
+                     const failures = [];
+                     // A rejected write may already have changed its file.
+                     for(const change of attempted.reverse()) {
+                         try { await this.project.write(change.url, change.original); }
+                         catch(restore_error) { failures.push(`${change.url}: ${restore_error.message}`); }
+                     }
+                     if(failures.length) {
+                         const failure = new Error(`${error.message}; restoration failed: ${failures.join('; ')}. Close and reopen the project before continuing.`);
+                         failure.rollback_failed = true;
+                         throw failure;
+                     }
+                     throw error;
+                 }
+                 return true;
              };
 
              model.deleteArticle = async function(article_url){
