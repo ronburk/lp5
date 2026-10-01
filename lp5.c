@@ -1304,16 +1304,28 @@ static int command_show_bundle(xsltStylesheetPtr stylesheet, int argc,
         char *argv[])
 {
     struct xslt_parameter parameter;
+    const char *filename = "weave.xml";
+    const char *code_name = NULL;
 
-    if (argc != 3) {
+    if (argc == 2 && strcmp(argv[1], "--") != 0) {
+        code_name = argv[1];
+    } else if (argc == 3) {
+        code_name = argv[2];
+        if (strcmp(argv[1], "--") != 0) {
+            filename = argv[1];
+        }
+    } else if (argc != 1) {
         fprintf(stderr,
-            "Usage: lp5 show-bundle <weave.xml> <code-name>\n");
+            "Usage: lp5 show-bundle [code-name]\n"
+            "       lp5 show-bundle -- code-name\n"
+            "       lp5 show-bundle <index.xml> <code-name> (legacy)\n");
         return 1;
     }
 
     parameter.name = "code_name";
-    parameter.value = argv[2];
-    return transform_file(stylesheet, argv[1], &parameter, 1,
+    parameter.value = code_name;
+    return transform_file(stylesheet, filename,
+        code_name == NULL ? NULL : &parameter, code_name == NULL ? 0 : 1,
         NULL, NULL, NULL);
 }
 
@@ -1795,11 +1807,12 @@ static void print_usage(const char *program)
         "       %s search-keywords [--all] -- KEYWORD [KEYWORD ...]\n"
         "       %s list-keywords\n"
         "       %s show-article [article-file.lp5]\n"
+        "       %s show-bundle [code-name] (omit name to list bundles; use \"\" for unnamed code)\n"
         "       %s [-s source-dir] [-o output-file] <stylesheet.xsl|stylesheet.xslt> [xml-file] [other args...]\n"
         "       Source directory defaults to lp5.lp5; LP5Source sets the environment default.\n"
         "       -s, -o, and -m options may appear anywhere before --; they are removed before command dispatch.\n"
         "       -m map-file applies only to tangle.\n",
-        program, program, program, program, program, program);
+        program, program, program, program, program, program, program);
 }
 
 int main(int argc, char *argv[])
