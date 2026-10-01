@@ -1,29 +1,47 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-     show-bundle.xsl - extract all code sections with one code name from a weave.
+     show-bundle.xsl - list bundle names or extract one bundle from a weave.
 
-     Run this stylesheet on weave.xml, passing the required code_name string
-     parameter and choosing the result filename with xsltproc's output option.
+     Omit code_name to list names. Supply a string (including an empty string
+     for unnamed code) to extract that bundle.
 
-     The output contains only matching code sections, in article/weave order.
+     Extraction contains only matching code sections, in article/weave order.
      Each bundle member is the original code section, with an article
      attribute added to identify its source. Explanations are excluded. An
      empty bundle means no matching code sections were found.
 -->
 <xsl:stylesheet version="1.0"
-    xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+    xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
+    xmlns:exsl="http://exslt.org/common"
+    exclude-result-prefixes="exsl">
 
     <!-- Avoid pretty-printing whitespace into copied code content. -->
     <xsl:output method="xml" encoding="UTF-8" indent="no"/>
 
-    <!-- A sentinel distinguishes an omitted required parameter from empty name. -->
-    <xsl:param name="code_name" select="'__CODE_NAME_PARAMETER_REQUIRED__'"/>
+    <!-- An empty node-set distinguishes omission from every supplied string. -->
+    <xsl:param name="code_name" select="/.."/>
 
     <xsl:template match="/">
-        <xsl:if test="$code_name = '__CODE_NAME_PARAMETER_REQUIRED__'">
-            <xsl:message terminate="yes">show-bundle.xsl requires --stringparam code_name NAME (use an empty value for the unnamed bundle).</xsl:message>
+        <xsl:if test="count(lp5-weave) != 1 or count(lp5-weave/bundles) != 1">
+            <xsl:message terminate="yes">show-bundle: expected lp5-weave with exactly one direct bundles child.</xsl:message>
         </xsl:if>
 
+        <xsl:choose>
+            <xsl:when test="exsl:object-type($code_name) = 'node-set'">
+                <bundles>
+                    <xsl:for-each select="lp5-weave/bundles/bundle[not(@name = preceding-sibling::bundle/@name)]">
+                        <bundle name="{@name}"/>
+                    </xsl:for-each>
+                </bundles>
+                <xsl:text>&#10;</xsl:text>
+            </xsl:when>
+            <xsl:otherwise>
+                <xsl:call-template name="show-bundle"/>
+            </xsl:otherwise>
+        </xsl:choose>
+    </xsl:template>
+
+    <xsl:template name="show-bundle">
         <xsl:variable name="canonical-name" select="normalize-space($code_name)"/>
         <xsl:variable name="bundle"
             select="/lp5-weave/bundles/bundle[@name = $canonical-name]"/>
