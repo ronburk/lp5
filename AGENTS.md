@@ -53,6 +53,14 @@ sections, recursively expanding named code references. It validates articles
 as it reads them. `weave.xsl` generates the separate `weave.xml` source index;
 it does not build the HTML program.
 
+The generated `/lp5-weave/keyword-index` contains one `<keyword value="...">`
+per nonempty canonical keyword, sorted by XSLT text order. Each entry contains
+`<article file="..."/>` references, once per matching article in weave order,
+including orphans. Canonicalization applies XPath `normalize-space()` followed
+by ASCII A-Z to a-z folding; other characters are preserved exactly. Keyword
+entries are whole terms, so commas and other punctuation are ordinary data.
+The original `<keywords><li>` entries remain in the article records.
+
 ## Check one article
 
 Use the `check` command to validate one article without tangling the whole
