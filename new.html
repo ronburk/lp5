@@ -125,14 +125,27 @@ state referenceContextMenu
 
 state articleContextMenu
     on  command
-        console.assert(event.detail[0] === 'createArticle');
         console.assert(pendingArticleContext);
+        const article_url = pendingArticleContext.articleURL;
+        pendingArticleContext = null;
+        if(event.detail[0] === 'deleteArticle') {
+            if(!window.confirm(`Delete article '${article_url}'? Its children will take its place in the hierarchy.`)) {
+    ->          home
+            }
+            asyncSchedule(async () => {
+                await model.deleteArticle(article_url);
+                await model.openProject(model.projectName);
+                model.updateDerivedState();
+                views.render();
+            });
+    ->      awaitArticleDelete
+        }
+        console.assert(event.detail[0] === 'createArticle');
         openArticleEditor(null, {
             isNew:true,
-            sourceURL:pendingArticleContext.articleURL,
+            sourceURL:article_url,
             insertPosition:Number(event.detail[1])
         });
-        pendingArticleContext = null;
     -> editingArticle
     on  lp5ContextMenuDismiss
         pendingArticleContext = null;
@@ -170,6 +183,12 @@ state editingView
     -> home
 
 state awaitArticleSave
+    on  lp5AsyncComplete
+    -> home
+
+state awaitArticleDelete
+    on  lp5ContextMenuDismiss
+    -> awaitArticleDelete
     on  lp5AsyncComplete
     -> home
         </script>
@@ -1346,6 +1365,7 @@ state awaitArticleSave
                 <li data-position="-1" data-cmd="createArticle -1" role="menuitem" tabindex="-1">Insert New Article Before</li>
                 <li data-position="1" data-cmd="createArticle 1" role="menuitem" tabindex="-1">Append New Article After</li>
                 <li data-position="0" data-cmd="createArticle 0" role="menuitem" tabindex="-1">Create First Child Article</li>
+                <li data-cmd="deleteArticle" role="menuitem" tabindex="-1">Delete Article</li>
             </ul>
             <script>
              class LP5ArticleContextMenu extends LP5Element {
@@ -1375,9 +1395,9 @@ state awaitArticleSave
                      const article = window.LP5.model.articleFromURL(
                          this.context?.articleURL);
                      const isRoot = Boolean(article && article.parentURL == null);
-                     // The root has no siblings, so only first-child insertion applies.
+                     // The root has no siblings and must remain the project entry point.
                      for(const item of this.#template.namedNodes.ul.querySelectorAll(
-                         '[data-position="-1"], [data-position="1"]'))
+                         '[data-position="-1"], [data-position="1"], [data-cmd="deleteArticle"]'))
                          item.hidden = isRoot;
                  }
                  selectEvent(menuItem){ // called by LP5ContextMenu on click
@@ -2970,6 +2990,17 @@ state awaitArticleSave
                          await writable.close();
                          return true;
                      }
+                     async remove(name){
+                         try {
+                             await this.#directoryHandle.getFileHandle(name);
+                             await this.#directoryHandle.removeEntry(name);
+                         } catch(error) {
+                             // A missing file can still have a hierarchy link to remove.
+                             if(error.name !== 'NotFoundError')
+                                 throw error;
+                         }
+                         return true;
+                     }
                      async create_unique_article(pattern, startingNumber){
                          const MAX_TRIES = 99;
                          let number = startingNumber;
@@ -3095,15 +3126,20 @@ state awaitArticleSave
                      "1.lp5"
                  ]);
                  const writes = new Map();
+                 const removed = new Set();
                  const failedRead = new URL(location.href).searchParams.get("fail");
+                 const failedRemove = new URL(location.href).searchParams.get("fail-remove");
                  const state = {
                      lastGeneratedOutput: null,
                      lastParent: "lp5-test-parent",
-                     writes
+                     writes,
+                     removed
                  };
 
                  class TestProjectStore {
                      async read(name){
+                         if(removed.has(name))
+                             throw new Error(`Test fixture file not found: ${name}`);
                          if(writes.has(name))
                              return writes.get(name);
                          if(name === failedRead)
@@ -3117,9 +3153,18 @@ state awaitArticleSave
                          return await response.text();
                      }
                      async write(name, text){
+                         removed.delete(name);
                          writes.set(name, String(text));
                          if(name === "lp5.html")
                              state.lastGeneratedOutput = String(text);
+                         return true;
+                     }
+                     async remove(name){
+                         if(name === failedRemove)
+                             throw new Error(`Controlled fixture removal failure: ${name}`);
+                         writes.delete(name);
+                         fixtureNames.delete(name);
+                         removed.add(name);
                          return true;
                      }
                      async create_unique_article(pattern, startingNumber){
@@ -3130,6 +3175,7 @@ state awaitArticleSave
                                  continue;
                              writes.set(name, "");
                              fixtureNames.add(name);
+                             removed.delete(name);
                              return name;
                          }
                          return null;
@@ -4818,6 +4864,46 @@ state awaitArticleSave
                      this.nextArticleID = 1 + name.slice(0,dotPos);
                  }
                  return name;
+             };
+
+             model.deleteArticle = async function(article_url){
+                 const article = this.articleFromURL(article_url);
+                 if(!article)
+                     throw new Error(`Cannot delete article: article not found: ${article_url}`);
+                 const parent = article.parentURL;
+                 if(!parent || article.URL === this.rootTOC.URL)
+                     throw new Error('Cannot delete the LP5 root article');
+
+                 // Work on a copy so a failed write leaves the loaded model intact.
+                 const original_parent = parent.toString();
+                 const revised_parent = parent.template.cloneNode(true);
+                 const child_list = Array.from(revised_parent.children).find(
+                     child => child.tagName === 'children');
+                 const link = Array.from(child_list?.children ?? []).find(
+                     child => child.tagName === 'li' && child.getAttribute('id') === article.URL);
+                 if(!link)
+                     throw new Error(`Cannot delete '${article_url}': parent link is unavailable`);
+
+                 // Delete one article, preserving its descendants in their original order.
+                 for(const child of article.sections.children?.children ?? [])
+                     link.before(revised_parent.ownerDocument.importNode(child, true));
+                 link.remove();
+                 const serial = new XMLSerializer().serializeToString(revised_parent);
+
+                 // Unlink first: a failed parent write must never leave a missing article.
+                 await this.project.write(parent.URL, serial);
+                 try {
+                     await this.project.remove(article.URL);
+                 } catch(error) {
+                     try {
+                         await this.project.write(parent.URL, original_parent);
+                     } catch(restore_error) {
+                         throw new Error(`Deleting '${article_url}' failed: ${error.message}; `
+                             + `restoring '${parent.URL}' also failed: ${restore_error.message}`);
+                     }
+                     throw error;
+                 }
+                 return true;
              };
 
              model.saveNewArticleAtPosition = async function(

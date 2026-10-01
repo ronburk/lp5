@@ -23,8 +23,10 @@
                 <button type="button" data-action="add-after-0">Add after article 0</button>
                 <button type="button" data-action="add-root-child">Add root child</button>
                 <button type="button" data-action="export">Export output</button>
+                <button type="button" data-action="inspect-storage">Inspect storage</button>
             </div>
-            <output aria-live="polite" data-status>Ready</output>`;
+            <output aria-live="polite" data-status>Ready</output>
+            <pre data-storage hidden style="max-height:10rem;overflow:auto;white-space:pre-wrap"></pre>`;
         document.body.append(panel);
 
         const status = panel.querySelector("[data-status]");
@@ -90,6 +92,17 @@
                     await model.project.write("lp5.html", model.outputText || "");
                     return "Export captured in memory";
                 });
+            else if(action === "inspect-storage"){
+                const storage = panel.querySelector('[data-storage]');
+                const {writes, removed} = window.LP5.testProjectIO;
+                storage.textContent = [
+                    `Removed files: ${[...removed].join(', ') || '(none)'}`,
+                    `Written files: ${[...writes.keys()].join(', ') || '(none)'}`,
+                    ...[...writes].map(([name, text]) => `${name}:\n${text}`)
+                ].join('\n\n');
+                storage.hidden = false;
+                status.textContent = 'Storage shown';
+            }
         });
     }
 

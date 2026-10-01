@@ -53,6 +53,30 @@ The adapter exposes its in-memory writes only in explicit test mode as
 and saved contents. It contains no native picker, IndexedDB, or filesystem
 handle calls.
 
+## Article deletion checks
+
+Run `node test/delete_article.js` for the project-store removal contract, then
+check the visible UI with `/new.html?test=1`:
+
+1. Right-click the root article. It should offer first-child insertion but no
+   **Delete Article** action.
+2. Right-click a child and choose **Delete Article**. Cancel the confirmation;
+   the source and navigation should remain unchanged.
+3. Delete the leaf `1.lp5` and accept the confirmation. Reload the project;
+   it should remain absent from source and navigation. Click **Inspect storage**
+   and confirm `Removed files: 1.lp5` and a root child list containing only `0.lp5`.
+4. In a fresh tab, add a first child under `0.lp5` using its context menu and
+   save it with a recognizable heading. Delete `0.lp5`. Its child should take
+   its place before `1.lp5`, survive reload, and remain editable. The root's
+   heading and explanation should be preserved. The code reference to Greeting
+   should become unresolved; deleting an article does not rewrite code references.
+5. In a fresh tab use `/new.html?test=1&fail-remove=0.lp5`. Attempt to delete
+   `0.lp5` and accept the confirmation. The normal error dialog should report
+   `Controlled fixture removal failure: 0.lp5`. The stored root's children
+   should still be `0.lp5`, `1.lp5`, and the removed-file set should be empty.
+   Press Escape to close the error dialog, then click **Inspect storage** to
+   see the stored parent XML and removal log.
+
 ## Validation boundaries
 
 These checks exercise application behavior through the test adapter. They do
