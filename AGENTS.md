@@ -61,6 +61,10 @@ by ASCII A-Z to a-z folding; other characters are preserved exactly. Keyword
 entries are whole terms, so commas and other punctuation are ordinary data.
 The original `<keywords><li>` entries remain in the article records.
 
+`./lp5 search-keywords [--all] -- KEYWORD [KEYWORD ...]` searches this snapshot
+after the shared weave freshness check. See [SEARCH_KEYWORDS.md](SEARCH_KEYWORDS.md)
+for the CLI grammar, normalization rules, and returned XML contract.
+
 ## Check one article
 
 Use the `check` command to validate one article without tangling the whole
