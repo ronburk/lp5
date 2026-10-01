@@ -65,6 +65,9 @@ The original `<keywords><li>` entries remain in the article records.
 after the shared weave freshness check. See [SEARCH_KEYWORDS.md](SEARCH_KEYWORDS.md)
 for the CLI grammar, normalization rules, and returned XML contract.
 
+`./lp5 list-keywords` lists the canonical vocabulary and distinct article counts
+from the same snapshot. See [LIST_KEYWORDS.md](LIST_KEYWORDS.md) for its contract.
+
 ## Check one article
 
 Use the `check` command to validate one article without tangling the whole

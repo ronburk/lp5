@@ -1,5 +1,8 @@
 # Search articles by keyword
 
+To inspect the indexed vocabulary first, use `./lp5 list-keywords`.
+See [LIST_KEYWORDS.md](LIST_KEYWORDS.md) for its XML output contract.
+
 ```sh
 ./lp5 [-s source-dir] [-o output-file] search-keywords [--all] -- KEYWORD [KEYWORD ...]
 ```
