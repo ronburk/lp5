@@ -9,6 +9,9 @@
      Each article is emitted in preorder, with the root article first. Article
      IDs are filenames, and code sections are grouped by bundle name so
      callers can find each bundle.
+     A keyword-index maps canonical keywords to distinct article filenames.
+     Canonicalization applies normalize-space() and ASCII A-Z to a-z folding;
+     other characters, including Unicode case, are preserved.
      Code text and lp5-* reference
      elements retain their original order and content.
 
@@ -42,6 +45,10 @@
 
     <!-- lp5.c passes the directory containing the input root article. -->
     <xsl:param name="source-directory" select="'lp5.lp5'"/>
+
+    <!-- The rooted match excludes similarly named markup in explanations. -->
+    <xsl:key name="weave-keywords-by-value" match="/articles/article/keywords/li"
+        use="translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz')"/>
 
     <xsl:template match="/">
         <xsl:variable name="source-root" select="/"/>
@@ -137,7 +144,7 @@
             </xsl:call-template>
         </xsl:variable>
 
-        <!-- This one preorder supplies both the article list and bundle index. -->
+        <!-- This one preorder supplies the article list and both indexes. -->
         <xsl:variable name="article-records">
             <articles>
                 <xsl:for-each select="exsl:node-set($root-result)/result/article">
@@ -180,6 +187,29 @@
                 </xsl:for-each>
                 <xsl:text>&#10;  </xsl:text>
             </bundles>
+
+            <xsl:text>&#10;  </xsl:text>
+            <keyword-index>
+                <xsl:for-each select="exsl:node-set($article-records)/articles/article/keywords/li[normalize-space(.) != '']">
+                    <xsl:sort select="translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz')"
+                              data-type="text" order="ascending"/>
+                    <xsl:variable name="value"
+                        select="translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz')"/>
+                    <!-- key() uses the temporary article-records document. -->
+                    <xsl:if test="generate-id() = generate-id(key('weave-keywords-by-value', $value)[1])">
+                        <xsl:text>&#10;    </xsl:text>
+                        <keyword value="{$value}">
+                            <!-- The parent path deduplicates articles and retains weave order. -->
+                            <xsl:for-each select="key('weave-keywords-by-value', $value)/../..">
+                                <xsl:text>&#10;      </xsl:text>
+                                <article file="{@file}"/>
+                            </xsl:for-each>
+                            <xsl:text>&#10;    </xsl:text>
+                        </keyword>
+                    </xsl:if>
+                </xsl:for-each>
+                <xsl:text>&#10;  </xsl:text>
+            </keyword-index>
             <xsl:text>&#10;</xsl:text>
         </lp5-weave>
         <xsl:text>&#10;</xsl:text>
