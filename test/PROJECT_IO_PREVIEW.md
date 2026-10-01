@@ -77,6 +77,30 @@ check the visible UI with `/new.html?test=1`:
    Press Escape to close the error dialog, then click **Inspect storage** to
    see the stored parent XML and removal log.
 
+## Move Article hierarchy checks
+
+1. Select a navigation row, then right-click a source article and choose
+   **Move Article**. Confirm the modal shows the root and all descendants in
+   their source order, initially expanded, with the invoking article selected.
+2. Select another row, collapse and expand a branch using its triangle, and
+   close with **Close**. Repeat from a navigation row and close with Escape.
+   The navigation selection must remain independent of the dialog selection.
+3. Add a first child under `0.lp5` with documentation but no title or code name.
+   Open **Move Article** for that child; its documentation excerpt and filename
+   should label its row at the correct depth.
+4. Clear the heading of `0.lp5`; its hierarchy label should use `Greeting`.
+   Clear both heading and documentation of `1.lp5`; its label should use the
+   literal code excerpt `Expanded section:`. Filenames remain visible for all
+   rows, and a completely empty article uses `(empty article)`.
+5. Open **Move Article** from the root. The root should appear selected, and
+   the root context menu should still hide sibling insertion and deletion.
+6. Inspect storage before and after browsing the dialog. Saved contents and
+   removed filenames must be identical. Dialog rows have no `draggable="true"`
+   attribute, and right-clicking them must not open article mutation menus.
+
+This first cut displays the article hierarchy only. It does not choose a move
+destination or modify article links, files, or code references.
+
 ## Validation boundaries
 
 These checks exercise application behavior through the test adapter. They do
