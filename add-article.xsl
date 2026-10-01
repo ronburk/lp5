@@ -62,6 +62,11 @@
 
         <template>
             <xsl:text>&#10;    </xsl:text>
+            <!--
+                 weave.xsl emits a children record even when the source
+                 article has no child links. Iterating its child entries
+                 therefore handles both an empty list and a populated one.
+             -->
             <children>
                 <xsl:if test="not(string-length($before_child_id))">
                     <xsl:text>&#10;        </xsl:text>
@@ -78,7 +83,14 @@
                 <xsl:text>&#10;    </xsl:text>
             </children>
 
-            <xsl:for-each select="$parent/heading | $parent/section">
+            <!--
+                 The children record above is derived index data, so rebuild
+                 it as source <li> links. Copy every other article element
+                 from the weave record. Keeping this selection open-ended
+                 prevents new article fields (such as <keywords>) from being
+                 silently lost when this operation rewrites the parent.
+             -->
+            <xsl:for-each select="$parent/*[not(self::children)]">
                 <xsl:text>&#10;    </xsl:text>
                 <xsl:apply-templates select="." mode="copy-parent"/>
             </xsl:for-each>
