@@ -120,6 +120,27 @@ delta();
                 source = source_lines[line_number - 1]
                 assert Path(source).name == expected[text], (line_number, text, source)
 
+        missing_root = directory / "missing-root.lp5"
+        missing_output = directory / "missing-output.html"
+        missing_root.write_text(
+            """<template>
+  <section data-lp5-kind="code"><name></name><code><![CDATA[start();]]><lp5- ref="not-present"/></code></section>
+  <children><li id="missing-child.lp5"/></children>
+</template>
+""",
+            encoding="utf-8",
+        )
+        missing_article = subprocess.run(
+            [executable, "-o", str(missing_output), "tangle", str(missing_root)],
+            cwd=PROJECT_DIR,
+            text=True,
+            capture_output=True,
+        )
+        assert missing_article.returncode == 0, missing_article.stderr
+        assert "MISSING-CHILD.LP5" in missing_output.read_text(encoding="utf-8")
+        assert "I/O warning" not in missing_article.stderr
+        assert "failed to load external entity" not in missing_article.stderr
+
         weave_file = directory / "weave.xml"
         weave_file.write_text('<lp5-weave version="1"/>', encoding="utf-8")
         invalid_input = subprocess.run(
