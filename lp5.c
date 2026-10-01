@@ -1440,13 +1440,25 @@ out_of_memory:
     return 1;
 }
 
+static int command_list_keywords(xsltStylesheetPtr stylesheet, int argc,
+        char *argv[])
+{
+    (void) argv;
+    if (argc != 1) {
+        fprintf(stderr, "Usage: lp5 list-keywords\n");
+        return 1;
+    }
+    return transform_file(stylesheet, "weave.xml", NULL, 0, NULL, NULL, NULL);
+}
+
 static const struct command_entry commands[] = {
     {"tangle", command_tangle},
     {"check", command_check},
     {"weave", command_weave},
     {"add-article", command_add_article},
     {"show-bundle", command_show_bundle},
-    {"search-keywords", command_search_keywords}
+    {"search-keywords", command_search_keywords},
+    {"list-keywords", command_list_keywords}
 };
 
 static int ends_with(const char *text, const char *suffix)
@@ -1750,14 +1762,15 @@ static void print_usage(const char *program)
 {
     fprintf(stderr,
         "Usage: %s [-s source-dir] [-o output-file] [-m map-file] <command> [args...]\n"
-        "       Commands: tangle, check, weave, add-article, show-bundle, search-keywords\n"
+        "       Commands: tangle, check, weave, add-article, show-bundle, search-keywords, list-keywords\n"
         "       %s tangle [xml-file]\n"
         "       %s search-keywords [--all] -- KEYWORD [KEYWORD ...]\n"
+        "       %s list-keywords\n"
         "       %s [-s source-dir] [-o output-file] <stylesheet.xsl|stylesheet.xslt> [xml-file] [other args...]\n"
         "       Source directory defaults to lp5.lp5; LP5Source sets the environment default.\n"
         "       -s, -o, and -m options may appear anywhere before --; they are removed before command dispatch.\n"
         "       -m map-file applies only to tangle.\n",
-        program, program, program, program);
+        program, program, program, program, program);
 }
 
 int main(int argc, char *argv[])
