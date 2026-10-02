@@ -3,7 +3,7 @@
 ```sh
 ./lp5 show-bundle                  # list every bundle name
 ./lp5 show-bundle "Bundle name"    # read one bundle from weave.xml
-./lp5 show-bundle weave.xml        # list names from this explicit index
+./lp5 show-bundle weave.xml        # read the bundle named "weave.xml"
 ./lp5 show-bundle ""               # read the unnamed bundle
 ./lp5 show-bundle -- "weave.xml"   # read a bundle named weave.xml
 ./lp5 show-bundle -- "-o"          # read a name equal to a global option
@@ -33,20 +33,19 @@ The supplied name undergoes XPath `normalize-space()`. Sections follow bundle
 order and retain code text, whitespace, inline name markup, and code references;
 references are not expanded. A nonexistent name succeeds with an empty bundle.
 
-The old two-argument form remains supported:
+The old two-argument form remains supported for selecting an explicit index:
 
 ```sh
 ./lp5 show-bundle other-index.xml "Bundle name"
 ```
 
-A single argument ending in `.xml` selects an explicit index and lists its names;
-this makes the original `show-bundle weave.xml` invocation useful without a
-bundle-name argument. Other single arguments name a bundle in the default index.
-Use `--` when a bundle name ends in `.xml` or collides with a global option; the
-token following it is always treated as the bundle name. The old two-argument
-form also selects the explicit index and extracts the named bundle. Listing and extraction also work when applying the
-stylesheet directly: omitted `code_name` lists names, and a string parameter
-(including empty) extracts one bundle. No string is reserved as an omission marker.
+With one argument, that argument is always the bundle name, even when it ends
+in `.xml` or matches a filename such as `weave.xml`. Use `--` when a bundle name
+collides with a global option; the token following it is always treated as the
+bundle name. The legacy two-argument form selects an explicit index and extracts
+the named bundle. Listing and extraction also work when applying the stylesheet
+directly: omitted `code_name` lists names, and a string parameter (including
+empty) extracts one bundle. No string is reserved as an omission marker.
 
 The index must have a no-namespace `lp5-weave` root and exactly one direct
 `bundles` child. Empty `bundles` is valid. Invalid arguments/index/transforms or
