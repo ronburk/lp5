@@ -1300,6 +1300,8 @@ static int command_add_article(xsltStylesheetPtr stylesheet, int argc,
         NULL, NULL, NULL);
 }
 
+static int ends_with(const char *text, const char *suffix);
+
 static int command_show_bundle(xsltStylesheetPtr stylesheet, int argc,
         char *argv[])
 {
@@ -1308,7 +1310,11 @@ static int command_show_bundle(xsltStylesheetPtr stylesheet, int argc,
     const char *code_name = NULL;
 
     if (argc == 2 && strcmp(argv[1], "--") != 0) {
-        code_name = argv[1];
+        if (ends_with(argv[1], ".xml")) {
+            filename = argv[1];
+        } else {
+            code_name = argv[1];
+        }
     } else if (argc == 3) {
         code_name = argv[2];
         if (strcmp(argv[1], "--") != 0) {
