@@ -1310,11 +1310,7 @@ static int command_show_bundle(xsltStylesheetPtr stylesheet, int argc,
     const char *code_name = NULL;
 
     if (argc == 2 && strcmp(argv[1], "--") != 0) {
-        if (ends_with(argv[1], ".xml")) {
-            filename = argv[1];
-        } else {
-            code_name = argv[1];
-        }
+        code_name = argv[1];
     } else if (argc == 3) {
         code_name = argv[2];
         if (strcmp(argv[1], "--") != 0) {
