@@ -3,7 +3,9 @@
 ```sh
 ./lp5 show-bundle                  # list every bundle name
 ./lp5 show-bundle "Bundle name"    # read one bundle from weave.xml
+./lp5 show-bundle weave.xml        # list names from this explicit index
 ./lp5 show-bundle ""               # read the unnamed bundle
+./lp5 show-bundle -- "weave.xml"   # read a bundle named weave.xml
 ./lp5 show-bundle -- "-o"          # read a name equal to a global option
 ```
 
@@ -37,11 +39,12 @@ The old two-argument form remains supported:
 ./lp5 show-bundle other-index.xml "Bundle name"
 ```
 
-A single argument always names a bundle: `show-bundle weave.xml` searches for a
-bundle literally named `weave.xml`. It does not select an index or list names.
-Use the no-argument command for listing. There is no filename guessing.
-The optional `--` before a name makes all following tokens literal data; exactly
-one name must follow it. Listing and extraction also work when applying the
+A single argument ending in `.xml` selects an explicit index and lists its names;
+this makes the original `show-bundle weave.xml` invocation useful without a
+bundle-name argument. Other single arguments name a bundle in the default index.
+Use `--` when a bundle name ends in `.xml` or collides with a global option; the
+token following it is always treated as the bundle name. The old two-argument
+form also selects the explicit index and extracts the named bundle. Listing and extraction also work when applying the
 stylesheet directly: omitted `code_name` lists names, and a string parameter
 (including empty) extracts one bundle. No string is reserved as an omission marker.
 

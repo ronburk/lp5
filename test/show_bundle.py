@@ -71,6 +71,8 @@ def main():
         cache = working / "weave.xml"
         assert not cache.exists()
         check_list(run("show-bundle"), names)
+        # The old index-only spelling now lists that explicit index's names.
+        check_list(run("show-bundle", "weave.xml"), names)
         timestamp = cache.stat().st_mtime_ns
         check_list(run("show-bundle"), names)
         assert cache.stat().st_mtime_ns == timestamp
@@ -81,7 +83,7 @@ def main():
             root = ET.fromstring(result.stdout)
             assert root.tag == "bundle" and root.attrib == {"name": name}
             assert len(root) > 0
-            if name not in ("-o", "--"):
+            if name not in ("-o", "--", "weave.xml"):
                 old = run("show-bundle", "weave.xml", name)
                 assert old.returncode == 0 and old.stdout == result.stdout, old.stderr
                 new = run("show-bundle", name)
@@ -99,6 +101,10 @@ def main():
         assert [s.attrib["article"] for s in ET.fromstring(bundle.stdout)] == ["4.lp5", "1.lp5"]
         missing = run("show-bundle", "not a bundle")
         assert missing.returncode == 0 and len(ET.fromstring(missing.stdout)) == 0
+        # -- resolves the deliberate index/name ambiguity for .xml bundle names.
+        xml_named = run("show-bundle", "--", "weave.xml")
+        assert xml_named.returncode == 0
+        assert ET.fromstring(xml_named.stdout).attrib == {"name": "weave.xml"}
         assert {p.name: p.read_bytes() for p in source.iterdir()} == original
 
         output = working / "bundles.xml"
@@ -122,6 +128,7 @@ def main():
         alternate.write_bytes(b'<lp5-weave><articles/><bundles/></lp5-weave>')
         result = run("show-bundle", str(alternate), "Bundle & Names")
         assert result.returncode == 0 and len(ET.fromstring(result.stdout)) == 0
+        check_list(run("show-bundle", str(alternate)), [])
 
         output.write_bytes(b"keep existing output")
         for args in (("--",), ("one", "two", "three"), ("-m", "unused.map")):
