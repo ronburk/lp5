@@ -1371,8 +1371,9 @@ static int valid_xml_text(const char *text)
     return 1;
 }
 
-static int command_search_keywords(xsltStylesheetPtr stylesheet, int argc,
-        char *argv[])
+static int command_search_terms(xsltStylesheetPtr stylesheet, int argc,
+        char *argv[], const char *command_name, const char *term_name,
+        const char *usage_term_name)
 {
     int argument = 1;
     int all = 0;
@@ -1385,8 +1386,8 @@ static int command_search_keywords(xsltStylesheetPtr stylesheet, int argc,
 
     while (argument < argc && strcmp(argv[argument], "--") != 0) {
         if (strcmp(argv[argument], "--all") != 0 || all) {
-            fprintf(stderr, "lp5: search-keywords: unexpected argument '%s'\n",
-                argv[argument]);
+            fprintf(stderr, "lp5: %s: unexpected argument '%s'\n",
+                command_name, argv[argument]);
             return 1;
         }
         all = 1;
@@ -1394,19 +1395,20 @@ static int command_search_keywords(xsltStylesheetPtr stylesheet, int argc,
     }
     if (argument == argc || argument + 1 == argc) {
         fprintf(stderr,
-            "Usage: lp5 search-keywords [--all] -- KEYWORD [KEYWORD ...]\n");
+            "Usage: lp5 %s [--all] -- %s [%s ...]\n",
+            command_name, usage_term_name, usage_term_name);
         return 1;
     }
     ++argument;
     for (i = argument; i < argc; ++i) {
         if (!valid_xml_text(argv[i])) {
-            fprintf(stderr, "lp5: keyword %d is not valid UTF-8/XML 1.0 text\n",
-                i - argument + 1);
+            fprintf(stderr, "lp5: %s %d is not valid UTF-8/XML 1.0 text\n",
+                term_name, i - argument + 1);
             return 1;
         }
         if (argv[i][strspn(argv[i], " \t\r\n")] == '\0') {
-            fprintf(stderr, "lp5: keyword %d is empty after normalization\n",
-                i - argument + 1);
+            fprintf(stderr, "lp5: %s %d is empty after normalization\n",
+                term_name, i - argument + 1);
             return 1;
         }
     }
@@ -1429,13 +1431,13 @@ static int command_search_keywords(xsltStylesheetPtr stylesheet, int argc,
     }
     for (i = argument; i < argc; ++i) {
         /* xmlNewTextChild keeps entity-like strings literal, including '&'. */
-        if (xmlNewTextChild(query, NULL, BAD_CAST "keyword", BAD_CAST argv[i]) == NULL) {
+        if (xmlNewTextChild(query, NULL, BAD_CAST term_name, BAD_CAST argv[i]) == NULL) {
             goto out_of_memory;
         }
     }
     weave = xmlReadFile("weave.xml", NULL, XML_PARSE_NONET);
     if (weave == NULL) {
-        fprintf(stderr, "lp5: cannot read weave.xml for keyword search\n");
+        fprintf(stderr, "lp5: cannot read weave.xml for %s\n", command_name);
         xmlFreeDoc(input);
         return 1;
     }
@@ -1452,6 +1454,18 @@ out_of_memory:
     fprintf(stderr, "lp5: out of memory\n");
     xmlFreeDoc(input);
     return 1;
+}
+
+static int command_search(xsltStylesheetPtr stylesheet, int argc, char *argv[])
+{
+    return command_search_terms(stylesheet, argc, argv, "search", "term", "TEXT");
+}
+
+static int command_search_keywords(xsltStylesheetPtr stylesheet, int argc,
+        char *argv[])
+{
+    return command_search_terms(stylesheet, argc, argv,
+        "search-keywords", "keyword", "KEYWORD");
 }
 
 static int command_list_keywords(xsltStylesheetPtr stylesheet, int argc,
@@ -1498,6 +1512,7 @@ static const struct command_entry commands[] = {
     {"weave", command_weave},
     {"add-article", command_add_article},
     {"show-bundle", command_show_bundle},
+    {"search", command_search},
     {"search-keywords", command_search_keywords},
     {"list-keywords", command_list_keywords},
     {"show-article", command_show_article}
@@ -1804,8 +1819,9 @@ static void print_usage(const char *program)
 {
     fprintf(stderr,
         "Usage: %s [-s source-dir] [-o output-file] [-m map-file] <command> [args...]\n"
-        "       Commands: tangle, check, weave, add-article, show-bundle, search-keywords, list-keywords, show-article\n"
+        "       Commands: tangle, check, weave, add-article, show-bundle, search, search-keywords, list-keywords, show-article\n"
         "       %s tangle [xml-file]\n"
+        "       %s search [--all] -- TEXT [TEXT ...]\n"
         "       %s search-keywords [--all] -- KEYWORD [KEYWORD ...]\n"
         "       %s list-keywords\n"
         "       %s show-article [article-file.lp5]\n"
@@ -1814,7 +1830,7 @@ static void print_usage(const char *program)
         "       Source directory defaults to lp5.lp5; LP5Source sets the environment default.\n"
         "       -s, -o, and -m options may appear anywhere before --; they are removed before command dispatch.\n"
         "       -m map-file applies only to tangle.\n",
-        program, program, program, program, program, program, program);
+        program, program, program, program, program, program, program, program);
 }
 
 int main(int argc, char *argv[])
