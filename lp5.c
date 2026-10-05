@@ -18,6 +18,7 @@
 #include <libxslt/variables.h>
 #include <libxslt/xsltutils.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,6 +28,7 @@
 #ifdef _WIN32
 #include <direct.h>
 #include <process.h>
+#include <windows.h>
 #define LP5_GETCWD _getcwd
 #define LP5_GETPID _getpid
 #else
@@ -39,10 +41,12 @@
 #include <io.h>
 #include <sys/stat.h>
 #define LP5_ISDIR(mode) (((mode) & _S_IFDIR) != 0)
+#define LP5_ISREG(mode) (((mode) & _S_IFMT) == _S_IFREG)
 #else
 #include <dirent.h>
 #include <sys/stat.h>
 #define LP5_ISDIR(mode) S_ISDIR(mode)
+#define LP5_ISREG(mode) S_ISREG(mode)
 #endif
 
 typedef int (*command_function)(xsltStylesheetPtr stylesheet, int argc,
@@ -1718,6 +1722,13 @@ static int valid_xml_text(const char *text)
     return 1;
 }
 
+static int valid_article_filename(const char *filename)
+{
+    size_t length = strlen(filename);
+    return valid_xml_text(filename) && !has_path_separator(filename) &&
+        length > 4 && strcmp(filename + length - 4, ".lp5") == 0;
+}
+
 static int command_search_terms(xsltStylesheetPtr stylesheet, int argc,
         char *argv[], const char *command_name, const char *term_name,
         const char *usage_term_name)
@@ -1833,12 +1844,9 @@ static int command_show_article(xsltStylesheetPtr stylesheet, int argc,
     const char *filename = argc == 1 ? "lp5.lp5" : argv[1];
     struct xslt_parameter parameter;
     char *path;
-    size_t length;
     int status;
 
-    length = strlen(filename);
-    if (argc > 2 || !valid_xml_text(filename) || has_path_separator(filename) || length <= 4 ||
-            strcmp(filename + length - 4, ".lp5") != 0) {
+    if (argc > 2 || !valid_article_filename(filename)) {
         fprintf(stderr, "Usage: lp5 show-article [article-file.lp5]\n");
         return 1;
     }
@@ -1854,6 +1862,238 @@ static int command_show_article(xsltStylesheetPtr stylesheet, int argc,
     return status;
 }
 
+static char *read_replacement_article(const char *filename, int *length)
+{
+    FILE *input = fopen(filename, "rb");
+    char *contents = NULL;
+    long size;
+    int error;
+
+    if (input == NULL) {
+        goto failed;
+    }
+    if (fseek(input, 0, SEEK_END) != 0 || (size = ftell(input)) < 0) {
+        goto failed;
+    }
+    if (size > INT_MAX) {
+        errno = EFBIG;
+        goto failed;
+    }
+    if (fseek(input, 0, SEEK_SET) != 0) {
+        goto failed;
+    }
+    contents = (char *) malloc((size_t) size + 1);
+    if (contents == NULL) {
+        errno = ENOMEM;
+        goto failed;
+    }
+    if (fread(contents, 1, (size_t) size, input) != (size_t) size ||
+            ferror(input) || fgetc(input) != EOF || ferror(input)) {
+        errno = EIO;
+        goto failed;
+    }
+    if (fclose(input) == EOF) {
+        input = NULL;
+        goto failed;
+    }
+    contents[size] = '\0';
+    *length = (int) size;
+    return contents;
+
+failed:
+    error = errno;
+    if (input != NULL) {
+        fclose(input);
+    }
+    free(contents);
+    fprintf(stderr, "lp5: cannot read replacement article '%s': %s\n",
+        filename, strerror(error));
+    return NULL;
+}
+
+static int validate_replacement_article(xsltStylesheetPtr stylesheet,
+        const char *filename, const char *contents, int length)
+{
+    xmlDocPtr document = xmlReadMemory(contents, length, filename, NULL,
+        XML_PARSE_NONET);
+    xsltTransformContextPtr context;
+    xmlDocPtr result = NULL;
+    int status = 1;
+
+    if (document == NULL) {
+        fprintf(stderr, "lp5: cannot parse replacement article '%s'\n", filename);
+        return 1;
+    }
+    context = xsltNewTransformContext(stylesheet, document);
+    if (context != NULL &&
+            xsltQuoteOneUserParam(context, BAD_CAST "article-location",
+                BAD_CAST filename) == 0) {
+        result = xsltApplyStylesheetUser(stylesheet, document, NULL, NULL,
+            NULL, context);
+        status = result == NULL || context->state != XSLT_STATE_OK;
+    }
+    if (status) {
+        fprintf(stderr, "lp5: cannot validate replacement article '%s'\n",
+            filename);
+    }
+    xmlFreeDoc(result);
+    xsltFreeTransformContext(context);
+    xmlFreeDoc(document);
+    return status;
+}
+
+static FILE *create_replacement_file(char **temporary_name)
+{
+    const char *directory = LP5Source[0] == '\0' ? "." : LP5Source;
+    size_t length = strlen(directory) + 64;
+    char *name = (char *) malloc(length);
+    FILE *file;
+    int descriptor = -1;
+    unsigned int attempt;
+
+    if (name == NULL) {
+        errno = ENOMEM;
+        return NULL;
+    }
+    for (attempt = 0; attempt < 100; ++attempt) {
+#ifdef _WIN32
+        snprintf(name, length, "%s/.lp5-replace-%lu-%u.tmp", directory,
+            (unsigned long) _getpid(), attempt);
+        descriptor = _open(name, _O_WRONLY | _O_CREAT | _O_EXCL | _O_BINARY,
+            _S_IREAD | _S_IWRITE);
+#else
+        snprintf(name, length, "%s/.lp5-replace-%lu-%u.tmp", directory,
+            (unsigned long) getpid(), attempt);
+        descriptor = open(name, O_WRONLY | O_CREAT | O_EXCL, 0600);
+#endif
+        if (descriptor >= 0 || errno != EEXIST) {
+            break;
+        }
+    }
+    if (descriptor < 0) {
+        int error = errno;
+        free(name);
+        errno = error;
+        return NULL;
+    }
+#ifdef _WIN32
+    file = _fdopen(descriptor, "wb");
+#else
+    file = fdopen(descriptor, "wb");
+#endif
+    if (file == NULL) {
+        int error = errno;
+#ifdef _WIN32
+        _close(descriptor);
+#else
+        close(descriptor);
+#endif
+        remove(name);
+        free(name);
+        errno = error;
+        return NULL;
+    }
+    *temporary_name = name;
+    return file;
+}
+
+static int command_replace_article(xsltStylesheetPtr stylesheet, int argc,
+        char *argv[])
+{
+    char *target;
+    char *contents = NULL;
+    char *temporary_name = NULL;
+    struct stat target_info;
+    FILE *temporary;
+    int length;
+    int write_error;
+    int status = 1;
+
+    if (argc > 1 && strcmp(argv[1], "--") == 0) {
+        --argc;
+        ++argv;
+    }
+    if (argc != 3 || !valid_article_filename(argv[1])) {
+        fprintf(stderr,
+            "Usage: lp5 replace-article <article-id> <article-file>\n");
+        return 1;
+    }
+    target = check_source_path(argv[1]);
+    if (target == NULL) {
+        fprintf(stderr, "lp5: out of memory\n");
+        return 1;
+    }
+#ifdef _WIN32
+    if (stat(target, &target_info) != 0) {
+#else
+    if (lstat(target, &target_info) != 0) {
+#endif
+        fprintf(stderr, "lp5: cannot inspect target article '%s': %s\n",
+            target, strerror(errno));
+        goto done;
+    }
+    if (!LP5_ISREG(target_info.st_mode)) {
+        fprintf(stderr, "lp5: target article '%s' must be a regular file\n",
+            target);
+        goto done;
+    }
+    contents = read_replacement_article(argv[2], &length);
+    if (contents == NULL ||
+            validate_replacement_article(stylesheet, argv[2], contents,
+                length) != 0) {
+        goto done;
+    }
+    temporary = create_replacement_file(&temporary_name);
+    if (temporary == NULL) {
+        fprintf(stderr, "lp5: cannot create replacement beside '%s': %s\n",
+            target, strerror(errno));
+        goto done;
+    }
+    write_error = 0;
+    if (fwrite(contents, 1, (size_t) length, temporary) != (size_t) length) {
+        write_error = errno != 0 ? errno : EIO;
+    }
+#ifndef _WIN32
+    if (!write_error && fchmod(fileno(temporary), target_info.st_mode & 0777) != 0) {
+        write_error = errno;
+    }
+#endif
+    if (fclose(temporary) == EOF && write_error == 0) {
+        write_error = errno != 0 ? errno : EIO;
+    }
+    if (write_error) {
+        fprintf(stderr, "lp5: cannot finish replacement for '%s': %s\n",
+            target, strerror(write_error));
+        goto done;
+    }
+    /* Never truncate or remove the old article before the replacement is ready. */
+#ifdef _WIN32
+    if (!MoveFileExA(temporary_name, target, MOVEFILE_REPLACE_EXISTING)) {
+        fprintf(stderr, "lp5: cannot replace article '%s': Windows error %lu\n",
+            target, (unsigned long) GetLastError());
+#else
+    if (rename(temporary_name, target) != 0) {
+        fprintf(stderr, "lp5: cannot replace article '%s': %s\n",
+            target, strerror(errno));
+#endif
+        status = 1;
+        goto done;
+    }
+    status = 0;
+
+done:
+    if (temporary_name != NULL) {
+        if (status && remove(temporary_name) != 0) {
+            fprintf(stderr, "lp5: cannot remove temporary file '%s': %s\n",
+                temporary_name, strerror(errno));
+        }
+        free(temporary_name);
+    }
+    free(contents);
+    free(target);
+    return status;
+}
+
 static const struct command_entry commands[] = {
     {"tangle", command_tangle},
     {"check", command_check},
@@ -1864,7 +2104,8 @@ static const struct command_entry commands[] = {
     {"search", command_search},
     {"search-keywords", command_search_keywords},
     {"list-keywords", command_list_keywords},
-    {"show-article", command_show_article}
+    {"show-article", command_show_article},
+    {"replace-article", command_replace_article}
 };
 
 static int ends_with(const char *text, const char *suffix)
@@ -2169,10 +2410,11 @@ static void print_usage(const char *program)
 {
     fprintf(stderr,
         "Usage: %s [-s source-dir] [-w weave-file] [-o output-file] [-m map-file] <command> [args...]\n"
-        "       Commands: tangle, check, weave, add-article, remove-article, show-bundle, search, search-keywords, list-keywords, show-article\n"
+        "       Commands: tangle, check, weave, add-article, remove-article, replace-article, show-bundle, search, search-keywords, list-keywords, show-article\n"
         "       %s tangle [xml-file]\n"
         "       %s [-w weave-file] weave [root-article]\n"
         "       %s [-w weave-file] add-article <parent-id> <article-file> [before-child-id]\n"
+        "       %s replace-article <article-id> <article-file>\n"
         "       %s remove-article <article-id.lp5>\n"
         "       %s search [--all] -- TEXT [TEXT ...]\n"
         "       %s search-keywords [--all] -- KEYWORD [KEYWORD ...]\n"
@@ -2185,7 +2427,7 @@ static void print_usage(const char *program)
         "       -s, -w, -o, and -m options may appear anywhere before --; they are removed before command dispatch.\n"
         "       -m map-file applies only to tangle.\n",
         program, program, program, program, program, program, program, program,
-        program, program, program);
+        program, program, program, program);
 }
 
 int main(int argc, char *argv[])
@@ -2220,6 +2462,14 @@ int main(int argc, char *argv[])
         if (LP5MapName != NULL && command->function != command_tangle) {
             fprintf(stderr, "lp5: -m is only valid with the tangle command\n");
             return finish_output(1);
+        }
+        if (command->function == command_replace_article) {
+            if (LP5OutputName != NULL) {
+                fprintf(stderr, "lp5: -o is not valid with replace-article\n");
+                return 1;
+            }
+            /* Replacement must also work with a missing/stale weave or bad target. */
+            return run_command(command, argc, argv, first_argument);
         }
         if (command->function == command_weave) {
             if (LP5OutputName != NULL && LP5WeaveNameSpecified &&
