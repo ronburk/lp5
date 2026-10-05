@@ -48,6 +48,8 @@ typedef int (*command_function)(xsltStylesheetPtr stylesheet, int argc,
 const char *LP5Source = "lp5.lp5";
 const char *LP5OutputName;
 const char *LP5MapName;
+const char *LP5WeaveName = "weave.xml";
+static int LP5WeaveNameSpecified;
 static FILE *LP5OutputFile;
 
 #define LP5_EXTENSION_NAMESPACE "http://example.com/lp5ext"
@@ -995,6 +997,21 @@ static int remove_global_options(int *argc, char *argv[])
             }
             LP5MapName = argv[read_argument + 1];
             read_argument += 2;
+        } else if (strcmp(argv[read_argument], "-w") == 0) {
+            if (read_argument + 1 >= *argc ||
+                    argv[read_argument + 1][0] == '\0' ||
+                    strcmp(argv[read_argument + 1], "--") == 0) {
+                fprintf(stderr, "lp5: -w requires a weave file\n");
+                return 1;
+            }
+            if (LP5WeaveNameSpecified &&
+                    strcmp(LP5WeaveName, argv[read_argument + 1]) != 0) {
+                fprintf(stderr, "lp5: weave file specified more than once\n");
+                return 1;
+            }
+            LP5WeaveName = argv[read_argument + 1];
+            LP5WeaveNameSpecified = 1;
+            read_argument += 2;
         } else {
             argv[write_argument++] = argv[read_argument++];
         }
@@ -1245,7 +1262,7 @@ static int command_weave(xsltStylesheetPtr stylesheet, int argc, char *argv[])
     int status;
 
     if (argc > 2) {
-        fprintf(stderr, "Usage: lp5 weave [xml-file]\n");
+        fprintf(stderr, "Usage: lp5 [-w weave-file] weave [root-article]\n");
         return 1;
     }
     if (argc == 2) {
@@ -1277,50 +1294,69 @@ static int command_weave(xsltStylesheetPtr stylesheet, int argc, char *argv[])
     return status;
 }
 
+static int ends_with(const char *text, const char *suffix);
+
 static int command_add_article(xsltStylesheetPtr stylesheet, int argc,
         char *argv[])
 {
     struct xslt_parameter parameters[4];
+    const char *filename = LP5WeaveName;
+    int offset = 0;
 
-    if (argc < 4 || argc > 5) {
+    /* Keep the former index-first spelling working when -w is not supplied. */
+    if (argc >= 4 && !ends_with(argv[1], ".lp5")) {
+        if (LP5WeaveNameSpecified) {
+            fprintf(stderr,
+                "lp5: use either -w or the legacy index argument with add-article\n");
+            return 1;
+        }
+        filename = argv[1];
+        offset = 1;
+    }
+
+    if (argc - offset < 3 || argc - offset > 4) {
         fprintf(stderr,
-            "Usage: lp5 add-article <weave.xml> <parent-id> <article-file> [before-child-id]\n");
+            "Usage: lp5 [-w weave-file] add-article <parent-id> <article-file> [before-child-id]\n");
         return 1;
     }
 
     parameters[0].name = "parent_id";
-    parameters[0].value = argv[2];
+    parameters[0].value = argv[1 + offset];
     parameters[1].name = "before_child_id";
-    parameters[1].value = argc == 5 ? argv[4] : "";
+    parameters[1].value = argc - offset == 4 ? argv[3 + offset] : "";
     parameters[2].name = "articles_dir";
     parameters[2].value = LP5Source;
     parameters[3].name = "article_file";
-    parameters[3].value = argv[3];
-    return transform_file(stylesheet, argv[1], parameters, 4,
+    parameters[3].value = argv[2 + offset];
+    return transform_file(stylesheet, filename, parameters, 4,
         NULL, NULL, NULL);
 }
-
-static int ends_with(const char *text, const char *suffix);
 
 static int command_show_bundle(xsltStylesheetPtr stylesheet, int argc,
         char *argv[])
 {
     struct xslt_parameter parameter;
-    const char *filename = "weave.xml";
+    const char *filename = LP5WeaveName;
     const char *code_name = NULL;
 
     if (argc == 2 && strcmp(argv[1], "--") != 0) {
         code_name = argv[1];
     } else if (argc == 3) {
-        code_name = argv[2];
         if (strcmp(argv[1], "--") != 0) {
+            if (LP5WeaveNameSpecified) {
+                fprintf(stderr,
+                    "lp5: use either -w or the legacy index argument with show-bundle\n");
+                return 1;
+            }
             filename = argv[1];
         }
+        code_name = argv[2];
     } else if (argc != 1) {
         fprintf(stderr,
             "Usage: lp5 show-bundle [code-name]\n"
             "       lp5 show-bundle -- code-name\n"
-            "       lp5 show-bundle <index.xml> <code-name> (legacy)\n");
+            "       Select another index with -w <weave-file>.\n"
+            "       The legacy form is: lp5 show-bundle <index.xml> <code-name>\n");
         return 1;
     }
 
@@ -1435,9 +1471,10 @@ static int command_search_terms(xsltStylesheetPtr stylesheet, int argc,
             goto out_of_memory;
         }
     }
-    weave = xmlReadFile("weave.xml", NULL, XML_PARSE_NONET);
+    weave = xmlReadFile(LP5WeaveName, NULL, XML_PARSE_NONET);
     if (weave == NULL) {
-        fprintf(stderr, "lp5: cannot read weave.xml for %s\n", command_name);
+        fprintf(stderr, "lp5: cannot read '%s' for %s\n",
+            LP5WeaveName, command_name);
         xmlFreeDoc(input);
         return 1;
     }
@@ -1448,7 +1485,7 @@ static int command_search_terms(xsltStylesheetPtr stylesheet, int argc,
     }
     xmlAddChild(root, copied_weave);
     /* transform_file owns and frees the supplied input document. */
-    return transform_file(stylesheet, "weave.xml", NULL, 0, input, NULL, NULL);
+    return transform_file(stylesheet, LP5WeaveName, NULL, 0, input, NULL, NULL);
 
 out_of_memory:
     fprintf(stderr, "lp5: out of memory\n");
@@ -1476,7 +1513,7 @@ static int command_list_keywords(xsltStylesheetPtr stylesheet, int argc,
         fprintf(stderr, "Usage: lp5 list-keywords\n");
         return 1;
     }
-    return transform_file(stylesheet, "weave.xml", NULL, 0, NULL, NULL, NULL);
+    return transform_file(stylesheet, LP5WeaveName, NULL, 0, NULL, NULL, NULL);
 }
 
 static int command_show_article(xsltStylesheetPtr stylesheet, int argc,
@@ -1771,7 +1808,7 @@ static int weave_is_current(const struct stat *latest_source_time)
 {
     struct stat weave_time;
 
-    if (stat("weave.xml", &weave_time) != 0 ||
+    if (stat(LP5WeaveName, &weave_time) != 0 ||
             LP5_ISDIR(weave_time.st_mode)) {
         return 0;
     }
@@ -1790,13 +1827,14 @@ static int refresh_weave(void)
         return 1;
     }
 
-    LP5OutputName = "weave.xml";
+    LP5OutputName = LP5WeaveName;
     status = run_command(weave_command, 2, weave_arguments, 1);
     status = finish_output(status);
     LP5OutputName = saved_output_name;
     if (status != 0) {
         fprintf(stderr,
-            "lp5: could not refresh weave.xml; requested command was not run\n");
+            "lp5: could not refresh '%s'; requested command was not run\n",
+            LP5WeaveName);
         return 1;
     }
     return 0;
@@ -1818,19 +1856,23 @@ static int ensure_weave_current(void)
 static void print_usage(const char *program)
 {
     fprintf(stderr,
-        "Usage: %s [-s source-dir] [-o output-file] [-m map-file] <command> [args...]\n"
+        "Usage: %s [-s source-dir] [-w weave-file] [-o output-file] [-m map-file] <command> [args...]\n"
         "       Commands: tangle, check, weave, add-article, show-bundle, search, search-keywords, list-keywords, show-article\n"
         "       %s tangle [xml-file]\n"
+        "       %s [-w weave-file] weave [root-article]\n"
+        "       %s [-w weave-file] add-article <parent-id> <article-file> [before-child-id]\n"
         "       %s search [--all] -- TEXT [TEXT ...]\n"
         "       %s search-keywords [--all] -- KEYWORD [KEYWORD ...]\n"
         "       %s list-keywords\n"
         "       %s show-article [article-file.lp5]\n"
         "       %s show-bundle [code-name] (omit name to list bundles; use \"\" for unnamed code)\n"
-        "       %s [-s source-dir] [-o output-file] <stylesheet.xsl|stylesheet.xslt> [xml-file] [other args...]\n"
+        "       %s [-s source-dir] [-w weave-file] [-o output-file] <stylesheet.xsl|stylesheet.xslt> [xml-file] [other args...]\n"
         "       Source directory defaults to lp5.lp5; LP5Source sets the environment default.\n"
-        "       -s, -o, and -m options may appear anywhere before --; they are removed before command dispatch.\n"
+        "       The weave file defaults to weave.xml; -w selects another weave file.\n"
+        "       -s, -w, -o, and -m options may appear anywhere before --; they are removed before command dispatch.\n"
         "       -m map-file applies only to tangle.\n",
-        program, program, program, program, program, program, program, program);
+        program, program, program, program, program, program, program, program,
+        program, program);
 }
 
 int main(int argc, char *argv[])
@@ -1865,6 +1907,17 @@ int main(int argc, char *argv[])
         if (LP5MapName != NULL && command->function != command_tangle) {
             fprintf(stderr, "lp5: -m is only valid with the tangle command\n");
             return finish_output(1);
+        }
+        if (command->function == command_weave) {
+            if (LP5OutputName != NULL && LP5WeaveNameSpecified &&
+                    strcmp(LP5OutputName, LP5WeaveName) != 0) {
+                fprintf(stderr,
+                    "lp5: -o and -w name different files for the weave output\n");
+                return finish_output(1);
+            }
+            if (LP5OutputName == NULL) {
+                LP5OutputName = LP5WeaveName;
+            }
         }
         if (command->function != command_weave && ensure_weave_current() != 0) {
             return finish_output(1);

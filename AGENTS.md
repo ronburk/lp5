@@ -76,8 +76,17 @@ from the same snapshot. See [LIST_KEYWORDS.md](LIST_KEYWORDS.md) for its contrac
 template; omitting the filename selects `lp5.lp5` under `LP5Source`.
 See [SHOW_ARTICLE.md](SHOW_ARTICLE.md) for its XML contract and navigation.
 
-`./lp5 show-bundle` lists all bundle names. Supply a name to read its code sections
-from `weave.xml`, or `""` for unnamed code. See [SHOW_BUNDLE.md](SHOW_BUNDLE.md).
+The weave index defaults to `weave.xml`. Use `-w <file>` to choose another index;
+the freshness check reads and refreshes that selected file. `weave` writes there
+by default. `add-article` uses it as input, and `show-bundle`, `search`,
+`search-keywords`, and `list-keywords` read it. `show-bundle` lists bundle names,
+or reads the named bundle; pass `""` for unnamed code. See
+[SHOW_BUNDLE.md](SHOW_BUNDLE.md).
+
+```sh
+./lp5 [-w weave-file] weave [root-article]
+./lp5 [-w weave-file] add-article <parent-id> <article-file> [before-child-id]
+```
 
 ## Check one article
 
