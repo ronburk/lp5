@@ -1,7 +1,7 @@
 # LP5 project-I/O cloud-browser test
 
-This is a test-only preview server. It serves only `new.html` and the three
-fixture articles; all other paths return 404. It is not part of the production
+This is a test-only preview server. It serves only `new.html`, the test-control
+and regression modules, and the three fixture articles; all other paths return 404. It is not part of the production
 application.
 
 Run it with the preview system's provided bind host and forwarded port, if any:
@@ -121,6 +121,26 @@ reparenting writes the destination parent first, then the old parent. On error,
 all attempted writes are restored in reverse order from their original stored
 text. Restoration failures identify the affected files and block further moves
 in that dialog. The filesystem API cannot make the two writes crash-atomic.
+
+## Output selection checks
+
+1. Open `/new.html?test=1` and select the fixture project. Select the named
+   Greeting article in Source or navigation. Its expanded text in Output should
+   have a pale blue background; the unnamed caller's text should remain distinct.
+2. Select the unnamed caller. Only `Expanded section:` should be highlighted;
+   the expanded Greeting text belongs to its own article.
+3. Click the Greeting text in Output. Its originating article should become
+   selected in Source and its text highlighted in Output. Selecting the root,
+   which has no code, should clear the Output highlight. Output must not scroll
+   automatically when selection changes.
+4. Click **Test output selection**. Expect **41 output selection checks passed**.
+   The browser runs `test/output_selection.js` with the actual XML loader,
+   Source/TOC/Output views, and isolated in-memory projects. It checks repeated
+   and nested expansions, other sections in the same bundle, all three selection
+   paths, quoted filenames, explanation-only/unreferenced/empty code, rerenders,
+   same-project reloads and edited content, selection removal/project switching,
+   and unchanged generated/displayed/exported text. It restores the original
+   fixture project and selection after running.
 
 ## Validation boundaries
 
