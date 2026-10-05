@@ -157,7 +157,7 @@ def main():
             assert result.returncode == 1 and not result.stdout and result.stderr
             assert output.read_bytes() == b"keep existing output"
         result = run("show-bundle", "-w", "first.xml", "-w", "second.xml")
-        assert result.returncode == 1 and "specified more than once" in result.stderr
+        assert result.returncode == 1 and b"specified more than once" in result.stderr
         for invalid in (b"<wrong/>", b"<lp5-weave/>",
                         b"<lp5-weave><bundles/><bundles/></lp5-weave>",
                         b'<lp5-weave xmlns="wrong"><bundles/></lp5-weave>', b"<broken"):

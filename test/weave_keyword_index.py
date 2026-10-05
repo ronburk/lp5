@@ -103,8 +103,8 @@ def main():
         original = {p.name: p.read_bytes() for p in source.iterdir()}
 
         result = run(executable, working, source, "weave")
-        assert result.stdout.endswith(b"\n")
-        document = ET.fromstring(result.stdout)
+        assert result.stdout == b""
+        document = ET.parse(working / "weave.xml").getroot()
         check_index(document, terms, order)
         values = [k.attrib["value"] for k in document.find("keyword-index")]
         assert [v for v in values if v in ("a-key", "b-key", "z-key")] == ["a-key", "b-key", "z-key"]
@@ -134,7 +134,9 @@ def main():
         empty_source.mkdir()
         write_article(empty_source, "lp5.lp5", ["\t\n\r "])
         result = run(executable, working, empty_source, "weave")
-        check_index(ET.fromstring(result.stdout), {"lp5.lp5": [" "]}, ["lp5.lp5"])
+        assert result.stdout == b""
+        check_index(ET.parse(working / "weave.xml").getroot(),
+                    {"lp5.lp5": [" "]}, ["lp5.lp5"])
     print("weave keyword index checks passed")
 
 

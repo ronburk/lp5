@@ -13,6 +13,9 @@ PROJECT_DIR = Path(__file__).resolve().parents[1]
 STYLESHEETS = (
     "add-article.xsl",
     "check.xsl",
+    "list-keywords.xsl",
+    "search-keywords.xsl",
+    "search.xsl",
     "show-bundle.xsl",
     "tangle.xsl",
     "weave.xsl",
@@ -177,14 +180,14 @@ def main():
             "-w", str(alternate_weave), "search", "--", "Alternate index article",
         )
         assert searched.returncode == 0, searched.stderr
-        assert "Alternate index article" in searched.stdout.decode("utf-8")
+        assert "Alternate index article" in searched.stdout
 
         keyword_search = run(
             executable, working_directory, source_directory,
             "-w", str(alternate_weave), "search-keywords", "--", "custom-word",
         )
         assert keyword_search.returncode == 0, keyword_search.stderr
-        assert "Alternate index article" in keyword_search.stdout.decode("utf-8")
+        assert "Alternate index article" in keyword_search.stdout
 
         listed = run(
             executable, working_directory, source_directory,
@@ -196,9 +199,9 @@ def main():
         assert [node.text for node in keywords] == ["custom-word"]
 
         # A deliberately different default index must not be read for add-article.
-        cache.write_text("<lp5-weave><articles/><bundles/></lp5-weave>", encoding="utf-8")
+        weave_file.write_text("<lp5-weave><articles/><bundles/></lp5-weave>", encoding="utf-8")
         future = alternate_weave.stat().st_mtime_ns + 2_000_000_000
-        os.utime(cache, ns=(future, future))
+        os.utime(weave_file, ns=(future, future))
         new_article = working_directory / "new-article.lp5"
         new_article.write_text("<template><heading>New article</heading></template>\n",
                                encoding="utf-8")
@@ -209,7 +212,7 @@ def main():
         assert added.returncode == 0, added.stderr
         assert "new-article-id:" in added.stderr
         assert ET.fromstring(added.stdout).tag == "template"
-        assert cache.read_text(encoding="utf-8") == "<lp5-weave><articles/><bundles/></lp5-weave>"
+        assert weave_file.read_text(encoding="utf-8") == "<lp5-weave><articles/><bundles/></lp5-weave>"
 
         # A custom output option may not silently redirect a selected weave.
         conflict = run(
