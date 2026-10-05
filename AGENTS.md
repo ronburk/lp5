@@ -138,7 +138,14 @@ or reads the named bundle; pass `""` for unnamed code. See
 ```sh
 ./lp5 [-w weave-file] weave [root-article]
 ./lp5 [-w weave-file] add-article <parent-id> <article-file> [before-child-id]
+./lp5 remove-article <article-id.lp5>
 ```
+
+`remove-article` removes a non-root leaf article and its unique parent link.
+It stages and validates the updated parent before changing either source file;
+the command leaves the selected weave file for the normal freshness check to
+regenerate.
+See [REMOVE_ARTICLE.md](REMOVE_ARTICLE.md) for refusal behavior.
 
 ## Check one article
 
