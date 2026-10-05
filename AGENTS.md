@@ -140,6 +140,11 @@ or reads the named bundle; pass `""` for unnamed code. See
 ./lp5 [-w weave-file] add-article <parent-id> <article-file> [before-child-id]
 ```
 
+`./lp5 replace-article <article-id> <article-file>` validates and replaces one
+existing source article, including its desired child links. It skips the weave
+freshness preflight and leaves the index untouched until a later command needs
+it. See [REPLACE_ARTICLE.md](REPLACE_ARTICLE.md) for failure handling and tests.
+
 ## Check one article
 
 Use the `check` command to validate one article without tangling the whole
