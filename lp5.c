@@ -30,9 +30,11 @@
 #include <process.h>
 #include <windows.h>
 #define LP5_GETCWD _getcwd
+#define LP5_GETPID _getpid
 #else
 #include <unistd.h>
 #define LP5_GETCWD getcwd
+#define LP5_GETPID getpid
 #endif
 
 #ifdef _WIN32
@@ -1300,6 +1302,7 @@ static int command_weave(xsltStylesheetPtr stylesheet, int argc, char *argv[])
 }
 
 static int ends_with(const char *text, const char *suffix);
+static int valid_xml_text(const char *text);
 
 static int command_add_article(xsltStylesheetPtr stylesheet, int argc,
         char *argv[])
@@ -1335,6 +1338,313 @@ static int command_add_article(xsltStylesheetPtr stylesheet, int argc,
     parameters[3].value = argv[2 + offset];
     return transform_file(stylesheet, filename, parameters, 4,
         NULL, NULL, NULL);
+}
+
+static int valid_article_basename(const char *filename)
+{
+    size_t length = strlen(filename);
+    return length > 4 && ends_with(filename, ".lp5") &&
+        !has_path_separator(filename) && valid_xml_text(filename);
+}
+
+static char *article_source_path(const char *filename)
+{
+    size_t directory_length = strlen(LP5Source);
+    int needs_separator = directory_length > 0 &&
+        LP5Source[directory_length - 1] != '/' &&
+        LP5Source[directory_length - 1] != '\\';
+    size_t filename_length = strlen(filename);
+    char *path = malloc(directory_length + (size_t) needs_separator +
+        filename_length + 1);
+
+    if (path == NULL) {
+        return NULL;
+    }
+    memcpy(path, LP5Source, directory_length);
+    if (needs_separator) {
+        path[directory_length++] = '/';
+    }
+    memcpy(path + directory_length, filename, filename_length + 1);
+    return path;
+}
+
+static int lookup_remove_parent(const char *article_id, char **parent_id)
+{
+    xmlDocPtr document = xmlReadFile(LP5WeaveName, NULL, XML_PARSE_NONET);
+    xmlNodePtr root;
+    xmlNodePtr articles = NULL;
+    xmlNodePtr target = NULL;
+    xmlNodePtr parent = NULL;
+    xmlNodePtr node;
+    int target_count = 0;
+    int parent_count = 0;
+
+    *parent_id = NULL;
+    if (document == NULL) {
+        fprintf(stderr, "lp5: cannot parse weave file '%s'\n", LP5WeaveName);
+        return 1;
+    }
+    root = xmlDocGetRootElement(document);
+    if (root != NULL && xmlStrEqual(root->name, BAD_CAST "lp5-weave")) {
+        for (node = root->children; node != NULL; node = node->next) {
+            if (node->type == XML_ELEMENT_NODE &&
+                    xmlStrEqual(node->name, BAD_CAST "articles")) {
+                articles = node;
+                break;
+            }
+        }
+    }
+    if (articles == NULL) {
+        fprintf(stderr, "lp5: weave file '%s' has no article list\n", LP5WeaveName);
+        xmlFreeDoc(document);
+        return 1;
+    }
+    for (node = articles->children; node != NULL; node = node->next) {
+        xmlChar *filename;
+        xmlNodePtr child;
+        if (node->type != XML_ELEMENT_NODE ||
+                !xmlStrEqual(node->name, BAD_CAST "article")) {
+            continue;
+        }
+        filename = xmlGetProp(node, BAD_CAST "file");
+        if (filename != NULL && strcmp((const char *) filename, article_id) == 0) {
+            target = node;
+            ++target_count;
+        }
+        xmlFree(filename);
+        for (child = node->children; child != NULL; child = child->next) {
+            xmlNodePtr link;
+            if (child->type != XML_ELEMENT_NODE ||
+                    !xmlStrEqual(child->name, BAD_CAST "children")) {
+                continue;
+            }
+            for (link = child->children; link != NULL; link = link->next) {
+                xmlChar *child_id;
+                if (link->type != XML_ELEMENT_NODE ||
+                        !xmlStrEqual(link->name, BAD_CAST "child")) {
+                    continue;
+                }
+                child_id = xmlGetProp(link, BAD_CAST "file");
+                if (child_id != NULL && strcmp((const char *) child_id,
+                        article_id) == 0) {
+                    parent = node;
+                    ++parent_count;
+                }
+                xmlFree(child_id);
+            }
+        }
+    }
+    if (target_count != 1) {
+        fprintf(stderr, "lp5: article '%s' must exist exactly once in '%s'\n",
+            article_id, LP5WeaveName);
+        xmlFreeDoc(document);
+        return 1;
+    }
+    /* The weave emits the root article first, before any orphans. */
+    for (node = articles->children; node != NULL; node = node->next) {
+        if (node->type == XML_ELEMENT_NODE &&
+                xmlStrEqual(node->name, BAD_CAST "article")) {
+            if (target == node) {
+                fprintf(stderr, "lp5: cannot remove the root article '%s'\n", article_id);
+                xmlFreeDoc(document);
+                return 1;
+            }
+            break;
+        }
+    }
+    {
+        xmlNodePtr child;
+        for (child = target->children; child != NULL; child = child->next) {
+            xmlNodePtr link;
+            if (child->type != XML_ELEMENT_NODE ||
+                    !xmlStrEqual(child->name, BAD_CAST "children")) {
+                continue;
+            }
+            for (link = child->children; link != NULL; link = link->next) {
+                if (link->type == XML_ELEMENT_NODE &&
+                        xmlStrEqual(link->name, BAD_CAST "child")) {
+                    fprintf(stderr,
+                        "lp5: cannot remove article '%s' because it has children\n",
+                        article_id);
+                    xmlFreeDoc(document);
+                    return 1;
+                }
+            }
+        }
+    }
+    if (parent_count != 1 || parent == NULL) {
+        fprintf(stderr,
+            "lp5: article '%s' must have exactly one parent link in '%s'\n",
+            article_id, LP5WeaveName);
+        xmlFreeDoc(document);
+        return 1;
+    }
+    {
+        xmlChar *filename = xmlGetProp(parent, BAD_CAST "file");
+        if (filename == NULL || !valid_article_basename((const char *) filename)) {
+            fprintf(stderr, "lp5: parent of '%s' must be a .lp5 filename\n", article_id);
+            xmlFree(filename);
+            xmlFreeDoc(document);
+            return 1;
+        }
+        *parent_id = malloc(xmlStrlen(filename) + 1);
+        if (*parent_id != NULL) {
+            memcpy(*parent_id, filename, xmlStrlen(filename) + 1);
+        }
+        xmlFree(filename);
+    }
+    xmlFreeDoc(document);
+    if (*parent_id == NULL) {
+        fprintf(stderr, "lp5: out of memory\n");
+        return 1;
+    }
+    return 0;
+}
+
+static char *temporary_sibling_path(const char *filename, const char *purpose)
+{
+    static unsigned long sequence;
+    size_t length = strlen(filename) + strlen(purpose) + 64;
+    char *candidate = malloc(length);
+    unsigned int attempt;
+
+    if (candidate == NULL) {
+        return NULL;
+    }
+    for (attempt = 0; attempt < 1000; ++attempt) {
+        struct stat file_status;
+        ++sequence;
+        snprintf(candidate, length, "%s.lp5-%s-%lu-%lu", filename, purpose,
+            (unsigned long) LP5_GETPID(), sequence);
+        if (stat(candidate, &file_status) != 0 && errno == ENOENT) {
+            return candidate;
+        }
+    }
+    free(candidate);
+    return NULL;
+}
+
+static int command_remove_article(xsltStylesheetPtr stylesheet, int argc,
+        char *argv[])
+{
+    struct xslt_parameter parameters[2];
+    const char *saved_output_name = LP5OutputName;
+    const char *article_id;
+    char *parent_id = NULL;
+    char *article_path = NULL;
+    char *parent_path = NULL;
+    char *updated_path = NULL;
+    char *backup_path = NULL;
+    struct stat file_status;
+    int status = 1;
+
+    if (argc != 2 || !valid_article_basename(argv[1])) {
+        fprintf(stderr, "Usage: lp5 remove-article <article-id.lp5>\n");
+        return 1;
+    }
+    if (saved_output_name != NULL) {
+        fprintf(stderr, "lp5: -o is not valid with remove-article\n");
+        return 1;
+    }
+    article_id = argv[1];
+    if (lookup_remove_parent(article_id, &parent_id) != 0) {
+        goto done;
+    }
+    article_path = article_source_path(article_id);
+    parent_path = article_source_path(parent_id);
+    if (article_path == NULL || parent_path == NULL) {
+        fprintf(stderr, "lp5: out of memory\n");
+        goto done;
+    }
+    if (stat(article_path, &file_status) != 0) {
+        fprintf(stderr, "lp5: cannot access article '%s': %s\n",
+            article_path, strerror(errno));
+        goto done;
+    }
+    if (LP5_ISDIR(file_status.st_mode)) {
+        fprintf(stderr, "lp5: article '%s' is a directory\n", article_path);
+        goto done;
+    }
+    if (stat(parent_path, &file_status) != 0) {
+        fprintf(stderr, "lp5: cannot access parent article '%s': %s\n",
+            parent_path, strerror(errno));
+        goto done;
+    }
+    if (LP5_ISDIR(file_status.st_mode)) {
+        fprintf(stderr, "lp5: parent article '%s' is a directory\n", parent_path);
+        goto done;
+    }
+    updated_path = temporary_sibling_path(parent_path, "updated");
+    backup_path = temporary_sibling_path(parent_path, "backup");
+    if (updated_path == NULL || backup_path == NULL) {
+        fprintf(stderr, "lp5: cannot create temporary filenames\n");
+        goto done;
+    }
+    parameters[0].name = "article_id";
+    parameters[0].value = article_id;
+    parameters[1].name = "parent_id";
+    parameters[1].value = parent_id;
+    LP5OutputName = updated_path;
+    status = transform_file(stylesheet, LP5WeaveName, parameters, 2,
+        NULL, NULL, NULL);
+    status = finish_output(status);
+    LP5OutputName = saved_output_name;
+    if (status != 0) {
+        goto done;
+    }
+
+    if (rename(parent_path, backup_path) != 0) {
+        fprintf(stderr, "lp5: cannot stage parent article '%s': %s\n",
+            parent_path, strerror(errno));
+        status = 1;
+        goto done;
+    }
+    if (rename(updated_path, parent_path) != 0) {
+        int saved_errno = errno;
+        if (rename(backup_path, parent_path) != 0) {
+            fprintf(stderr,
+                "lp5: cannot install updated parent or restore original '%s'\n",
+                parent_path);
+        } else {
+            fprintf(stderr, "lp5: cannot install updated parent '%s': %s\n",
+                parent_path, strerror(saved_errno));
+        }
+        status = 1;
+        goto done;
+    }
+    if (remove(article_path) != 0) {
+        int saved_errno = errno;
+        int moved_updated_parent = rename(parent_path, updated_path) == 0;
+        int restored_parent = rename(backup_path, parent_path) == 0;
+        if (!moved_updated_parent || !restored_parent) {
+            fprintf(stderr,
+                "lp5: cannot remove article '%s' and could not restore parent '%s'\n",
+                article_path, parent_path);
+        } else {
+            fprintf(stderr, "lp5: cannot remove article '%s': %s\n",
+                article_path, strerror(saved_errno));
+        }
+        status = 1;
+        goto done;
+    }
+    if (remove(backup_path) != 0) {
+        fprintf(stderr,
+            "lp5: warning: removed article '%s', but could not remove backup '%s': %s\n",
+            article_id, backup_path, strerror(errno));
+    }
+    status = 0;
+
+done:
+    LP5OutputName = saved_output_name;
+    if (updated_path != NULL) {
+        (void) remove(updated_path);
+    }
+    free(backup_path);
+    free(updated_path);
+    free(parent_path);
+    free(article_path);
+    free(parent_id);
+    return status;
 }
 
 static int command_show_bundle(xsltStylesheetPtr stylesheet, int argc,
@@ -1789,6 +2099,7 @@ static const struct command_entry commands[] = {
     {"check", command_check},
     {"weave", command_weave},
     {"add-article", command_add_article},
+    {"remove-article", command_remove_article},
     {"show-bundle", command_show_bundle},
     {"search", command_search},
     {"search-keywords", command_search_keywords},
@@ -2099,11 +2410,12 @@ static void print_usage(const char *program)
 {
     fprintf(stderr,
         "Usage: %s [-s source-dir] [-w weave-file] [-o output-file] [-m map-file] <command> [args...]\n"
-        "       Commands: tangle, check, weave, add-article, replace-article, show-bundle, search, search-keywords, list-keywords, show-article\n"
+        "       Commands: tangle, check, weave, add-article, remove-article, replace-article, show-bundle, search, search-keywords, list-keywords, show-article\n"
         "       %s tangle [xml-file]\n"
         "       %s [-w weave-file] weave [root-article]\n"
         "       %s [-w weave-file] add-article <parent-id> <article-file> [before-child-id]\n"
         "       %s replace-article <article-id> <article-file>\n"
+        "       %s remove-article <article-id.lp5>\n"
         "       %s search [--all] -- TEXT [TEXT ...]\n"
         "       %s search-keywords [--all] -- KEYWORD [KEYWORD ...]\n"
         "       %s list-keywords\n"
@@ -2115,7 +2427,7 @@ static void print_usage(const char *program)
         "       -s, -w, -o, and -m options may appear anywhere before --; they are removed before command dispatch.\n"
         "       -m map-file applies only to tangle.\n",
         program, program, program, program, program, program, program, program,
-        program, program, program);
+        program, program, program, program);
 }
 
 int main(int argc, char *argv[])
