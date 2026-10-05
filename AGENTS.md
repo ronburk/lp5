@@ -12,14 +12,50 @@ An extra Git worktree is unnecessary when your private clone is isolated.
 
 Before editing, fetch from GitHub and verify the checkout's branch and base commit. Preserve unrelated local changes and use a task-specific branch. Before merging a PR, fetch again; if `main` has advanced, update the branch and rerun relevant checks. Merge only when the PR is conflict-free. Use the GitHub connector for remote writes when available.
 
-## Install xsltproc
+## OpenAI Work environment recovery
+
+Before reporting that setup is blocked, inspect the exact error and the active
+filesystem, network, and approval permissions. Try the recovery paths those
+permissions allow, and continue any work that is still possible.
+
+- `Failed to connect to browser-proxy port 8889` from Git or curl can result
+  from the command sandbox denying the socket. A socket error such as
+  `PermissionError: [Errno 1] Operation not permitted` confirms a permission
+  failure. If escalation is allowed, retry a minimal read-only check through
+  `exec_command` with `sandbox_permissions: "require_escalated"`:
+
+  ```sh
+  git ls-remote https://github.com/ronburk/lp5.git refs/heads/main
+  ```
+
+  If that succeeds, use the same permitted execution mode for clone, fetch,
+  and network-dependent package installation. Do not repeatedly request
+  escalation when the active policy disallows it or a request is rejected.
+- Apt's `Read-only file system` error for `/var/lib/apt/lists` is a filesystem
+  permission failure; running as root does not overcome it. Use a supported
+  permission escalation if available, or recheck after the environment's
+  filesystem permissions change. The temporary archive cache below addresses
+  apt's cache and privilege-drop errors; it does not make a read-only lists
+  directory or installation destination writable.
+- Check the GitHub connector independently if shell networking fails. It can
+  still verify the remote branch, commit, and file contents. A failed shell
+  command does not establish that the connector or browser is unavailable.
+- Do not infer an OpenAI outage from these errors. If checking for an outage,
+  consult https://status.openai.com and verify the incident date and timezone.
+  For a remaining blocker, report the exact failure and the permitted recovery
+  attempts already made.
+
+## Install build dependencies
 
 Install `xsltproc` before building or testing XSLT work. On Ubuntu or Debian, use:
 
 ```sh
 sudo apt-get update
-sudo apt-get install -y xsltproc
+sudo apt-get install -y xsltproc libxml2-dev libxslt1-dev
 ```
+
+Omit `sudo` when already running as root. The development packages provide
+the headers, libraries, and `xslt-config` needed to build the C launcher.
 
 Confirm the installation with:
 
@@ -36,8 +72,18 @@ apt-get -o APT::Sandbox::User=root \
     -o Dir::Cache::archives=/tmp/apt-cache/archives update
 apt-get -o APT::Sandbox::User=root \
     -o Dir::Cache::archives=/tmp/apt-cache/archives \
-    install -y xsltproc
+    install -y xsltproc libxml2-dev libxslt1-dev
 ```
+
+## Build the C launcher
+
+Build `./lp5` in the checkout root before running CLI commands or their tests:
+
+```sh
+gcc -std=c99 -Wall -Wextra -pedantic -o lp5 lp5.c $(xslt-config --cflags --libs) -lexslt
+```
+
+Keep the executable in the checkout directory; `lp5` is already in `.gitignore`.
 
 ## Build the HTML program
 
@@ -45,8 +91,14 @@ The main program is generated from the root article `lp5.lp5/lp5.lp5` by
 `tangle.xsl`. Run this command from the repository root:
 
 ```sh
-xsltproc -o lp5.html tangle.xsl lp5.lp5/lp5.lp5
+./lp5 -o lp5.html tangle lp5.lp5/lp5.lp5
 ```
+
+The launcher registers the `my:ls` extension required by the current
+stylesheets; running `tangle.xsl` or `weave.xsl` directly with ordinary
+`xsltproc` fails with an unregistered-function error. For setup checks, use
+`-w` and `-o` with temporary paths to avoid changing the tracked `lp5.html`
+or creating `weave.xml` in the checkout.
 
 The transform follows each `<children>` link and assembles the unnamed code
 sections, recursively expanding named code references. It validates articles
