@@ -4,7 +4,7 @@ To inspect the indexed vocabulary first, use `./lp5 list-keywords`.
 See [LIST_KEYWORDS.md](LIST_KEYWORDS.md) for its XML output contract.
 
 ```sh
-./lp5 [-s source-dir] [-o output-file] search-keywords [--all] -- KEYWORD [KEYWORD ...]
+./lp5 [-s source-dir] [-w weave-file] [-o output-file] search-keywords [--all] -- KEYWORD [KEYWORD ...]
 ```
 
 Examples:
@@ -20,8 +20,10 @@ One shell argument is one complete keyword. Commas and spaces inside an argument
 are ordinary data. The first standalone `--` is required; every subsequent
 argument is a literal keyword, including another `--` or strings equal to options.
 Before the separator, `--all` is allowed once; other command arguments are errors.
-Global `-s`, `-o`, and `LP5Source` retain their existing behavior. Global options
-are removed before dispatch only up to `--`. `-m` is invalid for search.
+Global `-s`, `-w`, `-o`, and `LP5Source` retain their existing behavior. The
+index defaults to `weave.xml`; `-w` selects another index for reading and
+freshness checking. Global options are removed before dispatch only up to `--`.
+`-m` is invalid for search.
 
 At least one keyword is required. Empty normalized terms, invalid UTF-8, and
 characters forbidden in XML 1.0 are errors. Terms are canonicalized using XPath
@@ -87,7 +89,8 @@ unique identifiers; read the article identified by `file` for complete content.
 ## Cache and errors
 
 Search uses the existing shared `ensure_weave_current()` preflight and reads
-`weave.xml` from the working directory. Its keyword index provides membership;
+`weave.xml` from the working directory by default, or the selected `-w` file.
+Its keyword index provides membership;
 the article records provide metadata and ordering. A fresh older cache lacking
 the keyword index is supported by deriving membership from its article records.
 Search never edits articles; refreshing the generated cache is permitted.

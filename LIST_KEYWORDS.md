@@ -1,12 +1,13 @@
 # List the indexed keyword vocabulary
 
 ```sh
-./lp5 [-s source-dir] [-o output-file] list-keywords
+./lp5 [-s source-dir] [-w weave-file] [-o output-file] list-keywords
 ```
 
 The command accepts no positional arguments or command-specific options. Global
-`-s`, `-o`, and the `LP5Source` environment variable work as usual; `-m` is invalid.
-It refreshes `weave.xml` through the same freshness check as `search-keywords`.
+`-s`, `-w`, `-o`, and the `LP5Source` environment variable work as usual; `-m`
+is invalid. It refreshes `weave.xml` by default through the same freshness check
+as `search-keywords`; `-w` selects a different index for both refresh and reading.
 
 Output is a UTF-8 XML document without a namespace, ending with a newline:
 

@@ -1,7 +1,7 @@
 # Search article text
 
 ```sh
-./lp5 search [--all] -- TEXT [TEXT ...]
+./lp5 [-w weave-file] search [--all] -- TEXT [TEXT ...]
 ```
 
 The first standalone `--` is required. Every following argument is one literal
@@ -60,7 +60,8 @@ Output is one UTF-8 XML document without a namespace, ending with a newline:
   than comparing entity spellings.
 
 Search uses the shared weave freshness check and reads `weave.xml` in the working
-directory. It scans article records directly; `weave` does not generate a
-separate full-text index. Output goes to stdout, or to the existing `-o`
-destination with stdout empty. Invalid arguments, XML text, index, or transform
-return status 1 with diagnostics on stderr.
+directory by default. `-w <file>` selects another index for both freshness
+checking and reading. It scans article records directly; `weave` does not
+generate a separate full-text index. Output goes to stdout, or to the existing
+`-o` destination with stdout empty. Invalid arguments, XML text, index, or
+transform return status 1 with diagnostics on stderr.

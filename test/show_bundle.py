@@ -74,6 +74,14 @@ def main():
         timestamp = cache.stat().st_mtime_ns
         check_list(run("show-bundle"), names)
         assert cache.stat().st_mtime_ns == timestamp
+
+        default_contents = cache.read_bytes()
+        generated_alternate = working / "generated-alternate.xml"
+        result = run("-w", str(generated_alternate), "show-bundle")
+        check_list(result, names)
+        assert generated_alternate.exists()
+        assert cache.read_bytes() == default_contents
+
         for name in names:
             # -- allows names equal to global options without parsing them.
             result = run("show-bundle", "--", name)
@@ -128,13 +136,28 @@ def main():
         # The legacy two-argument form still reads its explicit index file.
         alternate = working / "alternate.xml"
         alternate.write_bytes(b'<lp5-weave><articles/><bundles/></lp5-weave>')
+        newest_source_mtime = max(
+            source.stat().st_mtime_ns,
+            *(path.stat().st_mtime_ns for path in source.iterdir()),
+        )
+        os.utime(alternate, ns=(newest_source_mtime + 2_000_000_000,
+                                newest_source_mtime + 2_000_000_000))
+        default_contents = cache.read_bytes()
+        result = run("-w", str(alternate), "show-bundle", "Bundle & Names")
+        assert result.returncode == 0
+        assert len(ET.fromstring(result.stdout)) == 0
+        assert cache.read_bytes() == default_contents
+
         result = run("show-bundle", str(alternate), "Bundle & Names")
         assert result.returncode == 0 and len(ET.fromstring(result.stdout)) == 0
         output.write_bytes(b"keep existing output")
-        for args in (("--",), ("one", "two", "three"), ("-m", "unused.map")):
+        for args in (("--",), ("one", "two", "three"), ("-m", "unused.map"),
+                     ("-w",)):
             result = run("show-bundle", "-o", str(output), *args)
             assert result.returncode == 1 and not result.stdout and result.stderr
             assert output.read_bytes() == b"keep existing output"
+        result = run("show-bundle", "-w", "first.xml", "-w", "second.xml")
+        assert result.returncode == 1 and "specified more than once" in result.stderr
         for invalid in (b"<wrong/>", b"<lp5-weave/>",
                         b"<lp5-weave><bundles/><bundles/></lp5-weave>",
                         b'<lp5-weave xmlns="wrong"><bundles/></lp5-weave>', b"<broken"):

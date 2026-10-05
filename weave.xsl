@@ -2,8 +2,9 @@
 <!--
      weave.xsl - make one XML snapshot of all discovered lp5 articles.
 
-     Example (run from the repository root through the lp5 CLI):
-       ./lp5 weave -o weave.xml
+     Examples (run from the repository root through the lp5 CLI):
+       ./lp5 weave
+       ./lp5 -w alternate.xml weave
 
      The result is an index for source-navigation tools, not tangled output.
      Each article is emitted in preorder, with the root article first. Article

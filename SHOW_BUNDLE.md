@@ -3,13 +3,15 @@
 ```sh
 ./lp5 show-bundle                  # list every bundle name
 ./lp5 show-bundle "Bundle name"    # read one bundle from weave.xml
+./lp5 -w other-index.xml show-bundle "Bundle name"
 ./lp5 show-bundle weave.xml        # read the bundle named "weave.xml"
 ./lp5 show-bundle ""               # read the unnamed bundle
 ./lp5 show-bundle -- "weave.xml"   # read a bundle named weave.xml
 ./lp5 show-bundle -- "-o"          # read a name equal to a global option
 ```
 
-The index defaults to `weave.xml` in the working directory. The shared freshness
+The index defaults to `weave.xml` in the working directory. `-w <file>` selects
+another index for both freshness checking and reading. The shared freshness
 check runs first, using `LP5Source` (including environment and `-s` overrides).
 Global `-o` redirects output, and `-m` is invalid. No source articles are modified.
 
@@ -38,6 +40,9 @@ The old two-argument form remains supported for selecting an explicit index:
 ```sh
 ./lp5 show-bundle other-index.xml "Bundle name"
 ```
+
+Prefer `-w` when selecting an index so the freshness check and the command read
+the same file.
 
 With one argument, that argument is always the bundle name, even when it ends
 in `.xml` or matches a filename such as `weave.xml`. Use `--` when a bundle name
