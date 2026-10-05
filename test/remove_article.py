@@ -41,10 +41,11 @@ def main():
   <children><li id="1.lp5"/><li id="2.lp5"/></children>
 </template>
 """)
-        write_article(source, "1.lp5", "<template><heading>Has child</heading><children><li id=\"3.lp5\"/><li id=\"4.lp5\"/></children></template>\n")
+        write_article(source, "1.lp5", "<template><heading>Has child</heading><children><li id=\"3.lp5\"/><li id=\"4.lp5\"/><li id=\"dup.lp5\"/><li id=\"dup.lp5\"/></children></template>\n")
         write_article(source, "2.lp5", "<template><heading>Remove me</heading></template>\n")
         write_article(source, "3.lp5", "<template><heading>Grandchild</heading></template>\n")
         write_article(source, "4.lp5", "<template><heading>Sibling leaf</heading></template>\n")
+        write_article(source, "dup.lp5", "<template><heading>Duplicate link target</heading></template>\n")
         write_article(source, "orphan.lp5", "<template><heading>Orphan</heading></template>\n")
 
         def run(*arguments):
@@ -64,7 +65,9 @@ def main():
         assert not (source / "3.lp5").exists()
         assert (working / "weave.xml").read_bytes() == weave_before_remove
         nested_parent = ET.parse(source / "1.lp5").getroot()
-        assert [node.get("id") for node in nested_parent.findall("children/li")] == ["4.lp5"]
+        assert [node.get("id") for node in nested_parent.findall("children/li")] == [
+            "4.lp5", "dup.lp5", "dup.lp5"
+        ]
 
         # The next removal refreshes the selected weave against the current source.
         result = run("remove-article", "2.lp5")
@@ -89,6 +92,7 @@ def main():
         for article_id, message in (
             ("lp5.lp5", "root article"),
             ("1.lp5", "has children"),
+            ("dup.lp5", "parent link"),
             ("orphan.lp5", "parent link"),
             ("missing.lp5", "must exist"),
         ):
