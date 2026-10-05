@@ -2554,6 +2554,7 @@ state awaitArticleDelete
                                  .forEach(node => node.classList.remove('lp5-selected'));
                              articleNode.classList.add('lp5-selected');
                              controller.currentArticle = articleNode;
+                             model.selected_article_url = articleNode.id;
                              articleNode.focus();
                              iView.eventPublish("SelectArticle", articleNode);
                              deferEvent(document, 'lp5SelectArticle', articleNode.id);
@@ -2739,6 +2740,10 @@ state awaitArticleDelete
                                  renderScript(article));
                              articleNode.appendChild(content);
                              articleNode.id = article.URL;
+                             if(article.URL === model.selected_article_url){
+                                 articleNode.classList.add('lp5-selected');
+                                 controller.currentArticle = articleNode;
+                             }
                              articleNode.querySelectorAll('a').
                                          forEach(link => link.tabIndex = -1);
                              outerDiv.appendChild(articleNode);
@@ -2822,6 +2827,7 @@ state awaitArticleDelete
                              }
                              if(model.rootTOC){
                                  outerDiv.replaceChildren();
+                                 controller.currentArticle = null;
                                  const undef = model.viewSettings.undef;
                                  const unref = model.viewSettings.unref;
                                  const match = true /*model.viewSettings.match*/;
@@ -2853,8 +2859,12 @@ state awaitArticleDelete
                     <template data-name="outputDiv" id="LP5-Output">
                         <style>
                          #root { display: flex; flex-direction: column; }
-                         span[data-ref]:hover:not(:has(span[data-ref]:hover)) > .lp5-output-text {
+                         span[data-ref]:not(.lp5-output-selected):hover:not(:has(span[data-ref]:hover)) > .lp5-output-text {
                              background-color: #ffe58a;
+                         }
+                         /* Nested expansions retain the ownership of their own text. */
+                         .lp5-output-selected > .lp5-output-text {
+                             background-color: #d9eaff;
                          }
                         </style>
                         <div id="root">
@@ -2864,7 +2874,7 @@ state awaitArticleDelete
                         <script>
                          let model       = require('model');
                          let {outputDiv} = require('dataID');
-                         const {publish} = require('controller');
+                         const {publish, subscribe} = require('controller');
                          const createFreeElement = require('createFreeElement');
 
                          let startTagRegex = /<lp5\s*((\/>)|(>)|([A-Za-z_]))/g;
@@ -2876,7 +2886,13 @@ state awaitArticleDelete
                              if(referenceSpan)
                                  publish('lp5NavSelect', referenceSpan.dataset.ref);
                          }
+                         function highlightSelection(){
+                             for(const span of outputDiv.querySelectorAll('span[data-ref]'))
+                                 span.classList.toggle('lp5-output-selected',
+                                     span.dataset.ref === model.selected_article_url);
+                         }
                          function init(iView){
+                             subscribe('lp5SelectArticle', highlightSelection);
                              let id    = "[_a-zA-Z]\w*";
                              let dval  = '"[^"\n\r]*"';
                              let sval  = "'[^'\n\r]*'";
@@ -3069,6 +3085,7 @@ state awaitArticleDelete
                              outputDiv.replaceChildren(); // empty the div
                              outputDiv.append(...renderArticles());
                              model.outputText = outputDiv.innerText;
+                             highlightSelection();
                          }
                          let result = {init:init, render:render};
                          return result;
@@ -5003,6 +5020,7 @@ state awaitArticleDelete
              model.nextArticleID    = 0;
              model.project         = null;
              model.projectName     = null;
+             model.selected_article_url = null;
              model.urlToResource    = null;
              model.articles         = new Articles();
              model.articleFromURL   = URL => Articles.fromURL(URL);
@@ -5406,8 +5424,12 @@ state awaitArticleDelete
              model.openProject = async function(name){
                  console.error("openProject ", name);
                  this.project = await window.LP5.modProjectIO.open_project(name);
+                 if(this.projectName !== name)
+                     this.selected_article_url = null;
                  this.projectName = name;
                  this.rootTOC = await this.loadTOC(name);
+                 if(!this.articleFromURL(this.selected_article_url))
+                     this.selected_article_url = null;
                  console.log("openProject got rootTOC of ", this.rootTOC);
                  console.assert(this.rootTOC.URL == name, this.rootTOC);
                  console.log("OpenProject returns after scheduling asyncComplete");
