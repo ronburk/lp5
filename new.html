@@ -1688,19 +1688,23 @@ state awaitArticleDelete
              dialog[open] { display: flex; flex-direction: column; }
              dialog::backdrop { background: rgb(18 24 32 / 48%); }
              .dialog-header { flex-shrink: 0; padding: .875rem 1.25rem; border-bottom: 1px solid #d8dde4; }
+             .dialog-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
              .dialog-title { margin: 0; font-size: 1.25rem; line-height: 1.3; }
-             .article-filename { margin: .25rem 0 0; color: #5c6673; font: .875rem/1.4 ui-monospace, monospace; }
+             .article-filename { margin: 0; color: #5c6673; font: .875rem/1.4 ui-monospace, monospace; text-align: right; overflow-wrap: anywhere; }
              .dialog-content {
                  flex: 1;
-                 display: grid;
-                 grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-                 gap: 1.25rem;
+                 display: flex;
                  min-height: 0;
                  overflow-y: auto;
                  padding: 1rem 1.25rem;
              }
-             .field-group { min-width: 0; }
-             .field-group + .field-group { padding-left: 1.25rem; border-left: 1px solid #e1e5ea; }
+             .field-group { min-width: 0; flex: 1 1 0; overflow: auto; }
+             .field-group:first-child { padding-right: .625rem; }
+             .field-group:last-child { padding-left: .625rem; }
+             .dialog-divider { flex: 0 0 1.25rem; position: relative; cursor: col-resize; touch-action: none; }
+             .dialog-divider::before { content: ""; position: absolute; inset: 0 auto 0 50%; width: 1px; background: #c4cbd4; transform: translateX(-50%); }
+             .dialog-divider:hover::before, .dialog-divider:focus-visible::before { width: 3px; background: #1769aa; }
+             .dialog-divider:focus-visible { outline: 2px solid #1769aa; outline-offset: -2px; }
              .field-group h3 { margin: 0 0 .625rem; font-size: 1rem; }
              .field { margin: 0 0 .75rem; }
              .field:last-child { margin-bottom: 0; }
@@ -1739,23 +1743,30 @@ state awaitArticleDelete
                  cursor: pointer;
              }
              button:hover { background: #eef1f4; }
+             button:disabled { opacity: .5; cursor: default; }
+             button[data-id="save"]:disabled { border-color: #7d8793; background: #e5e8ec; color: #59616b; }
              button:focus-visible { outline: 2px solid #1769aa; outline-offset: 2px; }
              button[data-id="save"] { border-color: #185a36; background: #216e42; color: white; }
              button[data-id="save"]:hover { background: #185a36; }
              @media (max-width: 48rem) {
-                 .dialog-content { grid-template-columns: minmax(0, 1fr); }
-                 .field-group + .field-group { padding: .875rem 0 0; border-left: 0; border-top: 1px solid #e1e5ea; }
+                 .dialog-content { flex-direction: column; }
+                 .dialog-divider { flex: 0 0 1.25rem; cursor: row-resize; }
+                 .dialog-divider::before { inset: 50% 0 auto; width: auto; height: 1px; transform: translateY(-50%); }
+                 .field-group:first-child { padding: 0 0 .625rem; }
+                 .field-group:last-child { padding: .625rem 0 0; }
                  .dialog-header, .dialog-content { padding-right: 1rem; padding-left: 1rem; }
                  .dialog-footer { padding-right: 1rem; padding-left: 1rem; }
              }
             </style>
             <dialog data-id="dialog" aria-labelledby="edit-article-title">
                 <header class="dialog-header">
-                    <h2 id="edit-article-title" data-id="dialogTitle" class="dialog-title"></h2>
-                    <p data-id="articleFilename" class="article-filename"></p>
+                    <div class="dialog-heading">
+                        <h2 id="edit-article-title" data-id="dialogTitle" class="dialog-title"></h2>
+                        <p data-id="articleFilename" class="article-filename"></p>
+                    </div>
                 </header>
-                <div class="dialog-content">
-                    <section class="field-group" aria-labelledby="article-fields-title">
+                <div data-id="dialogContent" class="dialog-content">
+                    <section data-id="articlePane" class="field-group" aria-labelledby="article-fields-title">
                         <h3 id="article-fields-title">Article</h3>
                         <div class="field">
                             <label for="article-title">Title</label>
@@ -1772,7 +1783,8 @@ state awaitArticleDelete
                             <p id="article-keywords-hint" class="hint">Enter one keyword per line.</p>
                         </div>
                     </section>
-                    <section class="field-group" aria-labelledby="code-fields-title">
+                    <div data-id="divider" class="dialog-divider" role="separator" aria-label="Resize Article and Code sections" aria-orientation="vertical" aria-valuemin="20" aria-valuemax="80" aria-valuenow="50" tabindex="0"></div>
+                    <section data-id="codePane" class="field-group" aria-labelledby="code-fields-title">
                         <h3 id="code-fields-title">Code</h3>
                         <div class="field">
                             <label for="article-code-name">Name</label>
@@ -1800,8 +1812,8 @@ state awaitArticleDelete
                  return result;
              }
 
-             function renderDialog(article, namedNodes, initialCodeName){
-                 const {articleTitle, articleFilename, docText, keywordText, codeText, codeName } = namedNodes;
+             function renderDialog(article, namedNodes, initialCodeName, isNewArticle){
+                 const {articleTitle, articleFilename, docText, keywordText, codeText, codeName, save } = namedNodes;
                  articleFilename.textContent = String(article.URL).split(/[\\/]/).pop();
                  let title = sectionGetTitle(article);
                  articleTitle.value = title ;
@@ -1815,6 +1827,12 @@ state awaitArticleDelete
                      : initialCodeName;
                  codeText.value = article.unindentCode(
                      Article2.codeEditorText(article.codeNode));
+                 namedNodes.initialValues = editableValues(namedNodes);
+                 save.disabled = !isNewArticle;
+             }
+
+             function editableValues({articleTitle, docText, keywordText, codeName, codeText}){
+                 return [articleTitle.value, docText.value, keywordText.value, codeName.value, codeText.value];
              }
 
              class EditArticle extends LP5Element {
@@ -1829,7 +1847,7 @@ state awaitArticleDelete
                  connectedCallback(){
                      super.connectedCallback();
                      renderDialog(this.#article, this.template.namedNodes,
-                                  this.#options.codeName);
+                                  this.#options.codeName, this.isNewArticle());
                      this.template.namedNodes.dialogTitle.textContent =
                          this.isNewArticle() ? 'Create article' : 'Edit article';
                      this.template.namedNodes.dialog.showModal();
@@ -1838,9 +1856,58 @@ state awaitArticleDelete
                      this.#article = null;
                  }
                  addListeners(){
-                     const {dialog, save, cancel} = this.template.namedNodes;
-                     save.addEventListener('click', ()=>this.saveClick());
+                     const {dialog, save, cancel, divider, articlePane, codePane, dialogContent} = this.template.namedNodes;
+                     const updateSaveState = ()=>{
+                         save.disabled = !this.isNewArticle()
+                             && editableValues(this.template.namedNodes).every((value, index)=>
+                                 value === this.template.namedNodes.initialValues[index]);
+                     };
+                     for(const input of [this.template.namedNodes.articleTitle,
+                                         this.template.namedNodes.docText,
+                                         this.template.namedNodes.keywordText,
+                                         this.template.namedNodes.codeName,
+                                         this.template.namedNodes.codeText])
+                         input.addEventListener('input', updateSaveState);
+                     save.addEventListener('click', ()=>{
+                         if(save.disabled) return;
+                         save.disabled = true;
+                         this.saveClick();
+                     });
                      cancel.addEventListener('click', ()=>this.cancelClick());
+                     const setSplit = (ratio)=>{
+                         ratio = Math.max(.2, Math.min(.8, ratio));
+                         articlePane.style.flex = `${ratio} 1 0`;
+                         codePane.style.flex = `${1 - ratio} 1 0`;
+                         divider.setAttribute('aria-valuenow', String(Math.round(ratio * 100)));
+                     };
+                     let dragStart = null;
+                     divider.addEventListener('pointerdown', event=>{
+                         if(event.button !== 0) return;
+                         dragStart = {x:event.clientX, y:event.clientY,
+                             ratio:Number(divider.getAttribute('aria-valuenow')) / 100};
+                         divider.setPointerCapture(event.pointerId);
+                         event.preventDefault();
+                     });
+                     divider.addEventListener('pointermove', event=>{
+                         if(!dragStart) return;
+                         const vertical = matchMedia('(max-width: 48rem)').matches;
+                         const extent = vertical ? dialogContent.clientHeight : dialogContent.clientWidth;
+                         const delta = vertical ? event.clientY - dragStart.y : event.clientX - dragStart.x;
+                         setSplit(dragStart.ratio + delta / extent);
+                     });
+                     const finishDrag = ()=>{ dragStart = null; };
+                     divider.addEventListener('pointerup', finishDrag);
+                     divider.addEventListener('pointercancel', finishDrag);
+                     divider.addEventListener('keydown', event=>{
+                         if(event.key !== 'ArrowLeft' && event.key !== 'ArrowRight'
+                             && event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+                         event.preventDefault();
+                         const vertical = matchMedia('(max-width: 48rem)').matches;
+                         if((vertical && event.key !== 'ArrowUp' && event.key !== 'ArrowDown')
+                             || (!vertical && event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return;
+                         const direction = event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 1;
+                         setSplit(Number(divider.getAttribute('aria-valuenow')) / 100 + direction * .02);
+                     });
                      dialog.addEventListener('cancel', event=>{
                          event.preventDefault();
                          this.cancelClick();
@@ -5752,5 +5819,3 @@ return {
         </script>
     </body>
 </html>
-
-
