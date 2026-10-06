@@ -81,7 +81,7 @@ export async function run_output_selection_tests(model, views) {
     }
     try {
         await reload();
-        const expected = 'prefix\nouter-before\ninner-bodyouter-afterouter-secondmiddle\nouter-before\ninner-bodyouter-afterouter-secondsuffixquoted-body';
+        const expected = 'prefix\nouter-before\ninner-body\nouter-after\nouter-second\nmiddle\nouter-before\ninner-body\nouter-after\nouter-second\nsuffix\nquoted-body\n';
         check_output(expected);
         check(selected().length === 0, 'A new project has no inherited selection');
         await select_source('0.lp5');

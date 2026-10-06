@@ -3889,7 +3889,9 @@ state awaitArticleDelete
                                  else if(node.nodeType === Node.ELEMENT_NODE)
                                      serialized += this.escapeHTML(new XMLSerializer().serializeToString(node));
                              }
-                             this.escapedScript = trimLines(serialized);
+                             const endsWithNewline = /(?:\r\n|\r|\n)$/.test(serialized);
+                             this.escapedScript = trimLines(serialized)
+                                 + (endsWithNewline ? '\n' : '');
                          }
                          this.codeParsed = parseCode(this.escapedScript);
                          this.name = this.codeSectionNode ?
