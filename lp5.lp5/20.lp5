@@ -1,14 +1,33 @@
-<template><heading>Controller</heading><section data-lp5-kind="explanation">Event dispatch is a kind of hierarchical state machine, implemented with a stack where push is a "call" and pop is a "return".</section><section data-lp5-kind="code"><name>Outermost scope objects</name><code><![CDATA[let handlerStack = new Array(); // top of stack is current event handler
+<template>
+    <heading>Controller</heading>
+    <section data-lp5-kind="explanation">Event dispatch is a kind of hierarchical state machine, implemented with a stack where push is a "call" and pop is a "return".</section>
+    <section data-lp5-kind="code">
+        <name>Outermost scope objects</name>
+        <code><![CDATA[let controller = (() => {
+    let handlerStack = new Array(); // top of stack is current event handler
 
-function baseEventHandler(event){
-   let handler;
-   for(let handler; (handler = handlerStack.at(-1)) !== undefined; ){
-       let result = handler.dispatch.next(event);
-       if(result.done)
-           handlerStack.pop()
-       else if(result.value === handler) // keep same handler
-           break;
-       else
-           handlerStack.push(result.value);
-       }
-}]]></code></section></template>
+    function baseEventHandler(event) {
+        for (let handler; (handler = handlerStack.at(-1)) !== undefined; ) {
+            let result = handler.dispatch.next(event);
+            if (result.done)
+                handlerStack.pop()
+            else if (result.value === handler) // keep same handler
+                return;
+            else
+                handlerStack.push(result.value);
+        }
+
+        if (!(event instanceof InitEventHandler))
+            throw new TypeError("Expected InitEventHandler when handler stack is empty");
+        if (event.handler === undefined)
+            throw new TypeError("InitEventHandler must supply a handler");
+
+        handlerStack.push(event.handler);
+    }
+
+    return {
+        dispatch: baseEventHandler
+    };
+})();]]></code>
+    </section>
+</template>
