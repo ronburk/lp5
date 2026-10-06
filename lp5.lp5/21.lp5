@@ -1,12 +1,38 @@
 <template>
     <heading>Operations</heading>
+    <keywords>
+        <li>operations</li>
+        <li>generator</li>
+        <li>coroutine</li>
+        <li>event handler</li>
+        <li>initialization</li>
+        <li>to_handler</li>
+    </keywords>
     <section data-lp5-kind="explanation">
-        <p>Operations will hold the application's multi-step operations. Keep it separate from the controller so each module has a clear role. The object is a placeholder for now.</p>
+        <p>Operations hold the application's multi-step event handlers. Each handler is a generator object, created and primed by <code>to_handler</code>. The generator receives a function that returns its own object; calling that function after construction avoids accessing the object before it exists.</p>
+        <p>The base handler receives events and ignores them for now. It yields itself to remain the current handler. Operations install the primed base handler with <code>controller.init</code> before any events are dispatched.</p>
     </section>
     <section data-lp5-kind="code">
         <name>Outermost scope objects</name>
-        <code><![CDATA[            let operations = (() => {
+        <code><![CDATA[
+let operations = (() => {
+    function to_handler(generator) {
+        const handler = generator(() => handler);
+        handler.next();
+        return handler;
+    }
+
+    function* baseOperationsHandler(self) {
+        while (true) {
+            let event = yield self();
+        }
+    }
+
+    const handler = to_handler(baseOperationsHandler);
+    controller.init(handler);
+
     return {};
-})();]]></code>
+})();
+]]></code>
     </section>
 </template>

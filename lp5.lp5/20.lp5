@@ -9,7 +9,7 @@
     </keywords>
     <section data-lp5-kind="explanation">
         <p>Event dispatch is a kind of hierarchical state machine, implemented with a stack where push is a "call" and pop is a "return".</p>
-        <p>Call <code>init(handler)</code> once to install the first handler. The stack is undefined until initialization creates it. An empty stack still records that initialization has occurred, so a second call throws an error even after dispatch removes the last handler.</p>
+        <p>Each handler is a generator object. Call <code>init(handler)</code> once to install the first handler. The stack is undefined until initialization creates it. An empty stack still records that initialization has occurred, so a second call throws an error even after dispatch removes the last handler.</p>
     </section>
     <section data-lp5-kind="code">
         <name>Outermost scope objects</name>
@@ -24,7 +24,7 @@
 
     function baseEventHandler(event) {
         for (let handler; (handler = handlerStack.at(-1)) !== undefined; ) {
-            let result = handler.dispatch.next(event);
+            let result = handler.next(event);
             if (result.done)
                 handlerStack.pop()
             else if (result.value === handler) // keep same handler
