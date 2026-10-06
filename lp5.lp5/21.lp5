@@ -5,8 +5,7 @@
     </section>
     <section data-lp5-kind="code">
         <name>Outermost scope objects</name>
-        <code><![CDATA[
-let operations = (() => {
+        <code><![CDATA[            let operations = (() => {
     return {};
 })();]]></code>
     </section>
