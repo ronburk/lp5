@@ -2771,19 +2771,7 @@ state awaitArticleDelete
                          const controller = require('controller');
                          const {deferEvent,publish,subscribe} = controller;
                          const iView            = this;
-                         let showArticleDetails = false;
-
-                         function setArticleDetailsVisible(visible){
-                             showArticleDetails = visible;
-                             outerDiv.querySelectorAll('.lp5ArticleDetails')
-                                 .forEach(details => details.hidden = !visible);
-                             outerDiv.querySelectorAll('.lp5ArticleDetailsToggle')
-                                 .forEach(toggle => {
-                                     toggle.setAttribute('aria-expanded', String(visible));
-                                     toggle.setAttribute('aria-label',
-                                         visible ? 'Hide article details' : 'Show article details');
-                                 });
-                         }
+                         const expandedArticleDetails = new Set();
 
                          function articleNodeFromClick(event){
                              let result = null;
@@ -2902,7 +2890,8 @@ state awaitArticleDelete
 
                              const details = document.createElement('div');
                              details.className = 'lp5ArticleDetails';
-                             details.hidden = !showArticleDetails;
+                             const detailsVisible = expandedArticleDetails.has(article.URL);
+                             details.hidden = !detailsVisible;
                              const filename = document.createElement('div');
                              filename.className = 'lp5ArticleDetailsFilename';
                              filename.textContent = article.URL;
@@ -2916,12 +2905,20 @@ state awaitArticleDelete
                                  toggle.className = 'lp5ArticleDetailsToggle';
                                  toggle.type = 'button';
                                  toggle.textContent = 'ⓘ';
-                                 toggle.setAttribute('aria-label', showArticleDetails
+                                 toggle.setAttribute('aria-label', detailsVisible
                                      ? 'Hide article details' : 'Show article details');
-                                 toggle.setAttribute('aria-expanded', String(showArticleDetails));
+                                 toggle.setAttribute('aria-expanded', String(detailsVisible));
                                  toggle.addEventListener('click', event => {
                                      event.stopPropagation();
-                                     setArticleDetailsVisible(!showArticleDetails);
+                                     const visible = !expandedArticleDetails.has(article.URL);
+                                     if(visible)
+                                         expandedArticleDetails.add(article.URL);
+                                     else
+                                         expandedArticleDetails.delete(article.URL);
+                                     details.hidden = !visible;
+                                     toggle.setAttribute('aria-expanded', String(visible));
+                                     toggle.setAttribute('aria-label',
+                                         visible ? 'Hide article details' : 'Show article details');
                                  });
                                  header.appendChild(toggle);
                              }
