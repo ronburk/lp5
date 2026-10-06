@@ -14,8 +14,30 @@ Before editing, fetch from GitHub and verify the checkout's branch and base comm
 
 ## GitHub connector tool interface
 
-For remote branch creation, use the established
-`mcp__codex_apps__github_create_branch` tool when available. Its arguments are:
+For all GitHub remote writes, use the established
+`mcp__codex_apps__github_*` tool family when available. This applies throughout
+publication: `create_blob`, `create_tree`, `create_commit`, `create_branch`,
+`update_ref`, `create_pull_request`, and `merge_pull_request`, as well as other
+remote-write operations. Prefer the same family for reads when available.
+Discover the exposed tools and inspect their schemas before choosing an
+interface; do not invent a tool name or assume a tool is unavailable without
+checking.
+
+For example, `mcp__codex_apps__github_create_blob` takes:
+
+```json
+{
+    "repository_full_name": "ronburk/lp5",
+    "content": "<base64-file-contents>",
+    "encoding": "base64"
+}
+```
+
+Supply the actual encoded file contents. The tool also accepts `encoding`
+`"utf-8"` for literal text. Check every result before passing its returned SHA
+to the next operation; do not proceed after a failed write.
+
+For remote branch creation, `mcp__codex_apps__github_create_branch` takes:
 
 ```json
 {
@@ -30,13 +52,17 @@ connector-created commit, use that commit's SHA. The tool also accepts
 `base_ref` instead of `sha`; provide exactly one. Creating a local branch with
 `git switch -c <task-branch>` is a separate operation.
 
-A different exposed interface has been observed as
-`/connector_.../link_.../create_branch`, with arguments named `Repository`,
-`Branch`, and `base_ref`. Both interfaces access GitHub, but do not assume
-they share tool identity or remembered approvals. If the established tool is
-unavailable, report that and identify the alternative tool before switching
-interfaces; do not silently substitute it. Inspect the available tool's
-schema rather than reusing another interface's argument names.
+A different exposed interface has been observed through generic `call_tool`
+paths such as `/connector_.../link_.../create_branch` and
+`/connector_.../link_.../create_blob`. Its branch arguments include `Repository`,
+`Branch`, and `base_ref`; its blob arguments include `Repository`, `Content`,
+and `encoding`. Both interfaces access GitHub, but do not assume they share
+tool identity or remembered approvals. The interface preference applies to
+every operation, not only branch creation: do not switch to generic
+`call_tool` paths while the corresponding established tool is available. If
+that tool is unavailable, report that and identify the alternative tool
+before switching interfaces; do not silently substitute it. Inspect the
+available tool's schema rather than reusing another interface's argument names.
 
 Repeated "Always allow" prompts have been observed, but their cause and the
 scope of saved approvals are not established. An interface change is a
