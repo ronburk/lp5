@@ -1,10 +1,28 @@
 <template>
     <heading>Controller</heading>
-    <section data-lp5-kind="explanation">Event dispatch is a kind of hierarchical state machine, implemented with a stack where push is a "call" and pop is a "return".</section>
+    <keywords>
+        <li>controller</li>
+        <li>event dispatch</li>
+        <li>handler stack</li>
+        <li>initialization</li>
+        <li>state machine</li>
+    </keywords>
+    <section data-lp5-kind="explanation">
+        <p>Event dispatch is a kind of hierarchical state machine, implemented with a stack where push is a "call" and pop is a "return".</p>
+        <p>Call <code>init(handler)</code> once to install the first handler. Initialization remains complete even if dispatch later empties the stack; a second call throws an error.</p>
+    </section>
     <section data-lp5-kind="code">
         <name>Outermost scope objects</name>
         <code><![CDATA[let controller = (() => {
     let handlerStack = new Array(); // top of stack is current event handler
+    let initialized = false;
+
+    function init(handler) {
+        if (initialized)
+            throw new Error("Controller has already been initialized");
+        handlerStack.push(handler);
+        initialized = true;
+    }
 
     function baseEventHandler(event) {
         for (let handler; (handler = handlerStack.at(-1)) !== undefined; ) {
@@ -16,16 +34,10 @@
             else
                 handlerStack.push(result.value);
         }
-
-        if (!(event instanceof InitEventHandler))
-            throw new TypeError("Expected InitEventHandler when handler stack is empty");
-        if (event.handler === undefined)
-            throw new TypeError("InitEventHandler must supply a handler");
-
-        handlerStack.push(event.handler);
     }
 
     return {
+        init: init,
         dispatch: baseEventHandler
     };
 })();
