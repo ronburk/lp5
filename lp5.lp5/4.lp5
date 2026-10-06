@@ -33,7 +33,7 @@
             return {
                 ]]><lp5- ref="Outermost scope object names"/><![CDATA[
                 };
-        )();
+        })();
     </script>
 </head>
 <body>
