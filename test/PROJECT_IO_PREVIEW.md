@@ -53,6 +53,25 @@ The adapter exposes its in-memory writes only in explicit test mode as
 and saved contents. It contains no native picker, IndexedDB, or filesystem
 handle calls.
 
+## Article popup editor checks
+
+1. Select `0.lp5`, then right-click `1.lp5` in Source and choose **Edit Article**.
+   Confirm the popup closes and the existing editor identifies `1.lp5`, with
+   its title, explanation, unnamed code name, and reference text prefilled.
+   The right-click target must take precedence over the selected article.
+2. Change a field and click **Cancel**. Confirm the editor closes and
+   **Inspect storage** reports no writes. Reopen from the navigation row for
+   `0.lp5`; confirm its filename and `Greeting` code name are prefilled.
+3. Edit the title/code and click **Save**. Reload the project; confirm the
+   source, navigation, and expanded Output reflect the edits, and storage
+   contains only the edited article's existing filename.
+4. Right-click the root. **Edit Article** must remain available while sibling
+   insertion and deletion remain hidden. Open the editor and press Escape;
+   confirm it closes. Ctrl-Shift-click a Source article and confirm the same
+   editor still opens with the correct filename.
+5. Reopen the article popup and choose **Move Article**. Confirm the existing
+   hierarchy dialog opens for that article; close it normally.
+
 ## Article deletion checks
 
 Run `node test/delete_article.js` for the project-store removal contract, then
