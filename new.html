@@ -1672,7 +1672,9 @@ state awaitArticleDelete
              dialog {
                  box-sizing: border-box;
                  width: min(54rem, calc(100vw - 2rem));
-                 max-width: none;
+                 min-width: min(42rem, calc(100vw - 2rem));
+                 max-width: calc(100vw - 2rem);
+                 resize: horizontal;
                  max-height: calc(100vh - 2rem);
                  overflow: hidden;
                  padding: 0;
