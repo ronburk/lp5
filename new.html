@@ -2175,27 +2175,62 @@ state awaitArticleDelete
                  flex-grow: 1;
                  width: 100%;
                  min-height: 0;
+                 min-width: 0;
              }
              #LP5-Toc {
                  overflow: auto;
                  height: 100%;
                  font-family: Helvetica;
-                 resize: horizontal;
-                 width: 15%;
+                 box-sizing: border-box;
+                 flex: 15 1 0px;
+                 min-width: 120px;
              }
              #LP5-Source{
                  position: relative;
                  background-color: #FFFFEB;
                  overflow: auto;
-                 resize: horizontal;
-                 width: 60%;
+                 box-sizing: border-box;
+                 flex: 60 1 0px;
+                 min-width: 200px;
              }
              #LP5-Output{
                  white-space: pre-wrap;
                  height: 100%;
-                 width: 25%;
                  overflow: auto;
                  margin: 0;
+                 box-sizing: border-box;
+                 flex: 25 1 0px;
+                 min-width: 160px;
+             }
+             .LP5-PaneSplitter {
+                 position: relative;
+                 z-index: 1;
+                 flex: 0 0 10px;
+                 width: 10px;
+                 min-width: 10px;
+                 padding: 0;
+                 border: 0;
+                 background: transparent;
+                 cursor: col-resize;
+                 touch-action: none;
+                 user-select: none;
+                 outline: none;
+             }
+             .LP5-PaneSplitter::after {
+                 content: "";
+                 position: absolute;
+                 top: 0;
+                 bottom: 0;
+                 left: 4px;
+                 width: 2px;
+                 background: #b9b9b9;
+             }
+             .LP5-PaneSplitter:hover::after,
+             .LP5-PaneSplitter:focus-visible::after,
+             #LP5-Middle.lp5-resizing .LP5-PaneSplitter::after {
+                 left: 3px;
+                 width: 4px;
+                 background: #555;
              }
 
              #LP5-Footer{
@@ -2243,6 +2278,94 @@ state awaitArticleDelete
              }
              function init(thisView){
                  iView.routeEvent = routeEvent;
+                 const homeRoot = thisView.rootNode.shadowRoot;
+                 const middle = homeRoot.querySelector('#LP5-Middle');
+                 const panes = [
+                     homeRoot.querySelector('#LP5-Toc'),
+                     homeRoot.querySelector('#LP5-Source'),
+                     homeRoot.querySelector('#LP5-Output')
+                 ];
+                 ['Navigation', 'Source', 'Output'].forEach((label, index) =>
+                     panes[index].setAttribute('aria-label', label));
+                 const splitters = [...middle.querySelectorAll('.LP5-PaneSplitter')];
+                 const minWidths = [120, 200, 160];
+
+                 function paneWidths(){
+                     return panes.map(pane => pane.getBoundingClientRect().width);
+                 }
+                 function availableWidth(){
+                     return Math.max(1, middle.clientWidth
+                         - splitters.reduce((sum, splitter) => sum + splitter.offsetWidth, 0));
+                 }
+                 function updateSplitter(splitter, leftIndex){
+                     const widths = paneWidths();
+                     const pairWidth = widths[leftIndex] + widths[leftIndex + 1];
+                     splitter.setAttribute('aria-valuemin', minWidths[leftIndex]);
+                     splitter.setAttribute('aria-valuemax', Math.floor(pairWidth - minWidths[leftIndex + 1]));
+                     splitter.setAttribute('aria-valuenow', Math.round(widths[leftIndex]));
+                     splitter.setAttribute('aria-valuetext',
+                         `${Math.round(widths[leftIndex])} pixels for ${panes[leftIndex].getAttribute('aria-label')}`);
+                 }
+                 function updateAllSplitters(){
+                     splitters.forEach((splitter, index) => updateSplitter(splitter, index));
+                 }
+                 function resizePair(leftIndex, leftWidth){
+                     const widths = paneWidths();
+                     const available = availableWidth();
+                     const pairWidth = widths[leftIndex] + widths[leftIndex + 1];
+                     const boundedLeft = Math.min(pairWidth - minWidths[leftIndex + 1],
+                         Math.max(minWidths[leftIndex], leftWidth));
+                     // Use flex-grow weights so pane proportions survive viewport resizing.
+                     panes.forEach((pane, index) => {
+                         pane.style.flexGrow = String(widths[index] / available * 100);
+                     });
+                     panes[leftIndex].style.flexGrow = String(boundedLeft / available * 100);
+                     panes[leftIndex + 1].style.flexGrow = String((pairWidth - boundedLeft) / available * 100);
+                     updateAllSplitters();
+                 }
+                 splitters.forEach((splitter, leftIndex) => {
+                     splitter.addEventListener('pointerdown', event => {
+                         if(event.button !== 0) return;
+                         event.preventDefault();
+                         const widths = paneWidths();
+                         // Normalize the starting flex weights to the rendered sizes.
+                         const available = availableWidth();
+                         panes.forEach((pane, index) => {
+                             pane.style.flexGrow = String(widths[index] / available * 100);
+                         });
+                         splitter.setPointerCapture(event.pointerId);
+                         middle.classList.add('lp5-resizing');
+                         splitter.dataset.startX = String(event.clientX);
+                         splitter.dataset.startWidth = String(widths[leftIndex]);
+                     });
+                     splitter.addEventListener('pointermove', event => {
+                         if(!splitter.hasPointerCapture(event.pointerId)) return;
+                         resizePair(leftIndex,
+                             Number(splitter.dataset.startWidth) + event.clientX - Number(splitter.dataset.startX));
+                     });
+                     const stopResize = event => {
+                         if(splitter.hasPointerCapture(event.pointerId))
+                             splitter.releasePointerCapture(event.pointerId);
+                         middle.classList.remove('lp5-resizing');
+                     };
+                     splitter.addEventListener('pointerup', stopResize);
+                     splitter.addEventListener('pointercancel', stopResize);
+                     splitter.addEventListener('lostpointercapture', () => middle.classList.remove('lp5-resizing'));
+                     splitter.addEventListener('keydown', event => {
+                         const widths = paneWidths();
+                         const pairWidth = widths[leftIndex] + widths[leftIndex + 1];
+                         const amount = event.shiftKey ? 40 : 10;
+                         let nextWidth;
+                         if(event.key === 'ArrowLeft') nextWidth = widths[leftIndex] - amount;
+                         else if(event.key === 'ArrowRight') nextWidth = widths[leftIndex] + amount;
+                         else if(event.key === 'Home') nextWidth = minWidths[leftIndex];
+                         else if(event.key === 'End') nextWidth = pairWidth - minWidths[leftIndex + 1];
+                         else return;
+                         event.preventDefault();
+                         resizePair(leftIndex, nextWidth);
+                     });
+                 });
+                 new ResizeObserver(updateAllSplitters).observe(middle);
 //                 console.warn(thisView, thisView.views);
              }
              function render(iView, message){
@@ -2424,6 +2547,9 @@ state awaitArticleDelete
                          return result;
                         </script>
                     </template>
+                    <div class="LP5-PaneSplitter" role="separator" tabindex="0"
+                         aria-label="Resize navigation and source panes" aria-orientation="vertical"
+                         aria-controls="LP5-Toc LP5-Source"></div>
                     <template data-name="sourceDiv" id="LP5-Source">
                         <style>
                          article {
@@ -2865,6 +2991,9 @@ state awaitArticleDelete
                          return result;
                         </script>
                     </template>
+                    <div class="LP5-PaneSplitter" role="separator" tabindex="0"
+                         aria-label="Resize source and output panes" aria-orientation="vertical"
+                         aria-controls="LP5-Source LP5-Output"></div>
                     <template data-name="outputDiv" id="LP5-Output">
                         <style>
                          #root { display: flex; flex-direction: column; }
