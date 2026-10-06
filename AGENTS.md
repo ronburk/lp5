@@ -12,6 +12,36 @@ An extra Git worktree is unnecessary when your private clone is isolated.
 
 Before editing, fetch from GitHub and verify the checkout's branch and base commit. Preserve unrelated local changes and use a task-specific branch. Before merging a PR, fetch again; if `main` has advanced, update the branch and rerun relevant checks. Merge only when the PR is conflict-free. Use the GitHub connector for remote writes when available.
 
+## GitHub connector tool interface
+
+For remote branch creation, use the established
+`mcp__codex_apps__github_create_branch` tool when available. Its arguments are:
+
+```json
+{
+    "repository_full_name": "ronburk/lp5",
+    "branch_name": "<task-branch>",
+    "sha": "<commit-sha>"
+}
+```
+
+Supply the actual task branch and existing commit SHA; when publishing a
+connector-created commit, use that commit's SHA. The tool also accepts
+`base_ref` instead of `sha`; provide exactly one. Creating a local branch with
+`git switch -c <task-branch>` is a separate operation.
+
+A different exposed interface has been observed as
+`/connector_.../link_.../create_branch`, with arguments named `Repository`,
+`Branch`, and `base_ref`. Both interfaces access GitHub, but do not assume
+they share tool identity or remembered approvals. If the established tool is
+unavailable, report that and identify the alternative tool before switching
+interfaces; do not silently substitute it. Inspect the available tool's
+schema rather than reusing another interface's argument names.
+
+Repeated "Always allow" prompts have been observed, but their cause and the
+scope of saved approvals are not established. An interface change is a
+possible explanation, not a confirmed diagnosis.
+
 ## OpenAI Work environment recovery
 
 Before reporting that setup is blocked, inspect the exact error and the active
