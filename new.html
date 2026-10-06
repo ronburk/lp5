@@ -2702,6 +2702,41 @@ state awaitArticleDelete
                          .lp5ArticleHeading {
                              margin: .1em 0;
                          }
+                         .lp5ArticleHeader {
+                             display: flex;
+                             align-items: baseline;
+                             gap: .4em;
+                         }
+                         .lp5ArticleHeader .lp5ArticleHeading {
+                             display: inline;
+                         }
+                         .lp5ArticleDetailsToggle {
+                             flex: 0 0 auto;
+                             border: 0;
+                             padding: 0;
+                             color: #555;
+                             background: transparent;
+                             font: inherit;
+                             line-height: 1;
+                             cursor: pointer;
+                         }
+                         .lp5ArticleDetailsToggle:hover,
+                         .lp5ArticleDetailsToggle:focus-visible {
+                             color: #000;
+                             text-decoration: underline;
+                         }
+                         .lp5ArticleDetails[hidden] {
+                             display: none;
+                         }
+                         .lp5ArticleDetails {
+                             margin: 0 0 .35em;
+                             color: #5c6673;
+                             font-size: .85em;
+                         }
+                         .lp5ArticleDetailsFilename {
+                             font-family: ui-monospace, monospace;
+                             overflow-wrap: anywhere;
+                         }
                          .LP5-ArticleContent {
                              margin-left: .25em;
                          }
@@ -2736,6 +2771,19 @@ state awaitArticleDelete
                          const controller = require('controller');
                          const {deferEvent,publish,subscribe} = controller;
                          const iView            = this;
+                         let showArticleDetails = false;
+
+                         function setArticleDetailsVisible(visible){
+                             showArticleDetails = visible;
+                             outerDiv.querySelectorAll('.lp5ArticleDetails')
+                                 .forEach(details => details.hidden = !visible);
+                             outerDiv.querySelectorAll('.lp5ArticleDetailsToggle')
+                                 .forEach(toggle => {
+                                     toggle.setAttribute('aria-expanded', String(visible));
+                                     toggle.setAttribute('aria-label',
+                                         visible ? 'Hide article details' : 'Show article details');
+                                 });
+                         }
 
                          function articleNodeFromClick(event){
                              let result = null;
@@ -2842,12 +2890,44 @@ state awaitArticleDelete
                          let codeNameToArticle = {};
                          let codeReferrers     = {};
                          function renderHeading(article){
-                             let result  = ""
-                             let heading = article.sections.heading;
-                             if(heading){
-                                 result = `<h2 class="lp5ArticleHeading">${heading.innerHTML}</h2>`;
+                             const header = document.createElement('div');
+                             header.className = 'lp5ArticleHeader';
+                             const heading = document.createElement('h2');
+                             heading.className = 'lp5ArticleHeading';
+                             const title = article.sections.heading;
+                             if(title){
+                                 heading.innerHTML = title.innerHTML;
+                                 header.appendChild(heading);
                              }
-                             return result;
+
+                             const details = document.createElement('div');
+                             details.className = 'lp5ArticleDetails';
+                             details.hidden = !showArticleDetails;
+                             const filename = document.createElement('div');
+                             filename.className = 'lp5ArticleDetailsFilename';
+                             filename.textContent = article.URL;
+                             details.appendChild(filename);
+                             const keywords = renderKeywords(article);
+                             if(keywords)
+                                 details.appendChild(keywords);
+
+                             if(article.URL || article.keywords.length){
+                                 const toggle = document.createElement('button');
+                                 toggle.className = 'lp5ArticleDetailsToggle';
+                                 toggle.type = 'button';
+                                 toggle.textContent = 'ⓘ';
+                                 toggle.setAttribute('aria-label', showArticleDetails
+                                     ? 'Hide article details' : 'Show article details');
+                                 toggle.setAttribute('aria-expanded', String(showArticleDetails));
+                                 toggle.addEventListener('click', event => {
+                                     event.stopPropagation();
+                                     setArticleDetailsVisible(!showArticleDetails);
+                                 });
+                                 header.appendChild(toggle);
+                             }
+                             const wrapper = document.createElement('div');
+                             wrapper.append(header, details);
+                             return wrapper;
                          }
                          function renderKeywords(article){
                              if(!article.keywords.length)
@@ -2930,12 +3010,9 @@ state awaitArticleDelete
                              console.log("source pane renderArticle ", article);
                              let articleNode = document.createElement('ARTICLE');
                              articleNode.setAttribute('tabIndex', 0);
-                             articleNode.innerHTML = renderHeading(article);
+                             articleNode.appendChild(renderHeading(article));
                              const content = document.createElement('div');
                              content.className = 'LP5-ArticleContent';
-                             const keywords = renderKeywords(article);
-                             if(keywords)
-                                 content.appendChild(keywords);
                              content.insertAdjacentHTML('beforeend',
                                  renderExplanation(article) +
                                  renderName(article) +

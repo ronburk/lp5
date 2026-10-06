@@ -1,5 +1,6 @@
 <template>
     <heading>Named code definition</heading>
+    <keywords><li>fixture-code</li></keywords>
     <section data-lp5-kind="explanation">
         <p>This child defines the named Greeting code section.</p>
     </section>
