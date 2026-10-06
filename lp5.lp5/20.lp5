@@ -28,6 +28,7 @@
     return {
         dispatch: baseEventHandler
     };
-})();]]></code>
+})();
+]]></code>
     </section>
 </template>
