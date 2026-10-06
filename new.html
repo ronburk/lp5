@@ -128,6 +128,10 @@ state articleContextMenu
         console.assert(pendingArticleContext);
         const article_url = pendingArticleContext.articleURL;
         pendingArticleContext = null;
+        if(event.detail[0] === 'editArticle') {
+            openArticleEditor(article_url);
+    ->      editingArticle
+        }
         if(event.detail[0] === 'deleteArticle') {
             if(!window.confirm(`Delete article '${article_url}'? Its children will take its place in the hierarchy.`)) {
     ->          home
@@ -1375,6 +1379,7 @@ state awaitArticleDelete
 
         <template data-custom="lp5-articlecontextmenu" data-extends="lp5-contextmenu">
             <ul data-id="ul" role="menu" aria-label="Article actions">
+                <li data-cmd="editArticle" role="menuitem" tabindex="-1">Edit Article</li>
                 <li data-position="-1" data-cmd="createArticle -1" role="menuitem" tabindex="-1">Insert New Article Before</li>
                 <li data-position="1" data-cmd="createArticle 1" role="menuitem" tabindex="-1">Append New Article After</li>
                 <li data-position="0" data-cmd="createArticle 0" role="menuitem" tabindex="-1">Create First Child Article</li>
