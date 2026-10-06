@@ -72,6 +72,20 @@ handle calls.
 5. Reopen the article popup and choose **Move Article**. Confirm the existing
    hierarchy dialog opens for that article; close it normally.
 
+## Editor width resizing checks
+
+1. Open **Edit Article** and drag the dialog's bottom-right resize handle
+   horizontally. Both columns and their text boxes should widen together;
+   the dialog height and field values should remain unchanged.
+2. Drag back to narrow the dialog. It must stop at 42rem, or the viewport width
+   minus 2rem on smaller screens. Widening must stop at the viewport width
+   minus 2rem; fields must not overlap or cause horizontal content overflow.
+3. Drag a text box's own handle vertically. Its height should still change
+   independently. Confirm Save and Cancel remain visible and usable.
+4. Change a field after resizing, cancel, and inspect storage: no write should
+   occur. Reopen, resize, edit, save, and reload: the edit should persist through
+   the existing save path. Each new editor starts at its normal compact width.
+
 ## Article deletion checks
 
 Run `node test/delete_article.js` for the project-store removal contract, then
