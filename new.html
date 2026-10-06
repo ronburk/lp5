@@ -1674,7 +1674,8 @@ state awaitArticleDelete
                  width: min(54rem, calc(100vw - 2rem));
                  min-width: min(42rem, calc(100vw - 2rem));
                  max-width: calc(100vw - 2rem);
-                 resize: horizontal;
+                 resize: both;
+                 min-height: min(20rem, calc(100vh - 2rem));
                  max-height: calc(100vh - 2rem);
                  overflow: hidden;
                  padding: 0;
@@ -1690,6 +1691,7 @@ state awaitArticleDelete
              .dialog-title { margin: 0; font-size: 1.25rem; line-height: 1.3; }
              .article-filename { margin: .25rem 0 0; color: #5c6673; font: .875rem/1.4 ui-monospace, monospace; }
              .dialog-content {
+                 flex: 1;
                  display: grid;
                  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
                  gap: 1.25rem;

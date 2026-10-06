@@ -72,7 +72,7 @@ handle calls.
 5. Reopen the article popup and choose **Move Article**. Confirm the existing
    hierarchy dialog opens for that article; close it normally.
 
-## Editor width resizing checks
+## Editor resizing checks
 
 1. Open **Edit Article** and drag the dialog's bottom-right resize handle
    horizontally. Both columns and their text boxes should widen together;
@@ -80,11 +80,16 @@ handle calls.
 2. Drag back to narrow the dialog. It must stop at 42rem, or the viewport width
    minus 2rem on smaller screens. Widening must stop at the viewport width
    minus 2rem; fields must not overlap or cause horizontal content overflow.
-3. Drag a text box's own handle vertically. Its height should still change
+3. Drag the dialog handle vertically or diagonally. It should become taller
+   or shorter, with Save and Cancel anchored at the bottom. Shortening stops
+   at 20rem (or the viewport height minus 2rem on smaller screens); overflowing
+   fields scroll within the content area. Growing stops at the viewport height
+   minus 2rem. Field values must remain unchanged.
+4. Drag a text box's own handle vertically. Its height should still change
    independently. Confirm Save and Cancel remain visible and usable.
-4. Change a field after resizing, cancel, and inspect storage: no write should
+5. Change a field after resizing, cancel, and inspect storage: no write should
    occur. Reopen, resize, edit, save, and reload: the edit should persist through
-   the existing save path. Each new editor starts at its normal compact width.
+   the existing save path. Each new editor starts at its normal compact size.
 
 ## Article deletion checks
 
