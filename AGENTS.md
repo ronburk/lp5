@@ -12,7 +12,7 @@ An extra Git worktree is unnecessary when your private clone is isolated.
 
 Before editing, fetch from GitHub and verify the checkout's branch and base commit. Preserve unrelated local changes and use a task-specific branch. Before merging a PR, fetch again; if `main` has advanced, update the branch and rerun relevant checks. Merge only when the PR is conflict-free. Use the GitHub connector for remote writes when available.
 
-## GitHub connector tool interface
+## GitHub connector tools and approval diagnostics
 
 For all GitHub remote writes, use the established
 `mcp__codex_apps__github_*` tool family when available. This applies throughout
@@ -22,6 +22,9 @@ remote-write operations. Prefer the same family for reads when available.
 Discover the exposed tools and inspect their schemas before choosing an
 interface; do not invent a tool name or assume a tool is unavailable without
 checking.
+
+These tool names specify the agent's invocation interface; using them does
+not guarantee that OpenAI Work will omit approval prompts.
 
 For example, `mcp__codex_apps__github_create_blob` takes:
 
@@ -52,21 +55,36 @@ connector-created commit, use that commit's SHA. The tool also accepts
 `base_ref` instead of `sha`; provide exactly one. Creating a local branch with
 `git switch -c <task-branch>` is a separate operation.
 
-A different exposed interface has been observed through generic `call_tool`
-paths such as `/connector_.../link_.../create_branch` and
-`/connector_.../link_.../create_blob`. Its branch arguments include `Repository`,
-`Branch`, and `base_ref`; its blob arguments include `Repository`, `Content`,
-and `encoding`. Both interfaces access GitHub, but do not assume they share
-tool identity or remembered approvals. The interface preference applies to
-every operation, not only branch creation: do not switch to generic
-`call_tool` paths while the corresponding established tool is available. If
-that tool is unavailable, report that and identify the alternative tool
-before switching interfaces; do not silently substitute it. Inspect the
-available tool's schema rather than reusing another interface's argument names.
+In a confirmed `mcp__codex_apps__github_create_blob` invocation using
+`repository_full_name`, `content`, and `encoding`, the approval popup displayed
+a generic `call_tool` path `/connector_.../link_.../create_blob` with `Repository`
+and `Content` labels. The popup's representation alone is therefore not
+evidence that an agent chose a different tool, connection, or argument schema.
+Use the exposed tool definition and literal invocation to establish what was
+called; do not diagnose interface substitution from screenshots alone.
 
-Repeated "Always allow" prompts have been observed, but their cause and the
-scope of saved approvals are not established. An interface change is a
-possible explanation, not a confirmed diagnosis.
+If a named tool is unavailable, report that and identify the alternative
+before using it. Follow its actual exposed schema rather than copying another
+tool's argument names. Do not invent or manually reconstruct connector/link
+paths from a popup.
+
+Treat `isError: true` with `user rejected MCP tool call` as an approval
+rejection, not a GitHub API failure or evidence of invalid arguments. Report
+the exact result and do not continue dependent writes. Do not repeatedly retry
+or switch tools to bypass a rejection; a user-authorized retry should be limited
+to the operation requested.
+
+For repeated "Always allow" prompts, record the available tool definition,
+literal invocation (omit large file payloads and secrets), exact returned
+result, and whether the prompt repeated for the same operation. A successful
+call in another chat does not establish this chat's tools or approval policy.
+Account authorization and app action confirmations are separate controls; see
+[OpenAI Work cloud security](https://learn.chatgpt.com/docs/enterprise/chatgpt-work-cloud-security)
+and [agent approvals](https://learn.chatgpt.com/docs/agent-approvals-security).
+As of October 6, 2026, the official documentation reviewed did not establish
+the cause of the project's repeated GitHub prompts or the scope/persistence
+of this popup's "Always allow" choice. Do not promise that choosing a particular
+tool name will eliminate prompts or claim a confirmed outage or regression.
 
 ## OpenAI Work environment recovery
 
