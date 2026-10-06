@@ -17,4 +17,4 @@ panes are separated by two visible, full-height resize handles.
    proportions, with both handles remaining usable and aligned to the panes.
 5. Confirm scrolling and editing within each pane still work, and clicking or
    selecting article text away from a handle behaves as before. Reloading should
-   restore the default 15/60/25 pane proportions.
+   restore the default 25/37.5/37.5 pane proportions.
