@@ -1,0 +1,13 @@
+<template>
+    <heading>Operations</heading>
+    <section data-lp5-kind="explanation">
+        <p>Operations will hold the application's multi-step operations. Keep it separate from the controller so each module has a clear role. The object is a placeholder for now.</p>
+    </section>
+    <section data-lp5-kind="code">
+        <name>Outermost scope objects</name>
+        <code><![CDATA[
+let operations = (() => {
+    return {};
+})();]]></code>
+    </section>
+</template>
