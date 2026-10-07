@@ -271,7 +271,8 @@ evidence that browser testing is unavailable.
 Use the provided `sites-preview` runner and CUA browser:
 
 1. Keep the checkout beneath `/workspace`.
-2. Provide a `dev` script or `.openai/hosting.json`.
+2. Use this checkout's existing `package.json` `dev` script, which runs
+   `test/preview_server.py`; do not start with a separate static-preview project.
 3. Run `sites-preview start "$PWD"` and open the returned
    `http://terminal.local:...` URL.
 4. Exercise the visible UI through CUA.
@@ -282,5 +283,13 @@ read-only and cannot install a shim after the application starts.
 
 If preview setup fails, first check `command -v sites-preview`, the checkout
 location, the project startup configuration, and the exact runner error.
+Failure of a separate static preview (including a `bwrap` `/proc` mount error)
+does not establish that the repository's preview setup is broken: the existing
+`dev` script has worked after that failure. Test it from the checkout before
+declaring cloud-browser testing blocked. Do not manually launch the preview
+daemon or retry denied escalation. The server allowlists paths; to preview a
+new tangled HTML file, temporarily add its route and restart the runner, then
+remove that temporary change after capturing the result. Use the returned
+preview URL, not `file://` or the execution container's loopback address.
 Native picker behavior, real disk permissions, and IndexedDB persistence
 remain separate tests.
