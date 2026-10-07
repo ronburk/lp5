@@ -38,6 +38,9 @@
             editor.setArticle(article, options);
             document.body.append(editor);
         }
+        function openFindArticle(){
+            document.body.append(document.createElement('lp5-findarticle'));
+        }
         let pendingCodeReferenceContext = null;
         let pendingArticleContext = null;
 state load
@@ -103,6 +106,18 @@ state home
         if(event.composedPath().some(node => node.id === 'LP5-Menu-View')) {
             views.push('EditView');
             -> editingView
+        }
+        if(event.composedPath().some(node => node.id === 'LP5-Menu-FindArticle'))
+            openFindArticle();
+    on  keydown
+        const target = event.target;
+        const typing = target instanceof HTMLElement
+            && (target.isContentEditable || target.matches('input, textarea, select'));
+        if(event.altKey && event.shiftKey && !event.ctrlKey && !event.metaKey
+           && event.key.toLowerCase() === 'a' && !typing
+           && !document.querySelector('dialog:modal')) {
+            event.preventDefault();
+            openFindArticle();
         }
     on  lp5EditArticle
         openArticleEditor(event.detail);
@@ -1440,6 +1455,111 @@ state awaitArticleDelete
              return LP5ReferenceContextMenu;
             </script>
         </template>
+        <template data-custom="lp5-findarticle">
+            <style>
+                dialog {
+                    width: min(42em, calc(100vw - 2em));
+                    max-height: calc(100vh - 2em);
+                    padding: 1.25em;
+                }
+                h2 { margin: 0 0 .75em; }
+                label { display: block; }
+                input { box-sizing: border-box; width: 100%; margin-top: .25em; padding: .5em; }
+                ul { list-style: none; margin: .75em 0; padding: 0; max-height: 55vh; overflow: auto; }
+                li + li { margin-top: .2em; }
+                li button { display: flex; width: 100%; gap: 1em; padding: .45em .6em; text-align: left; border: 1px solid transparent; background: white; }
+                li button:hover, li button:focus-visible { border-color: #7890aa; background: #edf2f7; }
+                .filename { flex: 0 0 10em; font: 14px ui-monospace, monospace; }
+                .title { color: #59616b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+                [data-id="empty"] { color: #59616b; }
+                .actions { display: flex; justify-content: flex-end; }
+            </style>
+            <dialog data-id="dialog" aria-labelledby="find-article-title">
+                <h2 id="find-article-title">Find Article</h2>
+                <label>Filename
+                    <input data-id="query" type="search" autocomplete="off" placeholder="Type a filename, such as 14.lp5">
+                </label>
+                <ul data-id="results" aria-label="Matching articles"></ul>
+                <p data-id="empty" hidden>No matching articles.</p>
+                <div class="actions"><button data-id="close" type="button">Close</button></div>
+            </dialog>
+            <script>
+                const model = require('model');
+                const {publish} = require('controller');
+
+                class FindArticle extends LP5Element {
+                    #template;
+                    #articles;
+                    constructor() {
+                        super();
+                        this.#template = new LP5Element.TemplateInstance();
+                        this.attachShadow({mode:'open'}).append(this.#template.nodes);
+                        const {dialog, query, results, close} = this.#template.namedNodes;
+                        query.addEventListener('input', () => this.#renderResults());
+                        query.addEventListener('keydown', event => {
+                            if(event.key === 'ArrowDown') {
+                                event.preventDefault();
+                                results.querySelector('button')?.focus();
+                            } else if(event.key === 'Enter') {
+                                event.preventDefault();
+                                results.querySelector('button')?.click();
+                            }
+                        });
+                        results.addEventListener('keydown', event => {
+                            if(event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+                            const buttons = [...results.querySelectorAll('button')];
+                            if(!buttons.length) return;
+                            event.preventDefault();
+                            const direction = event.key === 'ArrowDown' ? 1 : -1;
+                            const index = buttons.indexOf(event.target);
+                            buttons[(index + direction + buttons.length) % buttons.length].focus();
+                        });
+                        results.addEventListener('click', event => {
+                            const button = event.target.closest('button[data-url]');
+                            if(button) {
+                                publish('lp5NavSelect', button.dataset.url);
+                                dialog.close();
+                            }
+                        });
+                        close.addEventListener('click', () => dialog.close());
+                        dialog.addEventListener('close', () => this.remove());
+                        dialog.addEventListener('cancel', () => this.remove());
+                    }
+                    connectedCallback() {
+                        super.connectedCallback();
+                        this.#articles = [...model.docOrder(model.rootTOC)]
+                            .sort((a, b) => a.URL.localeCompare(b.URL, undefined, {numeric:true}));
+                        this.#renderResults();
+                        this.#template.namedNodes.dialog.showModal();
+                        this.#template.namedNodes.query.focus();
+                    }
+                    #renderResults() {
+                        const {query, results, empty} = this.#template.namedNodes;
+                        const search = query.value.trim().toLocaleLowerCase();
+                        const matches = this.#articles.filter(article =>
+                            article.URL.toLocaleLowerCase().includes(search));
+                        results.replaceChildren(...matches.map(article => {
+                            const item = document.createElement('li');
+                            const button = document.createElement('button');
+                            button.type = 'button';
+                            button.dataset.url = article.URL;
+                            button.setAttribute('role', 'option');
+                            const filename = document.createElement('span');
+                            filename.className = 'filename';
+                            filename.textContent = article.URL;
+                            const title = document.createElement('span');
+                            title.className = 'title';
+                            title.textContent = article.sections.heading?.textContent.trim() || '(untitled)';
+                            button.append(filename, title);
+                            item.append(button);
+                            return item;
+                        }));
+                        empty.hidden = matches.length !== 0;
+                    }
+                }
+                return FindArticle;
+            </script>
+        </template>
         <template data-custom="lp5-movearticle">
             <style>
                 dialog {
@@ -2464,7 +2584,7 @@ state awaitArticleDelete
                     <ul>
                         <li id="LP5-Menu-Reload" tabindex="0">Reload</li>
                         <li id="LP5-Menu-Export">Export</li>
-                        <li>Menu 3</li>
+                        <li id="LP5-Menu-FindArticle" tabindex="0" title="Alt+Shift+A">Find Article…</li>
                         <li id="LP5-Menu-Test">Test</li>
                         <li id="LP5-Menu-View">View</li>
                         <li>
