@@ -22,7 +22,7 @@
     <span class="LP5-MenuEntry">File</span>
 </nav>
 <main id="LP5-Main">
-    <aside id="LP5-Toc" aria-label="Table of Contents"></aside>
+    <nav id="LP5-Toc" aria-label="Table of contents"></nav>
     <div class="LP5-PaneSplitter" role="separator" aria-orientation="vertical"></div>
     <section id="LP5-Source" aria-label="Source"></section>
     <div class="LP5-PaneSplitter" role="separator" aria-orientation="vertical"></div>
