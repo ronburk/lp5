@@ -28,6 +28,7 @@
         ]]><lp5- ref="Global CSS declarations"/><![CDATA[
     </style>
     <script>
+        "use strict";
         window.LP5 = (function () {
             ]]><lp5- ref="Outermost scope objects"/><![CDATA[
             return {
