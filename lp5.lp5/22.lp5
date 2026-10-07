@@ -1,0 +1,33 @@
+<template>
+    <heading>DOM declarations</heading>
+    <keywords>
+        <li>HTML</li>
+        <li>navigation</li>
+        <li>Table of Contents</li>
+        <li>source</li>
+        <li>output</li>
+        <li>status</li>
+    </keywords>
+    <section data-lp5-kind="explanation">
+        <p>
+            These are the page elements whose layout is defined by
+            <code>Global CSS declarations</code>. The two narrow splitter
+            elements separate the three scrolling panes.
+        </p>
+    </section>
+    <section data-lp5-kind="code">
+        <name>DOM declarations</name>
+        <code><![CDATA[<nav id="LP5-TopNav" aria-label="Main navigation">
+    <span>LP5</span>
+</nav>
+<main id="LP5-Main">
+    <aside id="LP5-Toc" aria-label="Table of Contents"></aside>
+    <div class="LP5-PaneSplitter" role="separator" aria-orientation="vertical"></div>
+    <section id="LP5-Source" aria-label="Source"></section>
+    <div class="LP5-PaneSplitter" role="separator" aria-orientation="vertical"></div>
+    <section id="LP5-Output" aria-label="Output"></section>
+</main>
+<footer id="LP5-Status" role="status" aria-live="polite"></footer>
+]]></code>
+    </section>
+</template>
