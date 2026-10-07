@@ -152,6 +152,9 @@ def main():
         no_cap = search(["shared marker"])
         assert len(no_cap.findall("results/article")) == 25
         assert no_cap.findall("results/article")[-1].attrib["file"] == "44.lp5"
+        ordinary = run("search", "foo")
+        assert ordinary.returncode == 0, ordinary.stderr
+        assert ET.fromstring(ordinary.stdout).attrib["total"] == "0"
         assert search(["absent phrase"]).attrib["total"] == "0"
         assert {path.name: path.read_bytes() for path in source.iterdir()} == original
 

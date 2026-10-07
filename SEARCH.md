@@ -1,15 +1,16 @@
 # Search article text
 
 ```sh
-./lp5 [-w weave-file] search [--all] -- TEXT [TEXT ...]
+./lp5 [-w weave-file] search [--all] [--] TEXT [TEXT ...]
 ```
 
-The first standalone `--` is required. Every following argument is one literal
-search string, including phrases or strings that look like options. For example:
+The standalone `--` is optional. Every following argument is one literal search
+string. Use `--` before terms that look like options. For example:
 
 ```sh
 ./lp5 search -- -o "save article"
 ./lp5 search --all -- -o "save article"
+./lp5 search foo
 ```
 
 Search looks in each article's heading, each keyword, explanation, code name,
