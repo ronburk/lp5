@@ -116,8 +116,25 @@ body {
 }
 
 .LP5-PaneSplitter {
+    position: relative;
     flex: 0 0 4px;
     cursor: col-resize;
+}
+
+.LP5-PaneSplitter::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 1px;
+    width: 2px;
+    background: #8293a6;
+}
+
+.LP5-PaneSplitter:hover::after {
+    left: 0;
+    width: 4px;
+    background: #526174;
 }
 
 #LP5-Status {
