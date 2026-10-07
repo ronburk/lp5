@@ -3,13 +3,14 @@
     <keywords>
         <li>CSS</li>
         <li>layout</li>
+        <li>toolbar</li>
         <li>navigation</li>
         <li>panes</li>
         <li>status bar</li>
     </keywords>
     <section data-lp5-kind="explanation">
         <p>
-            The page is a column: the navigation bar is at the top, the
+            The page is a column: a command header is at the top, the
             three working panes fill the middle, and the status bar is at
             the bottom. The middle row may shrink below the viewport's
             height because each pane owns its own scrolling.
@@ -21,7 +22,7 @@
             <desc id="pageLayoutDescription">A top navigation bar, three middle panes separated by draggable splitters, and a bottom status bar.</desc>
             <rect x="8" y="8" width="544" height="198" rx="5" fill="#fff" stroke="#526174" stroke-width="2"/>
             <g>
-                <title>#LP5-TopNav: the navigation bar at the top of the page. It takes only the space its contents need.</title>
+                <title>#LP5-TopNav: the top-level header containing the command toolbar.</title>
                 <rect x="18" y="18" width="524" height="28" rx="3" fill="#dce8f5" stroke="#7890aa"/>
                 <text x="280" y="36" text-anchor="middle" fill="#17283a">#LP5-TopNav</text>
             </g>
@@ -88,20 +89,16 @@ body {
 }
 
 #LP5-TopNav {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
     flex: 0 0 auto;
     padding: 0.25rem 0.5rem;
     background: #dce8f5;
     border-bottom: 1px solid #7890aa;
 }
 
-.LP5-MenuEntry {
-    padding: 0.15rem 0.5rem;
-    border: 1px solid #7890aa;
-    border-radius: 3px;
-    background: #fff;
+#LP5-TopNav [role="toolbar"] {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 #LP5-Main {

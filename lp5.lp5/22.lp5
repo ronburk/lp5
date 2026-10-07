@@ -3,6 +3,7 @@
     <keywords>
         <li>HTML</li>
         <li>navigation</li>
+        <li>toolbar</li>
         <li>Table of Contents</li>
         <li>source</li>
         <li>output</li>
@@ -17,10 +18,13 @@
     </section>
     <section data-lp5-kind="code">
         <name>DOM declarations</name>
-        <code><![CDATA[<nav id="LP5-TopNav" aria-label="Main navigation">
-    <span>LP5</span>
-    <span class="LP5-MenuEntry">File</span>
-</nav>
+        <code><![CDATA[<header id="LP5-TopNav">
+    <div role="toolbar" aria-label="Main commands">
+        <span>LP5</span>
+        <button type="button">Reload</button>
+        <button type="button">Export</button>
+    </div>
+</header>
 <main id="LP5-Main">
     <nav id="LP5-Toc" aria-label="Table of contents"></nav>
     <div class="LP5-PaneSplitter" role="separator" aria-orientation="vertical"></div>
