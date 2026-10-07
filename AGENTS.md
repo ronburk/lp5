@@ -106,11 +106,15 @@ permissions allow, and continue any work that is still possible.
   and network-dependent package installation. Do not repeatedly request
   escalation when the active policy disallows it or a request is rejected.
 - Apt's `Read-only file system` error for `/var/lib/apt/lists` is a filesystem
-  permission failure; running as root does not overcome it. Use a supported
-  permission escalation if available, or recheck after the environment's
-  filesystem permissions change. The temporary archive cache below addresses
-  apt's cache and privilege-drop errors; it does not make a read-only lists
-  directory or installation destination writable.
+  permission failure; running as root does not overcome it. If escalation is
+  available, retry the documented temporary-cache apt recovery below using
+  `exec_command` with `sandbox_permissions: "require_escalated"` and a brief
+  justification. The temporary archive cache addresses apt's archive-cache
+  and privilege-drop errors; escalation is what permits apt to update its
+  system lists and write to installation destinations. Do not stop after a
+  default-sandbox failure: continue with the escalated recovery if permitted.
+  If escalation is unavailable or rejected, report that exact result rather
+  than treating the default-sandbox failure as the final recovery attempt.
 - Check the GitHub connector independently if shell networking fails. It can
   still verify the remote branch, commit, and file contents. A failed shell
   command does not establish that the connector or browser is unavailable.
@@ -137,7 +141,7 @@ Confirm the installation with:
 xsltproc --version
 ```
 
-In the managed Ubuntu container used for this project, apt's default privilege drop may fail with `setgroups: Operation not permitted`, and its default archive cache may not be writable. If the normal install fails for those reasons, use a temporary archive cache and disable apt's sandbox user:
+In the managed Ubuntu container used for this project, apt's default privilege drop may fail with `setgroups: Operation not permitted`, its default archive cache may not be writable, and the default sandbox may deny writes to system apt directories. If the normal install fails for those reasons, run the following recovery with `exec_command` and `sandbox_permissions: "require_escalated"` (include a concise justification). The temporary archive cache and `APT::Sandbox::User=root` handle the archive-cache and apt privilege-drop problems; escalated execution permits writes to system apt directories:
 
 ```sh
 mkdir -p /tmp/apt-cache/archives/partial
