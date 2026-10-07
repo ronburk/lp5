@@ -1735,6 +1735,7 @@ static int command_search_terms(xsltStylesheetPtr stylesheet, int argc,
 {
     int argument = 1;
     int all = 0;
+    int options_ended = 0;
     int i;
     xmlDocPtr input;
     xmlDocPtr weave;
@@ -1742,8 +1743,9 @@ static int command_search_terms(xsltStylesheetPtr stylesheet, int argc,
     xmlNodePtr query;
     xmlNodePtr copied_weave;
 
-    while (argument < argc && strcmp(argv[argument], "--") != 0) {
-        if (strcmp(argv[argument], "--all") != 0 || all) {
+    while (argument < argc && strcmp(argv[argument], "--") != 0 &&
+            strcmp(argv[argument], "--all") == 0) {
+        if (all) {
             fprintf(stderr, "lp5: %s: unexpected argument '%s'\n",
                 command_name, argv[argument]);
             return 1;
@@ -1751,14 +1753,23 @@ static int command_search_terms(xsltStylesheetPtr stylesheet, int argc,
         all = 1;
         ++argument;
     }
-    if (argument == argc || argument + 1 == argc) {
+    if (argument < argc && strcmp(argv[argument], "--") == 0) {
+        options_ended = 1;
+        ++argument;
+    }
+    if (argument == argc) {
         fprintf(stderr,
-            "Usage: lp5 %s [--all] -- %s [%s ...]\n",
+            "Usage: lp5 %s [--all] [--] %s [%s ...]\n",
             command_name, usage_term_name, usage_term_name);
         return 1;
     }
-    ++argument;
     for (i = argument; i < argc; ++i) {
+        if (!options_ended && argv[i][0] == '-' &&
+                (argv[i][1] == '-' || argv[i][1] != '\0')) {
+            fprintf(stderr, "lp5: %s: unexpected argument '%s'\n",
+                command_name, argv[i]);
+            return 1;
+        }
         if (!valid_xml_text(argv[i])) {
             fprintf(stderr, "lp5: %s %d is not valid UTF-8/XML 1.0 text\n",
                 term_name, i - argument + 1);
@@ -2416,8 +2427,8 @@ static void print_usage(const char *program)
         "       %s [-w weave-file] add-article <parent-id> <article-file> [before-child-id]\n"
         "       %s replace-article <article-id> <article-file>\n"
         "       %s remove-article <article-id.lp5>\n"
-        "       %s search [--all] -- TEXT [TEXT ...]\n"
-        "       %s search-keywords [--all] -- KEYWORD [KEYWORD ...]\n"
+        "       %s search [--all] [--] TEXT [TEXT ...]\n"
+        "       %s search-keywords [--all] [--] KEYWORD [KEYWORD ...]\n"
         "       %s list-keywords\n"
         "       %s show-article [article-file.lp5]\n"
         "       %s show-bundle [code-name] (omit name to list bundles; use \"\" for unnamed code)\n"
