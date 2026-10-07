@@ -56,6 +56,7 @@ export async function run_output_selection_tests(model, views) {
     const nav = views.views.home.children.tableOfContents.rootNode.shadowRoot;
     const wrappers = url => [...output.querySelectorAll('span[data-ref]')]
         .filter(node => node.dataset.ref === url);
+    const occurrence = (url, index = 0) => wrappers(url)[index];
     const selected = () => [...output.querySelectorAll('.lp5-output-selected')];
     const text_runs = url => wrappers(url).flatMap(node =>
         [...node.querySelectorAll(':scope > .lp5-output-text')]);
@@ -77,11 +78,32 @@ export async function run_output_selection_tests(model, views) {
     }
     function check_output(expected) {
         check(model.outputText === expected, `Selection preserves generated text: ${JSON.stringify(model.outputText)}`);
-        check(output.innerText === expected, 'Selection preserves displayed output text');
+        check(output.innerText === expected,
+            `Selection preserves displayed output text: ${JSON.stringify(output.innerText)}`);
     }
     try {
         await reload();
         const expected = 'prefix\nouter-before\ninner-body\nouter-after\nouter-second\nmiddle\nouter-before\ninner-body\nouter-after\nouter-second\nsuffix\nquoted-body\n';
+        check_output(expected);
+        check(output.querySelectorAll('.lp5-output-hidden').length === 0, 'Sections are visible by default');
+        const firstRepeatedOuter = occurrence('0.lp5', 0);
+        const firstRepeatedKey = firstRepeatedOuter.dataset.outputKey;
+        firstRepeatedOuter.dispatchEvent(new MouseEvent('click', {bubbles: true, composed: true, ctrlKey: true}));
+        check(wrappers('0.lp5').filter(node => node.classList.contains('lp5-output-hidden')).length === 1,
+            'Ctrl-click hides only the chosen occurrence of a repeated section');
+        check(occurrence('0.lp5', 0).dataset.outputKey === firstRepeatedKey
+            && occurrence('0.lp5', 0).querySelector('.lp5-output-placeholder')?.textContent === '⟪ hidden: Outer first ⟫',
+            'Hidden occurrence shows its article title and keeps a stable identity');
+        check(!occurrence('0.lp5', 1).classList.contains('lp5-output-hidden'),
+            'Another occurrence of the same article remains visible');
+        check(model.outputText === expected && (output.innerText.match(/outer-before/g) || []).length === 1,
+            `Hiding preserves generated text: ${JSON.stringify(model.outputText)}; display: ${JSON.stringify(output.innerText)}`);
+        check(output.innerText.includes('⟪ hidden: Outer first ⟫'), 'Placeholder is visible in the Output pane');
+        views.render();
+        check(occurrence('0.lp5', 0).classList.contains('lp5-output-hidden'), 'Hidden occurrence survives a view rerender');
+        occurrence('0.lp5', 0).dispatchEvent(new MouseEvent('click', {bubbles: true, composed: true, ctrlKey: true}));
+        check(wrappers('0.lp5').every(node => !node.classList.contains('lp5-output-hidden')),
+            'Ctrl-click on a hidden placeholder restores that occurrence');
         check_output(expected);
         check(selected().length === 0, 'A new project has no inherited selection');
         await select_source('0.lp5');
