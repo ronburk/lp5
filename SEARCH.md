@@ -24,7 +24,7 @@ not regular-expression, whole-word, stemming, or token matching. Duplicate
 canonical query terms are considered once. Default `any` mode returns articles
 matching at least one term; `--all` requires each distinct term to occur in some
 searched field of that article. Every matching article is returned, including
-orphans, with no result cap. Results sort by descending distinct-term score,
+orphans, with no result cap. Results sort by descending weighted term score,
 with weave order breaking ties.
 
 ## Returned document
@@ -47,8 +47,13 @@ Output is one UTF-8 XML document without a namespace, ending with a newline:
 ```
 
 - `query` contains normalized, distinct terms in first-occurrence order.
-- Each result's `score` is the number of distinct query terms matched anywhere
-  in that article. Results are in descending score, then weave order.
+- Each result's `score` is the sum of scores for its distinct matched query terms:
+  2 points if a term matches any keyword, otherwise 1 point if it matches another
+  searched field. Keyword matches use the same normalized literal substring
+  rule as other fields. Repeated occurrences, matching multiple keywords, or
+  matching both keywords and other fields do not add points for the same term.
+  Results are in descending score, then weave order. `--all` still requires all
+  distinct terms to match, regardless of their scores.
 - `matches` contains one entry per matched term and field, ordered by query
   argument and then by the field's order in the article.
 - Each `match` has exactly `term` and `field` attributes and one `excerpt` child.

@@ -34,6 +34,7 @@
         <xsl:variable name="result-tree">
             <results>
                 <xsl:for-each select="$weave/articles/article">
+                    <xsl:variable name="keywords" select="keywords/li"/>
                     <xsl:variable name="fields"
                         select="heading | keywords/li | section[@data-lp5-kind='explanation'] | section[@data-lp5-kind='code']/name | section[@data-lp5-kind='code']/code"/>
                     <xsl:variable name="matched-terms">
@@ -41,7 +42,15 @@
                             <xsl:for-each select="$terms">
                                 <xsl:variable name="term" select="string(.)"/>
                                 <xsl:if test="$fields[contains(translate(normalize-space(string(.)), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), $term)]">
-                                    <term><xsl:value-of select="$term"/></term>
+                                    <term>
+                                        <xsl:attribute name="score">
+                                            <xsl:choose>
+                                                <xsl:when test="$keywords[contains(translate(normalize-space(string(.)), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), $term)]">2</xsl:when>
+                                                <xsl:otherwise>1</xsl:otherwise>
+                                            </xsl:choose>
+                                        </xsl:attribute>
+                                        <xsl:value-of select="$term"/>
+                                    </term>
                                 </xsl:if>
                             </xsl:for-each>
                         </terms>
@@ -49,7 +58,7 @@
                     <xsl:variable name="matched"
                         select="exsl:node-set($matched-terms)/terms/term"/>
                     <xsl:if test="($mode = 'any' and count($matched) &gt; 0) or ($mode = 'all' and count($matched) = count($terms))">
-                        <article file="{@file}" score="{count($matched)}">
+                        <article file="{@file}" score="{sum($matched/@score)}">
                             <matches>
                                 <xsl:for-each select="$matched">
                                     <xsl:variable name="term" select="string(.)"/>
