@@ -88,7 +88,20 @@ body {
 }
 
 #LP5-TopNav {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
     flex: 0 0 auto;
+    padding: 0.25rem 0.5rem;
+    background: #dce8f5;
+    border-bottom: 1px solid #7890aa;
+}
+
+.LP5-MenuEntry {
+    padding: 0.15rem 0.5rem;
+    border: 1px solid #7890aa;
+    border-radius: 3px;
+    background: #fff;
 }
 
 #LP5-Main {
@@ -138,9 +151,13 @@ body {
 }
 
 #LP5-Status {
+    display: flex;
+    align-items: center;
     flex: 0 0 1.5rem;
     min-height: 1.5rem;
-    overflow: hidden;
+    padding: 0 0.5rem;
+    background: #dce8f5;
+    border-top: 1px solid #7890aa;
 }
 ]]></code>
     </section>
