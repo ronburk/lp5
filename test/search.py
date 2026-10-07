@@ -70,6 +70,11 @@ def main():
         article(source, "5.lp5", explanation="z" * 300 + "end needle")
         long_explanation = "x" * 240 + "unique needle" + "y" * 240
         article(source, "4.lp5", explanation=long_explanation)
+        article(source, "6.lp5", heading="priorityneedle priorityneedle",
+                keywords=("  PRIORITYNEEDLE  ", "priorityneedle topic"),
+                code_name="ranking", code="priorityneedle secondaryneedle")
+        article(source, "7.lp5", explanation="priorityneedle priorityneedle")
+        article(source, "8.lp5", keywords=("priorityneedle",))
         for number in range(20, 45):
             article(source, f"{number}.lp5", explanation="shared marker in an orphan article")
         original = {path.name: path.read_bytes() for path in source.iterdir()}
@@ -127,7 +132,7 @@ def main():
 
         fields = search(["iostore", "draft & notes"], all_terms=True)
         article3 = fields.find("results/article")
-        assert article3.attrib == {"file": "3.lp5", "score": "2"}
+        assert article3.attrib == {"file": "3.lp5", "score": "3"}
         matches = result_map(article3)
         assert set(matches) == {
             ("iostore", "code-name"),
@@ -135,6 +140,15 @@ def main():
             ("draft & notes", "code"),
         }
         assert "ioStore" in matches[("iostore", "code-name")].text
+
+        ranked = search(["priorityneedle", " PRIORITYNEEDLE "]).findall("results/article")
+        assert [(node.attrib["file"], node.attrib["score"]) for node in ranked] == [
+            ("6.lp5", "2"), ("8.lp5", "2"), ("7.lp5", "1")]
+        assert {match.attrib["field"] for match in ranked[0].findall("matches/match")} == {
+            "heading", "keyword", "code"}
+        mixed = search(["priorityneedle", "secondaryneedle"], all_terms=True)
+        assert [node.attrib for node in mixed.findall("results/article")] == [
+            {"file": "6.lp5", "score": "3"}]
 
         literal_options = search(["-o", "save article"], all_terms=True)
         assert [node.attrib["file"] for node in literal_options.findall("results/article")] == ["lp5.lp5"]
