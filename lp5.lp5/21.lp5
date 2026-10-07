@@ -9,8 +9,14 @@
         <li>to_handler</li>
     </keywords>
     <section data-lp5-kind="explanation">
-        <p>Operations hold the application's multi-step event handlers. Each handler is a generator object, created and primed by <code>to_handler</code>. The generator receives a function that returns its own object; calling that function after construction avoids accessing the object before it exists.</p>
-        <p>The base handler receives events and ignores them for now. It yields itself to remain the current handler. Operations install the primed base handler with <code>controller.init</code> before any events are dispatched.</p>
+        <p><code>operations</code> holds the application's multi-step event handlers. Each handler is a generator object, created and primed by <code>to_handler</code>. The generator receives <code>self</code>, a function that returns its own object; calling <code>self()</code> after construction avoids accessing the object before it exists.</p>
+        <p>Each operation can produce one of three outcomes when <code>controller</code> resumes it with <code>handler.next(event)</code>:</p>
+        <ol>
+            <li><code>yield self()</code>: remain the current handler. The controller stops dispatching this event; the next event resumes the same operation.</li>
+            <li><code>yield child</code>, where <code>child</code> is another primed generator object: call a child operation. The controller pushes <code>child</code> onto <code>handlerStack</code> and immediately dispatches the same event to it.</li>
+            <li><code>return</code>, or reach the end of the generator: finish the operation. The generator result has <code>done === true</code>, so the controller pops it and resumes the parent with the same event. Any returned value is ignored. If no parent remains, dispatch ends.</li>
+        </ol>
+        <p><code>baseOperationsHandler</code> receives events and ignores them for now, yielding <code>self()</code> to remain the current handler. <code>operations</code> installs this primed base handler with <code>controller.init(handler)</code> before any events are dispatched.</p>
     </section>
     <section data-lp5-kind="code">
         <name>Outermost scope objects</name>
