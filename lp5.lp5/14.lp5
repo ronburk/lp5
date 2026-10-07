@@ -14,6 +14,36 @@
             the bottom. The middle row may shrink below the viewport's
             height because each pane owns its own scrolling.
         </p>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 190"
+             role="img" aria-labelledby="pageLayoutTitle pageLayoutDescription"
+             style="display:block; width:min(100%, 560px); height:auto; margin:0.75rem auto; font:12px sans-serif">
+            <title id="pageLayoutTitle">LP5 page layout</title>
+            <desc id="pageLayoutDescription">A top navigation bar, three middle panes separated by draggable splitters, and a bottom status bar.</desc>
+            <rect x="8" y="8" width="544" height="174" rx="5" fill="#fff" stroke="#526174" stroke-width="2"/>
+            <rect x="18" y="18" width="524" height="28" rx="3" fill="#dce8f5" stroke="#7890aa"/>
+            <text x="280" y="36" text-anchor="middle" fill="#17283a">#LP5-TopNav</text>
+
+            <rect x="18" y="54" width="116" height="104" rx="3" fill="#edf2f7" stroke="#7890aa"/>
+            <text x="76" y="100" text-anchor="middle" fill="#17283a">#LP5-Toc</text>
+
+            <rect x="138" y="54" width="8" height="104" fill="#8293a6"/>
+            <path d="M142 98v16 M139 102l3-4 3 4 M139 110l3 4 3-4" fill="none" stroke="#fff" stroke-width="1.5"/>
+            <text x="142" y="151" text-anchor="middle" font-size="7" fill="#fff" transform="rotate(-90 142 151)">.LP5-PaneSplitter</text>
+
+            <rect x="150" y="54" width="184" height="104" rx="3" fill="#f7f4e8" stroke="#b5a36e"/>
+            <text x="242" y="100" text-anchor="middle" fill="#342d1c">#LP5-Source</text>
+
+            <rect x="338" y="54" width="8" height="104" fill="#8293a6"/>
+            <path d="M342 98v16 M339 102l3-4 3 4 M339 110l3 4 3-4" fill="none" stroke="#fff" stroke-width="1.5"/>
+            <text x="342" y="151" text-anchor="middle" font-size="7" fill="#fff" transform="rotate(-90 342 151)">.LP5-PaneSplitter</text>
+
+            <rect x="350" y="54" width="192" height="104" rx="3" fill="#e8f2eb" stroke="#7d9c84"/>
+            <text x="446" y="100" text-anchor="middle" fill="#203b29">#LP5-Output</text>
+            <text x="534" y="65" text-anchor="end" font-size="8" fill="#526174">#LP5-Main</text>
+
+            <rect x="18" y="166" width="524" height="9" rx="2" fill="#dce8f5" stroke="#7890aa"/>
+            <text x="280" y="173" text-anchor="middle" font-size="7" fill="#17283a">#LP5-Status</text>
+        </svg>
     </section>
     <section data-lp5-kind="code">
         <name>Global CSS declarations</name>
