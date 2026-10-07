@@ -28,7 +28,7 @@
     <div class="LP5-PaneSplitter" role="separator" aria-orientation="vertical"></div>
     <section id="LP5-Output" aria-label="Output"></section>
 </main>
-<footer id="LP5-Status" role="status" aria-live="polite">Ready</footer>
+<div id="LP5-Status" role="status">Ready</div>
 ]]></code>
     </section>
 </template>
