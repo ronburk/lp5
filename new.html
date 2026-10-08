@@ -72,7 +72,8 @@ state awaitProjectPicker
 state awaitProjectLoad
     on  lp5AsyncComplete
         model.updateDerivedState();
-        views.close();
+        if(views.dialog)
+            views.close();
         views.render();
     ->  home
 
@@ -106,6 +107,10 @@ state home
         if(event.composedPath().some(node => node.id === 'LP5-Menu-View')) {
             views.push('EditView');
             -> editingView
+        }
+        if(event.composedPath().some(node => node.id === 'LP5-Menu-Reload')) {
+            asyncSchedule(model.openProject.bind(model), model.projectName);
+            -> awaitProjectLoad
         }
         if(event.composedPath().some(node => node.id === 'LP5-Menu-FindArticle'))
             openFindArticle();
