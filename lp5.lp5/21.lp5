@@ -16,7 +16,7 @@
             <li><code>yield child</code>, where <code>child</code> is another primed generator object: call a child operation. The controller pushes <code>child</code> onto <code>handlerStack</code> and immediately dispatches the same event to it.</li>
             <li><code>return</code>, or reach the end of the generator: finish the operation. The generator result has <code>done === true</code>, so the controller pops it and resumes the parent with the same event. Any returned value is ignored. If no parent remains, dispatch ends.</li>
         </ol>
-        <p><code>baseOperationsHandler</code> receives events and ignores them for now, yielding <code>self()</code> to remain the current handler. <code>operations</code> installs this primed base handler with <code>controller.init(handler)</code> before any events are dispatched.</p>
+        <p><code>baseOperationsHandler</code> receives events and normally ignores them, yielding <code>self()</code> to remain the current handler. When it receives <code>"ModalDialog"</code>, it pushes a primed <code>modalDialogOperation</code> as a child handler. The stub consumes that event and remains the current handler. <code>operations</code> installs the primed base handler with <code>controller.init(handler)</code> before any events are dispatched.</p>
     </section>
     <section data-lp5-kind="code">
         <name>Outermost scope objects</name>
@@ -28,9 +28,17 @@ let operations = (() => {
         return handler;
     }
 
+    function* modalDialogOperation(self) {
+        while (true) {
+            let event = yield self();
+        }
+    }
+
     function* baseOperationsHandler(self) {
         while (true) {
             let event = yield self();
+            if (event === "ModalDialog")
+                yield to_handler(modalDialogOperation);
         }
     }
 
