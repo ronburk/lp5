@@ -2421,7 +2421,7 @@ static void print_usage(const char *program)
 {
     fprintf(stderr,
         "Usage: %s [-s source-dir] [-w weave-file] [-o output-file] [-m map-file] <command> [args...]\n"
-        "       Commands: tangle, check, weave, add-article, remove-article, replace-article, show-bundle, search, search-keywords, list-keywords, show-article\n"
+        "       Commands: help, tangle, check, weave, add-article, remove-article, replace-article, show-bundle, search, search-keywords, list-keywords, show-article\n"
         "       %s tangle [xml-file]\n"
         "       %s [-w weave-file] weave [root-article]\n"
         "       %s [-w weave-file] add-article <parent-id> <article-file> [before-child-id]\n"
@@ -2436,7 +2436,8 @@ static void print_usage(const char *program)
         "       Source directory defaults to lp5.lp5; LP5Source sets the environment default.\n"
         "       The weave file defaults to weave.xml; -w selects another weave file.\n"
         "       -s, -w, -o, and -m options may appear anywhere before --; they are removed before command dispatch.\n"
-        "       -m map-file applies only to tangle.\n",
+        "       -m map-file applies only to tangle.\n"
+        "       Use --help or the help command to display this usage.\n",
         program, program, program, program, program, program, program, program,
         program, program, program, program);
 }
@@ -2447,15 +2448,39 @@ int main(int argc, char *argv[])
     const char *environment_source;
     int first_argument = 1;
     int status = 0;
+    int help_requested = 0;
 
     environment_source = getenv("LP5Source");
     if (environment_source != NULL) {
         LP5Source = environment_source;
     }
 
+    {
+        int i;
+
+        for (i = 1; i < argc; ++i) {
+            if (strcmp(argv[i], "--") == 0) {
+                break;
+            }
+            if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
+                help_requested = 1;
+            }
+        }
+    }
+
     if (remove_global_options(&argc, argv) != 0) {
+        if (help_requested) {
+            print_usage(argv[0]);
+            return 0;
+        }
         print_usage(argv[0]);
         return 1;
+    }
+
+    if (help_requested || (first_argument < argc &&
+            strcmp(argv[first_argument], "help") == 0)) {
+        print_usage(argv[0]);
+        return 0;
     }
 
     if (first_argument >= argc) {
