@@ -189,7 +189,7 @@ def main():
         assert result.returncode == 0 and result.stdout == b"", result.stderr
         check_result(destination.read_bytes(), "all", terms, source, order)
 
-        for arguments in ([], ["persistence"], ["--"], ["--all", "--"],
+        for arguments in ([], ["--"], ["--all", "--"],
                           ["--limit", "--", "persistence"], ["weave.xml", "--", "persistence"],
                           ["--all", "--all", "--", "persistence"], ["--", ""],
                           ["--", " \t\r\n"], ["-m", "map.json", "--", "persistence"]):

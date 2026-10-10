@@ -25,10 +25,9 @@
      Article validation is imported from tangle.xsl so both transforms apply
      the same on-disk format rules to each article that exists. Missing child
      articles remain explicit unresolved links in the index. Articles not
-     reachable from the root are appended as orphans; their child links
-     determine preorder within each orphan tree. A component with no root
-     (for example, a cycle) starts at its first still-unseen file in discovery
-     order.
+     reachable from the root are appended as orphan trees; their child links
+     determine preorder within each orphan tree. Each tree root has no parent
+     attribute. Cycles and multiple parents are rejected.
 -->
 <xsl:stylesheet version="1.0"
     xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
@@ -82,6 +81,46 @@
             </files>
         </xsl:variable>
 
+        <!-- Build the available-article graph. Missing links are not graph edges. -->
+        <xsl:variable name="article-graph">
+            <graph>
+                <xsl:for-each select="exsl:node-set($disk-files)/files/file">
+                    <xsl:variable name="file" select="string(@name)"/>
+                    <xsl:variable name="article" select="document($file, $source-root)"/>
+                    <xsl:if test="$article/*">
+                        <xsl:call-template name="validate-article">
+                            <xsl:with-param name="document" select="$article"/>
+                            <xsl:with-param name="location" select="$file"/>
+                        </xsl:call-template>
+                        <article file="{$file}">
+                            <xsl:for-each select="$article/template/children/li">
+                                <xsl:variable name="child-file" select="string(@id)"/>
+                                <xsl:if test="$directory-entries[@name = $child-file]">
+                                    <child file="{$child-file}"/>
+                                </xsl:if>
+                            </xsl:for-each>
+                        </article>
+                    </xsl:if>
+                </xsl:for-each>
+            </graph>
+        </xsl:variable>
+        <xsl:variable name="graph" select="exsl:node-set($article-graph)/graph"/>
+
+        <!-- The root cannot have a parent; no available article can have two. -->
+        <xsl:for-each select="$graph/article">
+            <xsl:variable name="file" select="string(@file)"/>
+            <xsl:variable name="incoming" select="$graph/article/child[@file = $file]"/>
+            <xsl:if test="$file = 'lp5.lp5' and $incoming">
+                <xsl:message terminate="yes">weave: root article 'lp5.lp5' has incoming parent link(s): <xsl:for-each select="$incoming"><xsl:if test="position() &gt; 1">, </xsl:if>'<xsl:value-of select="../@file"/>'</xsl:for-each>.</xsl:message>
+            </xsl:if>
+            <xsl:if test="count($incoming) &gt; 1">
+                <xsl:message terminate="yes">weave: article '<xsl:value-of select="$file"/>' has multiple parent links from <xsl:for-each select="$incoming"><xsl:if test="position() &gt; 1">, </xsl:if>'<xsl:value-of select="../@file"/>'</xsl:for-each>.</xsl:message>
+            </xsl:if>
+            <xsl:if test="child[@file = $file]">
+                <xsl:message terminate="yes">weave: article '<xsl:value-of select="$file"/>' links to itself.</xsl:message>
+            </xsl:if>
+        </xsl:for-each>
+
         <!-- Visit the root tree first and carry one global set of visited files. -->
         <xsl:variable name="root-result">
             <xsl:call-template name="visit-article">
@@ -95,29 +134,12 @@
         <xsl:variable name="root-seen"
             select="string(exsl:node-set($root-result)/result/@seen)"/>
 
-        <!-- Build a temporary graph of discovered articles outside the root tree. -->
-        <xsl:variable name="orphan-candidates">
-            <orphans>
-                <xsl:for-each select="exsl:node-set($disk-files)/files/file">
-                    <xsl:variable name="file" select="string(@name)"/>
-                    <xsl:if test="not(contains($root-seen, concat('|', $file, '|')))">
-                        <xsl:variable name="article" select="document($file, $source-root)"/>
-                        <orphan file="{$file}">
-                            <xsl:for-each select="$article/template/children/li">
-                                <child file="{@id}"/>
-                            </xsl:for-each>
-                        </orphan>
-                    </xsl:if>
-                </xsl:for-each>
-            </orphans>
-        </xsl:variable>
-
-        <!-- Orphan roots have no incoming child link from another orphan. -->
+        <!-- Orphan roots have no incoming link from any available article. -->
         <xsl:variable name="orphan-roots">
             <roots>
-                <xsl:for-each select="exsl:node-set($orphan-candidates)/orphans/orphan">
+                <xsl:for-each select="$graph/article[@file != 'lp5.lp5']">
                     <xsl:variable name="file" select="string(@file)"/>
-                    <xsl:if test="not(exsl:node-set($orphan-candidates)/orphans/orphan/child[@file = $file])">
+                    <xsl:if test="not($graph/article/child[@file = $file])">
                         <orphan file="{$file}"/>
                     </xsl:if>
                 </xsl:for-each>
@@ -134,16 +156,14 @@
             </xsl:call-template>
         </xsl:variable>
 
-        <!-- Visit any leftovers to include components with no root, such as cycles. -->
-        <xsl:variable name="orphan-fallback-result">
-            <xsl:call-template name="visit-article-list">
-                <xsl:with-param name="articles" select="exsl:node-set($orphan-candidates)/orphans/orphan"/>
-                <xsl:with-param name="source-root" select="$source-root"/>
-                <xsl:with-param name="available-files" select="$directory-entries"/>
-                <xsl:with-param name="seen"
-                    select="string(exsl:node-set($orphan-root-result)/result/@seen)"/>
-            </xsl:call-template>
-        </xsl:variable>
+        <!-- Any undiscovered available articles have no forest root: they cycle. -->
+        <xsl:variable name="all-seen"
+            select="string(exsl:node-set($orphan-root-result)/result/@seen)"/>
+        <xsl:for-each select="$graph/article[not(contains($all-seen, concat('|', @file, '|')))]">
+            <xsl:variable name="file" select="string(@file)"/>
+            <xsl:variable name="incoming" select="$graph/article/child[@file = $file]"/>
+            <xsl:message terminate="yes">weave: cycle includes article '<xsl:value-of select="$file"/>'<xsl:if test="$incoming"> (incoming link from '<xsl:value-of select="$incoming[1]/../@file"/>')</xsl:if>.</xsl:message>
+        </xsl:for-each>
 
         <!-- This one preorder supplies the article list and both indexes. -->
         <xsl:variable name="article-records">
@@ -153,10 +173,6 @@
                     <xsl:copy-of select="."/>
                 </xsl:for-each>
                 <xsl:for-each select="exsl:node-set($orphan-root-result)/result/article">
-                    <xsl:text>&#10;    </xsl:text>
-                    <xsl:copy-of select="."/>
-                </xsl:for-each>
-                <xsl:for-each select="exsl:node-set($orphan-fallback-result)/result/article">
                     <xsl:text>&#10;    </xsl:text>
                     <xsl:copy-of select="."/>
                 </xsl:for-each>
@@ -223,6 +239,7 @@
         <xsl:param name="available-files"/>
         <xsl:param name="location"/>
         <xsl:param name="seen"/>
+        <xsl:param name="parent-file" select="''"/>
 
         <xsl:choose>
             <xsl:when test="not($document/*) or contains($seen, concat('|', $location, '|'))">
@@ -240,10 +257,14 @@
                         <xsl:with-param name="source-root" select="$source-root"/>
                         <xsl:with-param name="available-files" select="$available-files"/>
                         <xsl:with-param name="seen" select="$seen-current"/>
+                        <xsl:with-param name="parent-file" select="$location"/>
                     </xsl:call-template>
                 </xsl:variable>
                 <result seen="{string(exsl:node-set($descendants)/result/@seen)}">
                     <article file="{$location}">
+                        <xsl:if test="$parent-file != ''">
+                            <xsl:attribute name="parent"><xsl:value-of select="$parent-file"/></xsl:attribute>
+                        </xsl:if>
                         <!-- Preserve source order and section content. -->
                         <xsl:for-each select="$document/template/heading |
                                 $document/template/keywords |
@@ -294,6 +315,7 @@
         <xsl:param name="source-root"/>
         <xsl:param name="available-files"/>
         <xsl:param name="seen"/>
+        <xsl:param name="parent-file"/>
 
         <xsl:choose>
             <xsl:when test="not($links)">
@@ -314,6 +336,7 @@
                                         <xsl:with-param name="available-files" select="$available-files"/>
                                         <xsl:with-param name="location" select="$child-filename"/>
                                         <xsl:with-param name="seen" select="$seen"/>
+                                        <xsl:with-param name="parent-file" select="$parent-file"/>
                                     </xsl:call-template>
                                 </xsl:when>
                                 <xsl:otherwise>
@@ -343,6 +366,7 @@
                         <xsl:with-param name="available-files" select="$available-files"/>
                         <xsl:with-param name="seen"
                             select="string(exsl:node-set($first)/result/@seen)"/>
+                        <xsl:with-param name="parent-file" select="$parent-file"/>
                     </xsl:call-template>
                 </xsl:variable>
                 <result seen="{string(exsl:node-set($rest)/result/@seen)}">

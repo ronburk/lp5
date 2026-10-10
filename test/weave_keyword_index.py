@@ -51,6 +51,14 @@ def check_index(document, terms_by_file, order):
     assert [child.tag for child in document] == ["articles", "bundles", "keyword-index"]
     article_order = [a.attrib["file"] for a in document.find("articles")]
     assert article_order == order, (article_order, order)
+    articles = {a.attrib["file"]: a for a in document.find("articles")}
+    assert "parent" not in articles["lp5.lp5"].attrib
+    if "9.lp5" in articles:
+        assert articles["9.lp5"].attrib["parent"] == "lp5.lp5"
+        assert articles["7.lp5"].attrib["parent"] == "9.lp5"
+        assert articles["2.lp5"].attrib["parent"] == "lp5.lp5"
+        for filename in order[4:]:
+            assert "parent" not in articles[filename].attrib
     expected = {}
     for filename in order:
         for value in dict.fromkeys(canonical(t) for t in terms_by_file[filename]):
@@ -94,7 +102,7 @@ def main():
         for number in range(30, 55):
             terms[f"{number}.lp5"] = ["shared"]
         for filename, keywords in terms.items():
-            children = {"lp5.lp5": ("9.lp5", "2.lp5", "9.lp5"),
+            children = {"lp5.lp5": ("9.lp5", "2.lp5"),
                         "9.lp5": ("7.lp5",)}.get(filename, ())
             write_article(source, filename, None if filename == "0.lp5" else keywords,
                           children, "Bundle" if filename in ("9.lp5", "2.lp5") else None)

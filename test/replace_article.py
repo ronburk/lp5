@@ -37,7 +37,7 @@ def main():
         replacement = '''<?xml version="1.0" encoding="UTF-8"?>
 <!-- document comment --><?outside kept?>
 <template xmlns:meta="urn:test" meta:label="kept">
-    <children><li id="13.lp5"/><li id="missing.lp5"/></children>
+    <children><li id="missing.lp5"/></children>
     <!-- article comment --><?inside kept?>
     <heading>New <em>article</em> 雪 &amp; more</heading>
     <keywords><li> Changed Keyword </li></keywords>
