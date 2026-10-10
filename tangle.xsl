@@ -14,6 +14,8 @@
     <xsl:param name="source-directory" select="'.'"/>
     <xsl:param name="source-map-enabled" select="'false'"/>
     <xsl:param name="source-map-marker-name" select="'lp5-source'"/>
+    <xsl:param name="root-bundle-enabled" select="'false'"/>
+    <xsl:param name="root-bundle" select="''"/>
 
     <xsl:template match="/">
         <!-- lp5.c's my:ls inventory lets us skip absent links before document(). -->
@@ -275,7 +277,9 @@
         <xsl:param name="source-map-enabled"/>
         <xsl:param name="available-articles"/>
 
-        <xsl:for-each select="$document/template/section[@data-lp5-kind = 'code'][not(normalize-space(name))]/code">
+        <xsl:for-each select="$document/template/section[@data-lp5-kind = 'code'][
+                ($root-bundle-enabled = 'true' and normalize-space(name) = $root-bundle) or
+                ($root-bundle-enabled != 'true' and not(normalize-space(name)))]/code">
             <xsl:apply-templates select="node()" mode="emit-code">
                 <xsl:with-param name="root" select="$root"/>
                 <xsl:with-param name="stack" select="'|'"/>

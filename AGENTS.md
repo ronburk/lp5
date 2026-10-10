@@ -199,8 +199,14 @@ stylesheets; running `tangle.xsl` or `weave.xsl` directly with ordinary
 `xsltproc` fails with an unregistered-function error. The project name is the
 first argument after `./lp5`: project `X` requires directory `X.lp5/` and root
 article `X.lp5/X.lp5`. Its weave index is always `X.lp5/weave.xml`; tangle
-always writes both `X.lp5/X.out` and `X.lp5/X.map`. These names are derived
-from the project name, not command-line path overrides.
+writes the unnamed bundle to `X.lp5/X.out` with source map `X.lp5/X.map`. A
+nonempty code name enclosed in angle brackets also declares an output bundle:
+`<app.js>` writes that bundle to `X.lp5/app.js` and its map to
+`X.lp5/app.js.map`. References to an output bundle expand its code just like
+references to any named bundle. Output names must be plain filenames inside
+the project directory; the harness rejects path separators, unsafe platform
+filename characters, collisions, and output bundles defined only in orphan
+articles.
 
 The transform follows each `<children>` link and assembles the unnamed code
 sections, recursively expanding named code references. It validates articles
@@ -306,6 +312,10 @@ Each permitted direct child may appear at most once in an article. Each kind of 
 The `data-lp5-kind` attribute distinguishes the explanation and code sections, and distinguishes both from inline HTML `<code>` markup in the explanation. If an article has no code fragment, omit the code section rather than writing an empty one.
 
 A **bundle** is the ordered set of code sections that share the same `<name>` value.
+A nonempty bundle name whose trimmed value begins with `<` and ends with `>` is
+also an output declaration; its interior is the output filename. Every
+matching section contributes to that output in normal bundle order. The
+unnamed bundle remains the project's default `X.out` output.
 
 ### Cloud-browser testing in OpenAI Work
 
