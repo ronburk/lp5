@@ -2,30 +2,31 @@
     <heading>Controller</heading>
     <keywords>
         <li>controller</li>
-        <li>event dispatch</li>
+        <li>command dispatch</li>
         <li>handler stack</li>
         <li>initialization</li>
         <li>state machine</li>
     </keywords>
     <section data-lp5-kind="explanation">
-        <p>Event dispatch is a kind of hierarchical state machine, implemented with a stack where push is a "call" and pop is a "return".</p>
-        <p>Dispatch throws an explicit error until initialization installs the event handler. Each handler is a generator object. Call <code>init(handler)</code> once to install the first handler. The stack is undefined until initialization creates it. An empty stack still records that initialization has occurred, so a second call throws an error even after dispatch removes the last handler.</p>
+        <p>Command dispatch is a kind of hierarchical state machine, implemented with a stack where push is a "call" and pop is a "return".</p>
+        <p>Each command is an object with at least a <code>name</code> field identifying the command. Additional fields carry its arguments. The controller passes the same object to each handler involved in dispatch.</p>
+        <p>Dispatch throws an explicit error until initialization installs the command handler. Each handler is a generator object. Call <code>init(handler)</code> once to install the first handler. The stack is undefined until initialization creates it. An empty stack still records that initialization has occurred, so a second call throws an error even after dispatch removes the last handler.</p>
     </section>
     <section data-lp5-kind="code">
         <name>Outermost scope objects</name>
         <code><![CDATA[let controller = (() => {
-    let handlerStack; // top of stack is current event handler
+    let handlerStack; // top of stack is current command handler
 
     function init(handler) {
         if (handlerStack !== undefined)
             throw new Error("Controller has already been initialized");
         handlerStack = [handler];
-        result.dispatch = baseEventHandler;
+        result.dispatch = baseCommandHandler;
     }
 
-    function baseEventHandler(event) {
+    function baseCommandHandler(command) {
         for (let handler; (handler = handlerStack.at(-1)) !== undefined; ) {
-            let result = handler.next(event);
+            let result = handler.next(command);
             if (result.done)
                 handlerStack.pop()
             else if (result.value === handler) // keep same handler
