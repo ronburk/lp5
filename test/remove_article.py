@@ -24,7 +24,7 @@ def main():
 
     with tempfile.TemporaryDirectory(prefix="lp5-remove-article-") as temporary:
         working = Path(temporary)
-        source = working / "source"
+        source = working / "lp5.lp5"
         source.mkdir()
         for stylesheet in (
             "weave.xsl", "tangle.xsl", "add-article.xsl", "remove-article.xsl",
@@ -50,7 +50,7 @@ def main():
 
         def run(*arguments):
             return subprocess.run(
-                [executable, "-s", str(source), "-w", str(working / "weave.xml"), *arguments],
+                [executable, "lp5", *arguments],
                 cwd=working,
                 capture_output=True,
                 text=True,
@@ -58,8 +58,8 @@ def main():
 
         initial = run("weave")
         assert initial.returncode == 0, initial.stderr
-        weave_before_remove = (working / "weave.xml").read_bytes()
-        weave_root = ET.parse(working / "weave.xml").getroot()
+        weave_before_remove = (source / "weave.xml").read_bytes()
+        weave_root = ET.parse(source / "weave.xml").getroot()
         assert weave_root.find("articles/article[@file='lp5.lp5']").get("parent") is None
         assert weave_root.find("articles/article[@file='1.lp5']").get("parent") == "lp5.lp5"
         assert weave_root.find("articles/article[@file='3.lp5']").get("parent") == "1.lp5"
@@ -67,7 +67,7 @@ def main():
         result = run("remove-article", "3.lp5")
         assert result.returncode == 0, result.stderr
         assert not (source / "3.lp5").exists()
-        assert (working / "weave.xml").read_bytes() == weave_before_remove
+        assert (source / "weave.xml").read_bytes() == weave_before_remove
         nested_parent = ET.parse(source / "1.lp5").getroot()
         assert [node.get("id") for node in nested_parent.findall("children/li")] == [
             "4.lp5"
@@ -90,7 +90,7 @@ def main():
         # The command leaves its index alone; the next ordinary command refreshes it.
         refreshed = run("show-article", "lp5.lp5")
         assert refreshed.returncode == 0, refreshed.stderr
-        refreshed_weave = ET.parse(working / "weave.xml").getroot()
+        refreshed_weave = ET.parse(source / "weave.xml").getroot()
         assert refreshed_weave.find("articles/article[@file='2.lp5']") is None
 
         # Each refusal leaves every source file byte-for-byte unchanged.
@@ -111,7 +111,7 @@ def main():
         result = run("remove-article", "3.lp5", "extra")
         assert result.returncode == 1 and "Usage:" in result.stderr
         result = run("-o", str(working / "unused.xml"), "remove-article", "3.lp5")
-        assert result.returncode == 1 and "-o is not valid" in result.stderr
+        assert result.returncode == 1 and "unknown command" in result.stderr
         assert {path.name: path.read_bytes() for path in source.iterdir()} == before
 
     print("remove-article CLI tests passed")

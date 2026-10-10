@@ -21,13 +21,13 @@ def write(directory, filename, children=()):
 
 def run(executable, working, source):
     return subprocess.run(
-        [executable, "-s", str(source), "-w", str(working / "weave.xml"), "weave"],
+        [executable, "lp5", "weave"],
         cwd=working, capture_output=True, text=True,
     )
 
 
 def fixture(executable, working, files):
-    source = working / "source"
+    source = working / "lp5.lp5"
     source.mkdir()
     for name, children in files.items():
         write(source, name, children)
@@ -40,7 +40,7 @@ def main():
     executable = str(Path(sys.argv[1]).resolve())
     with tempfile.TemporaryDirectory(prefix="lp5-weave-tree-") as temporary:
         working = Path(temporary)
-        source = working / "source"
+        source = working / "lp5.lp5"
         source.mkdir()
         for stylesheet in ("weave.xsl", "tangle.xsl"):
             (working / stylesheet).symlink_to(PROJECT_DIR / stylesheet)
@@ -56,7 +56,7 @@ def main():
         valid = run(executable, working, source)
         assert valid.returncode == 0, valid.stderr
         assert "failed to load external entity" not in valid.stderr
-        root = ET.parse(working / "weave.xml").getroot()
+        root = ET.parse(source / "weave.xml").getroot()
         articles = {article.get("file"): article for article in root.find("articles")}
         assert articles["lp5.lp5"].get("parent") is None
         assert articles["1.lp5"].get("parent") == "lp5.lp5"

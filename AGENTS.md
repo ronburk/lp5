@@ -191,16 +191,16 @@ reuse an applicable generated output for follow-up publication. Run this
 command from the repository root:
 
 ```sh
-./lp5 -o lp5.html tangle lp5.lp5/lp5.lp5
+./lp5 lp5 tangle
 ```
 
 The launcher registers the `my:ls` extension required by the current
 stylesheets; running `tangle.xsl` or `weave.xsl` directly with ordinary
-`xsltproc` fails with an unregistered-function error. Use the default weave
-index for ordinary work. It is an ignored, disposable cache inside the source
-directory, refreshed automatically as source articles change. Generated
-`lp5.html` files are also ignored build outputs; regenerate them with `tangle`
-rather than committing them.
+`xsltproc` fails with an unregistered-function error. The project name is the
+first argument after `./lp5`: project `X` requires directory `X.lp5/` and root
+article `X.lp5/X.lp5`. Its weave index is always `X.lp5/weave.xml`; tangle
+always writes both `X.lp5/X.out` and `X.lp5/X.map`. These names are derived
+from the project name, not command-line path overrides.
 
 The transform follows each `<children>` link and assembles the unnamed code
 sections, recursively expanding named code references. It validates articles
@@ -223,53 +223,52 @@ weave index when needed instead of running `weave` before every operation.
 Record and report harness failures and concrete improvements that would make
 the work easier.
 
-`./lp5 search-keywords [--all] -- KEYWORD [KEYWORD ...]` searches this snapshot
+`./lp5 X search-keywords [--all] -- KEYWORD [KEYWORD ...]` searches this snapshot
 after the shared weave freshness check. See [SEARCH_KEYWORDS.md](SEARCH_KEYWORDS.md)
 for the CLI grammar, normalization rules, and returned XML contract.
 
-`./lp5 search [--all] [--] TEXT [TEXT ...]` searches article text in this snapshot
+`./lp5 X search [--all] [--] TEXT [TEXT ...]` searches article text in this snapshot
 after the same freshness check. See [SEARCH.md](SEARCH.md) for searchable fields,
 literal matching, excerpts, and the returned XML contract.
 
-`./lp5 list-keywords` lists the canonical vocabulary and distinct article counts
+`./lp5 X list-keywords` lists the canonical vocabulary and distinct article counts
 from the same snapshot. See [LIST_KEYWORDS.md](LIST_KEYWORDS.md) for its contract.
 
-`./lp5 show-article [article-file.lp5]` returns the filename and complete source
-template; omitting the filename selects `lp5.lp5` under `LP5Source`.
+`./lp5 X show-article [article-file.lp5]` returns the filename and complete source
+template; omitting the filename selects the project root article `X.lp5`.
 See [SHOW_ARTICLE.md](SHOW_ARTICLE.md) for its XML contract and navigation.
 
-The weave index defaults to `<source-dir>/weave.xml` (normally
-`lp5.lp5/weave.xml`). `-s` and `LP5Source` select the source directory.
-Use `-w <file>` only when an explicit alternate index is needed;
-the freshness check reads and refreshes that selected file. `weave` writes there
-by default. `add-article` uses it as input, and `show-bundle`, `search`,
-`search-keywords`, and `list-keywords` read it. `show-bundle` lists bundle names,
-or reads the named bundle; pass `""` for unnamed code. See
+Every command takes the project name first: `./lp5 <project-name> <command> <arguments>`.
+The project directory and root article are `<project-name>.lp5/` and
+`<project-name>.lp5/<project-name>.lp5`; the weave index is always
+`<project-name>.lp5/weave.xml`. `add-article` uses that index, and `show-bundle`, `search`, `search-keywords`,
+and `list-keywords` read it. `show-bundle` lists bundle names or reads the named
+bundle; pass `""` for unnamed code. See
 [SHOW_BUNDLE.md](SHOW_BUNDLE.md).
 
 ```sh
-./lp5 [-w weave-file] weave [root-article]
-./lp5 [-w weave-file] add-article <parent-id> <article-file> [before-child-id]
-./lp5 remove-article <article-id.lp5>
-./lp5 replace-article <article-id> <article-file>
+./lp5 X weave
+./lp5 X add-article <parent-id> <article-file> [before-child-id]
+./lp5 X remove-article <article-id.lp5>
+./lp5 X replace-article <article-id> <article-file>
 ```
 
 `add-article` validates the supplied article template, chooses an unused
-numeric `.lp5` filename, writes the article under the selected source directory,
+numeric `.lp5` filename, writes the article under the project directory,
 and adds its link to the parent in one command. It stages both files and rolls
 back the new article if the parent update cannot be installed. The input file is
-left untouched. Do not pass `-o`; the parent is updated in place. On success,
-the command reports `added article: <filename>` on stderr. The selected weave
-index is left stale and will be refreshed by the next command that needs it.
+left untouched. The parent is updated in place. On success, the command reports
+`added article: <filename>` on stderr. `X.lp5/weave.xml` is left stale and will
+be refreshed by the next command that needs it.
 
-`./lp5 replace-article <article-id> <article-file>` validates and replaces one
+`./lp5 X replace-article <article-id> <article-file>` validates and replaces one
 existing source article, including its desired child links. It skips the weave
 freshness preflight and leaves the index untouched until a later command needs
 it. See [REPLACE_ARTICLE.md](REPLACE_ARTICLE.md) for failure handling and tests.
 
 `remove-article` removes a non-root leaf article and its unique parent link.
 It stages and validates the updated parent before changing either source file;
-the command leaves the selected weave file for the normal freshness check to
+the command leaves `X.lp5/weave.xml` for the normal freshness check to
 regenerate.
 See [REMOVE_ARTICLE.md](REMOVE_ARTICLE.md) for refusal behavior.
 
@@ -279,7 +278,7 @@ Use the `check` command to validate one article without tangling the whole
 article tree:
 
 ```sh
-./lp5 check lp5.lp5/1.lp5
+./lp5 X check 1.lp5
 ```
 
 It applies the same article-format validation used by `tangle`. A valid file
@@ -288,8 +287,8 @@ error and exits unsuccessfully.
 
 For a bare filename that cannot be opened as given, `check` tries appending
 `.lp5` when the name has no suffix, then looks for that resulting filename
-under `LP5Source`. Arguments containing `/` or `\` are used as paths and do
-not get these fallbacks. If no candidate exists, the error reports the
+under the project directory. Arguments containing `/` or `\` are used as paths
+and do not get these fallbacks. If no candidate exists, the error reports the
 original argument.
 
 ## Article terminology and format

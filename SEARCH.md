@@ -1,16 +1,16 @@
 # Search article text
 
 ```sh
-./lp5 [-w weave-file] search [--all] [--] TEXT [TEXT ...]
+./lp5 X search [--all] [--] TEXT [TEXT ...]
 ```
 
 The standalone `--` is optional. Every following argument is one literal search
 string. Use `--` before terms that look like options. For example:
 
 ```sh
-./lp5 search -- -o "save article"
-./lp5 search --all -- -o "save article"
-./lp5 search foo
+./lp5 X search -- -o "save article"
+./lp5 X search --all -- -o "save article"
+./lp5 X search foo
 ```
 
 Search looks in each article's heading, each keyword, explanation, code name,
@@ -65,9 +65,7 @@ Output is one UTF-8 XML document without a namespace, ending with a newline:
   text and attributes are escaped by the serializer; parse the document rather
   than comparing entity spellings.
 
-Search uses the shared weave freshness check and reads `weave.xml` in the
-selected source directory by default. `-w <file>` selects another index for both freshness
-checking and reading. It scans article records directly; `weave` does not
-generate a separate full-text index. Output goes to stdout, or to the existing
-`-o` destination with stdout empty. Invalid arguments, XML text, index, or
-transform return status 1 with diagnostics on stderr.
+Search uses the shared weave freshness check and reads the fixed project index
+`X.lp5/weave.xml`. It scans article records directly; `weave` does not generate
+a separate full-text index. Output goes to stdout. Invalid arguments, XML text,
+index, or transform return status 1 with diagnostics on stderr.

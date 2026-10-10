@@ -106,7 +106,7 @@ def main():
     executable = str(Path(sys.argv[1]).resolve())
     with tempfile.TemporaryDirectory(prefix="lp5-search-keywords-") as temporary:
         working = Path(temporary)
-        source = working / "source"
+        source = working / "lp5.lp5"
         source.mkdir()
         for stylesheet in ("search-keywords.xsl", "weave.xsl", "tangle.xsl", "check.xsl",
                            "show-bundle.xsl", "add-article.xsl"):
@@ -133,11 +133,8 @@ def main():
         order += [f"{n}.lp5" for n in range(30, 55)] + ["a&z.lp5"]
         original = snapshot(source)
 
-        def run(*args, env=None, source_option=True):
-            arguments = [executable]
-            if source_option:
-                arguments += ["-s", str(source)]
-            return subprocess.run(arguments + list(args), cwd=working,
+        def run(*args, env=None, project="lp5"):
+            return subprocess.run([executable, project, *args], cwd=working,
                                   env=env, capture_output=True)
 
         def search(terms, all_terms=False):
@@ -158,14 +155,14 @@ def main():
         assert len(search(["Été"]).find("results")) == 0
         assert snapshot(source) == original
 
-        bundle = run("show-bundle", str(source / "weave.xml"), "ioStore & More")
+        bundle = run("show-bundle", "ioStore & More")
         assert bundle.returncode == 0, bundle.stderr
         bundle_root = ET.fromstring(bundle.stdout)
         assert bundle_root.attrib == {"name": "ioStore & More"}
         assert [s.attrib["article"] for s in bundle_root] == ["3.lp5"]
         incoming = working / "incoming.xml"
         incoming.write_text("<template><heading>New article</heading></template>")
-        added = run("add-article", str(source / "weave.xml"), "lp5.lp5", str(incoming))
+        added = run("add-article", "lp5.lp5", str(incoming))
         assert added.returncode == 0 and added.stdout == b"", added.stderr
         new_id = re.search(rb"added article: (\S+)", added.stderr)
         assert new_id is not None, added.stderr
@@ -184,31 +181,18 @@ def main():
         assert not (working / "do-not-create.xml").exists()
         assert not (working / "do-not-create.map").exists()
 
-        destination = working / "matches.xml"
-        result = run("search-keywords", "-o", str(destination), "--all", "--", *terms)
-        assert result.returncode == 0 and result.stdout == b"", result.stderr
-        check_result(destination.read_bytes(), "all", terms, source, order)
-
         for arguments in ([], ["--"], ["--all", "--"],
                           ["--limit", "--", "persistence"], ["weave.xml", "--", "persistence"],
                           ["--all", "--all", "--", "persistence"], ["--", ""],
                           ["--", " \t\r\n"], ["-m", "map.json", "--", "persistence"]):
-            destination.write_bytes(b"unchanged")
-            result = run("-o", str(destination), "search-keywords", *arguments)
+            result = run("search-keywords", *arguments)
             assert result.returncode == 1 and result.stdout == b"" and result.stderr, arguments
-            assert destination.read_bytes() == b"unchanged"
 
         for keyword in (b"\xff", b"\xe2\x82", b"\xc0\x80", b"\xe0\x80\x80",
                         b"\xf0\x80\x80\x80", b"\xed\xa0\x80", b"\xf4\x90\x80\x80",
                         b"\xe2A\x80", b"\x01", b"\x0b", "\ufffe".encode()):
             result = run("search-keywords", "--", keyword)
             assert result.returncode == 1 and result.stdout == b"" and result.stderr, keyword
-
-        result = run("search-keywords", "-o", str(working), "--", "persistence")
-        assert result.returncode == 1 and result.stdout == b""
-        if Path("/dev/full").exists():
-            result = run("search-keywords", "-o", "/dev/full", "--", "persistence")
-            assert result.returncode == 1 and result.stderr
 
         cache = source / "weave.xml"
         cache_bytes = cache.read_bytes()
@@ -226,10 +210,8 @@ def main():
                         b'<lp5-weave xmlns="urn:wrong"><articles/></lp5-weave>'):
             cache.write_bytes(invalid)
             os.utime(cache, ns=(future, future))
-            destination.write_bytes(b"unchanged")
-            result = run("search-keywords", "-o", str(destination), "--", "persistence")
+            result = run("search-keywords", "--", "persistence")
             assert result.returncode == 1 and result.stdout == b"" and result.stderr, invalid
-            assert destination.read_bytes() == b"unchanged"
         cache.write_bytes(b"<lp5-weave><articles/></lp5-weave>")
         os.utime(cache, ns=(future, future))
         result = run("search-keywords", "--", "persistence")
@@ -253,10 +235,8 @@ def main():
         stylesheet = working / "search-keywords.xsl"
         stylesheet.unlink()
         stylesheet.write_text('<xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" version="1.0"><xsl:template match="/"><partial/><xsl:message terminate="yes">controlled failure</xsl:message></xsl:template></xsl:stylesheet>')
-        destination.write_bytes(b"unchanged")
-        result = run("search-keywords", "-o", str(destination), "--", "persistence")
+        result = run("search-keywords", "--", "persistence")
         assert result.returncode == 1 and result.stdout == b"" and result.stderr
-        assert destination.read_bytes() == b"unchanged"
         stylesheet.unlink()
         stylesheet.symlink_to(PROJECT_DIR / "search-keywords.xsl")
 
@@ -267,20 +247,12 @@ def main():
         assert result.find("results")[0].attrib["file"] == "4.lp5"
         assert snapshot(source) == edited
 
-        environment = dict(os.environ, LP5Source=str(source))
-        result = run("search-keywords", "--", "persistence", env=environment, source_option=False)
-        assert result.returncode == 0, result.stderr
-        check_result(result.stdout, "any", ["persistence"], source, order)
-        environment["LP5Source"] = str(working / "does-not-exist")
-        result = run("search-keywords", "--", "persistence", env=environment)
-        assert result.returncode == 0, result.stderr
-
-        other = working / "other"
+        other = working / "other.lp5"
         other.mkdir()
-        write_article(other, "lp5.lp5", ["other project"])
-        result = run("search-keywords", "-s", str(other), "--", "other project", source_option=False)
+        write_article(other, "other.lp5", ["other project"])
+        result = run("search-keywords", "--", "other project", project="other")
         assert result.returncode == 0, result.stderr
-        check_result(result.stdout, "any", ["other project"], other, ["lp5.lp5"])
+        check_result(result.stdout, "any", ["other project"], other, ["other.lp5"])
         assert snapshot(source) == edited
     print("search-keywords acceptance checks passed")
 

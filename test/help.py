@@ -12,8 +12,8 @@ def main():
 
     executable = str(Path(sys.argv[1]).resolve())
     outputs = []
-    for argument in ("--help", "help"):
-        result = subprocess.run([executable, argument], capture_output=True)
+    for arguments in (("--help",), ("lp5", "help")):
+        result = subprocess.run([executable, *arguments], capture_output=True)
         assert result.returncode == 0, result.stderr
         assert result.stdout == b"", result.stdout
         assert b"Usage:" in result.stderr, result.stderr

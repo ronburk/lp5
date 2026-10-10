@@ -54,7 +54,7 @@ def main():
     executable = str(Path(sys.argv[1]).resolve())
     with tempfile.TemporaryDirectory(prefix="lp5-search-") as temporary:
         working = Path(temporary)
-        source = working / "source"
+        source = working / "lp5.lp5"
         source.mkdir()
         for stylesheet in ("weave.xsl", "tangle.xsl", "check.xsl", "search.xsl"):
             (working / stylesheet).symlink_to(PROJECT_DIR / stylesheet)
@@ -80,7 +80,7 @@ def main():
         original = {path.name: path.read_bytes() for path in source.iterdir() if path.name != "weave.xml"}
 
         def run(*args):
-            return subprocess.run([executable, "-s", str(source), *args], cwd=working,
+            return subprocess.run([executable, "lp5", *args], cwd=working,
                                   capture_output=True)
 
         def search(terms, all_terms=False):
@@ -172,11 +172,6 @@ def main():
         assert search(["absent phrase"]).attrib["total"] == "0"
         assert {path.name: path.read_bytes() for path in source.iterdir() if path.name != "weave.xml"} == original
 
-        output = working / "results.xml"
-        redirected = run("-o", str(output), "search", "--all", "--", "save", "reload")
-        assert redirected.returncode == 0 and redirected.stdout == b"", redirected.stderr
-        assert ET.parse(output).getroot().find("results/article").attrib["file"] == "3.lp5"
-
         for arguments in ([], ["--"], ["--all", "--"], ["--other", "--", "save"],
                           ["--all", "--all", "--", "save"], ["--", " \t\r\n"]):
             failed = run("search", *arguments)
@@ -184,10 +179,6 @@ def main():
         for invalid in (b"\xff", b"\xc0\x80", b"\x01"):
             failed = run("search", "--", invalid)
             assert failed.returncode == 1 and failed.stdout == b"" and failed.stderr
-        if Path("/dev/full").exists():
-            failed = run("-o", "/dev/full", "search", "--", "save")
-            assert failed.returncode == 1 and failed.stderr
-
     print("search acceptance checks passed")
 
 

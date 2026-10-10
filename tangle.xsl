@@ -9,8 +9,8 @@
     <!-- XPath 1.0 cannot distinguish CDATA sections from ordinary text nodes;
          the validator can check the XML tree shape, not the lexical CDATA form. -->
 
-    <!-- Override when tangling a root article outside the project convention. -->
-    <xsl:param name="root-location" select="'lp5.lp5/lp5.lp5'"/>
+    <!-- lp5.c supplies the project-named root article and its directory. -->
+    <xsl:param name="root-location" select="'root.lp5'"/>
     <xsl:param name="source-directory" select="'.'"/>
     <xsl:param name="source-map-enabled" select="'false'"/>
     <xsl:param name="source-map-marker-name" select="'lp5-source'"/>

@@ -1,29 +1,27 @@
 # Search articles by keyword
 
-To inspect the indexed vocabulary first, use `./lp5 list-keywords`.
+To inspect the indexed vocabulary first, use `./lp5 X list-keywords`.
 See [LIST_KEYWORDS.md](LIST_KEYWORDS.md) for its XML output contract.
 
 ```sh
-./lp5 [-s source-dir] [-w weave-file] [-o output-file] search-keywords [--all] -- KEYWORD [KEYWORD ...]
+./lp5 X search-keywords [--all] -- KEYWORD [KEYWORD ...]
 ```
 
 Examples:
 
 ```sh
-./lp5 search-keywords -- persistence "save article"
-./lp5 search-keywords --all -- "save article" persistence
-./lp5 search-keywords -- "O'Reilly, C++" "</keyword>" "-o" "--all"
-./lp5 -s other.lp5 -o matches.xml search-keywords -- persistence
+./lp5 X search-keywords -- persistence "save article"
+./lp5 X search-keywords --all -- "save article" persistence
+./lp5 X search-keywords -- "O'Reilly, C++" "</keyword>" "-o" "--all"
+./lp5 X search-keywords -- persistence
 ```
 
 One shell argument is one complete keyword. Commas and spaces inside an argument
 are ordinary data. The first standalone `--` is required; every subsequent
 argument is a literal keyword, including another `--` or strings equal to options.
 Before the separator, `--all` is allowed once; other command arguments are errors.
-Global `-s`, `-w`, `-o`, and `LP5Source` retain their existing behavior. The
-index defaults to `<source-dir>/weave.xml`; `-w` selects another index for reading and
-freshness checking. Global options are removed before dispatch only up to `--`.
-`-m` is invalid for search.
+The command reads the fixed project index `X.lp5/weave.xml`, refreshing it when
+needed. The project name is the only project-path selector.
 
 At least one keyword is required. Empty normalized terms, invalid UTF-8, and
 characters forbidden in XML 1.0 are errors. Terms are canonicalized using XPath
@@ -89,14 +87,14 @@ unique identifiers; read the article identified by `file` for complete content.
 ## Cache and errors
 
 Search uses the existing shared `ensure_weave_current()` preflight and reads
-`weave.xml` from the selected source directory by default, or the selected `-w` file.
+`X.lp5/weave.xml`.
 Its keyword index provides membership;
 the article records provide metadata and ordering. A fresh older cache lacking
 the keyword index is supported by deriving membership from its article records.
 Search never edits articles; refreshing the generated cache is permitted.
 
 Success is status 0, including no matches (`total="0"` and empty `results`).
-Output goes to stdout, or to the existing `-o` destination with stdout empty.
+Output goes to stdout.
 Diagnostics and refresh warnings go to stderr. Invalid arguments, index reads,
 or transforms return status 1 without result XML. The index must have an
 `lp5-weave` root with exactly one direct `articles` child; an empty collection

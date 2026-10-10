@@ -45,7 +45,7 @@ def main():
     executable = str(Path(sys.argv[1]).resolve())
     with tempfile.TemporaryDirectory(prefix="lp5-show-bundle-") as temporary:
         working = Path(temporary)
-        source = working / "source"
+        source = working / "lp5.lp5"
         source.mkdir()
         for stylesheet in ("weave.xsl", "tangle.xsl", "show-bundle.xsl"):
             (working / stylesheet).symlink_to(PROJECT_DIR / stylesheet)
@@ -63,10 +63,9 @@ def main():
                  "weave.xml", "-o", "--"]
         original = {p.name: p.read_bytes() for p in source.iterdir() if p.name != "weave.xml"}
 
-        def run(*args, environment=None, default_source=True):
-            options = ["-s", str(source)] if default_source else []
-            return subprocess.run([executable, *options, *args], cwd=working,
-                                  env=environment, capture_output=True)
+        def run(*args):
+            return subprocess.run([executable, "lp5", *args], cwd=working,
+                                  capture_output=True)
 
         cache = source / "weave.xml"
         assert not cache.exists()
@@ -75,24 +74,17 @@ def main():
         check_list(run("show-bundle"), names)
         assert cache.stat().st_mtime_ns == timestamp
 
-        default_contents = cache.read_bytes()
-        generated_alternate = working / "generated-alternate.xml"
-        result = run("-w", str(generated_alternate), "show-bundle")
-        check_list(result, names)
-        assert generated_alternate.exists()
-        assert cache.read_bytes() == default_contents
-
         for name in names:
-            # -- allows names equal to global options without parsing them.
+            # -- allows names equal to option-like arguments.
             result = run("show-bundle", "--", name)
             assert result.returncode == 0, result.stderr
             root = ET.fromstring(result.stdout)
             assert root.tag == "bundle" and root.attrib == {"name": name}
             assert len(root) > 0
-            if name not in ("-o", "--"):
-                old = run("show-bundle", str(cache), name)
-                assert old.returncode == 0 and old.stdout == result.stdout, old.stderr
-                new = run("show-bundle", name)
+            new = run("show-bundle", name)
+            if name == "--":
+                assert new.returncode != 0
+            else:
                 assert new.returncode == 0 and new.stdout == result.stdout, new.stderr
             for section in root:
                 assert section.tag == "section"
@@ -117,14 +109,6 @@ def main():
         assert ET.fromstring(xml_named.stdout).attrib == {"name": "weave.xml"}
         assert {p.name: p.read_bytes() for p in source.iterdir() if p.name != "weave.xml"} == original
 
-        output = working / "bundles.xml"
-        result = run("show-bundle", "-o", str(output))
-        assert result.returncode == 0 and not result.stdout, result.stderr
-        check_list(subprocess.CompletedProcess([], 0, output.read_bytes(), b""), names)
-        result = run("show-bundle", "Bundle & Names", "-o", str(output))
-        assert result.returncode == 0 and not result.stdout, result.stderr
-        assert len(ET.parse(output).getroot()) == 2
-
         if shutil.which("xsltproc"):
             direct = subprocess.run(["xsltproc", "show-bundle.xsl", str(cache)],
                                     cwd=working, capture_output=True)
@@ -133,38 +117,15 @@ def main():
                                      "show-bundle.xsl", str(cache)], cwd=working, capture_output=True)
             assert direct.returncode == 0 and ET.fromstring(direct.stdout).attrib == {"name": ""}
 
-        # The legacy two-argument form still reads its explicit index file.
-        alternate = working / "alternate.xml"
-        alternate.write_bytes(b'<lp5-weave><articles/><bundles/></lp5-weave>')
-        newest_source_mtime = max(
-            source.stat().st_mtime_ns,
-            *(path.stat().st_mtime_ns for path in source.iterdir()),
-        )
-        os.utime(alternate, ns=(newest_source_mtime + 2_000_000_000,
-                                newest_source_mtime + 2_000_000_000))
-        default_contents = cache.read_bytes()
-        result = run("-w", str(alternate), "show-bundle", "Bundle & Names")
-        assert result.returncode == 0
-        assert len(ET.fromstring(result.stdout)) == 0
-        assert cache.read_bytes() == default_contents
-
-        result = run("show-bundle", str(alternate), "Bundle & Names")
-        assert result.returncode == 0 and len(ET.fromstring(result.stdout)) == 0
-        output.write_bytes(b"keep existing output")
-        for args in (("--",), ("one", "two", "three"), ("-m", "unused.map"),
-                     ("-w",)):
-            result = run("show-bundle", "-o", str(output), *args)
+        for args in (("--",), ("one", "two"), ("one", "two", "three")):
+            result = run("show-bundle", *args)
             assert result.returncode == 1 and not result.stdout and result.stderr
-            assert output.read_bytes() == b"keep existing output"
-        result = run("show-bundle", "-w", "first.xml", "-w", "second.xml")
-        assert result.returncode == 1 and b"specified more than once" in result.stderr
         for invalid in (b"<wrong/>", b"<lp5-weave/>",
                         b"<lp5-weave><bundles/><bundles/></lp5-weave>",
                         b'<lp5-weave xmlns="wrong"><bundles/></lp5-weave>', b"<broken"):
             cache.write_bytes(invalid)
-            result = run("show-bundle", "-o", str(output))
+            result = run("show-bundle")
             assert result.returncode == 1 and not result.stdout and result.stderr
-            assert output.read_bytes() == b"keep existing output"
         cache.write_bytes(b"<lp5-weave><articles/><bundles/></lp5-weave>")
         check_list(run("show-bundle"), [])
 
@@ -172,15 +133,6 @@ def main():
         os.utime(cache, ns=(0, 0))
         names.insert(2, "Changed")
         check_list(run("show-bundle"), names)
-        environment = dict(os.environ, LP5Source=str(source))
-        check_list(run("show-bundle", environment=environment, default_source=False), names)
-        environment["LP5Source"] = str(working / "nonexistent")
-        check_list(run("show-bundle", environment=environment), names)
-        result = run("show-bundle", "-o", str(working))
-        assert result.returncode == 1 and not result.stdout and result.stderr
-        if Path("/dev/full").exists():
-            result = run("show-bundle", "-o", "/dev/full")
-            assert result.returncode == 1 and not result.stdout and result.stderr
     print("show-bundle acceptance checks passed")
 
 
