@@ -1,26 +1,14 @@
-<template>
-    <children>
+<template><children>
         <li id="24.lp5"/>
-    </children>
-    <heading>Dialog templates</heading>
-    <keywords>
-        <li>dialog</li>
-        <li>template</li>
-        <li>modal</li>
-    </keywords>
-    <section data-lp5-kind="explanation">
-        <p>
-            Dialog markup lives in named child templates inside
-            <code>LP5-Dialog-Templates</code>. Each dialog has its own article, and
-            its bundle name matches the dialog template ID. The parent template
-            also contains styles shared by all modal dialogs.
-        </p>
-    </section>
-    <section data-lp5-kind="code">
-        <name>Dialog templates</name>
-        <code><![CDATA[
+    </children><heading>Dialog templates</heading><keywords><li>dialog</li><li>template</li><li>modal</li></keywords><section data-lp5-kind="explanation"><p>
+    Dialog markup lives in named child templates inside
+    <code>LP5-Dialog-Templates</code>. Each dialog has its own article, and
+    its bundle name matches the dialog template ID. The parent template
+    also contains styles shared by all modal dialogs.
+</p>
+</section><section data-lp5-kind="code"><name>Dialog templates</name><code><![CDATA[
 <template id="LP5-Dialog-Templates">
-    <style>
+    <style> // dynamically inserted ahead of modal dialogs
         dialog:modal {
             max-width: 25rem;
             padding: 1.25rem;
@@ -37,6 +25,4 @@
     </style>
     ]]><lp5- ref="LP5-Dialog-SelectCreateProject"/><![CDATA[
 </template>
-]]></code>
-    </section>
-</template>
+]]></code></section></template>
