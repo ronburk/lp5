@@ -1,0 +1,28 @@
+<template>
+    <heading>Startup code</heading>
+    <keywords>
+        <li>startup</li>
+        <li>module</li>
+        <li>command</li>
+        <li>dialog</li>
+    </keywords>
+    <section data-lp5-kind="explanation">
+        <p>This module script runs after the browser has parsed the document,
+        so the dialog templates are available. The earlier classic script has
+        already initialized <code>window.LP5.controller</code>.</p>
+        <p>Startup dispatches a <code>ModalDialog</code> command naming the
+        Select/Create Project dialog. The modal dialog operation receives the
+        command; its current stub does not yet display the dialog.</p>
+    </section>
+    <section data-lp5-kind="code">
+        <name>Startup code</name>
+        <code><![CDATA[
+<script type="module">
+    window.LP5.controller.dispatch({
+        name: "ModalDialog",
+        dialogName: "LP5-Dialog-SelectCreateProject"
+    });
+</script>
+]]></code>
+    </section>
+</template>
