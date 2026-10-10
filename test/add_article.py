@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Exercise the add-article command's complete source-file update."""
 
+import os
 import subprocess
 import sys
 import tempfile
@@ -57,6 +58,7 @@ def main():
         added = run("add-article", "lp5.lp5", str(incoming), "2.lp5")
         assert added.returncode == 0 and added.stdout == b"", added.stderr
         assert b"added article: 3.lp5" in added.stderr
+        assert b"failed to load external entity" not in added.stderr
         assert (source / "3.lp5").read_bytes() == article_bytes
         parent = ET.parse(source / "lp5.lp5").getroot()
         assert [link.get("id") for link in parent.findall("children/li")] == [
@@ -83,6 +85,26 @@ def main():
                             "lp5.lp5", str(incoming))
         assert output_option.returncode == 1 and b"-o is not valid" in output_option.stderr
         assert {path.name: path.read_bytes() for path in source.iterdir()} == before_failure
+
+        occupied_candidate = source / "4.lp5"
+        occupied_contents = b"<this is malformed XML"
+        occupied_candidate.write_bytes(occupied_contents)
+        future_time = max(
+            weave.stat().st_mtime_ns,
+            source.stat().st_mtime_ns,
+            occupied_candidate.stat().st_mtime_ns,
+        ) + 1_000_000_000
+        os.utime(weave, ns=(future_time, future_time))
+        added_after_malformed_file = run("add-article", "lp5.lp5", str(incoming))
+        assert added_after_malformed_file.returncode == 0, added_after_malformed_file.stderr
+        assert b"added article: 5.lp5" in added_after_malformed_file.stderr
+        assert b"failed to load external entity" not in added_after_malformed_file.stderr
+        assert occupied_candidate.read_bytes() == occupied_contents
+        assert (source / "5.lp5").read_bytes() == article_bytes
+        parent = ET.parse(source / "lp5.lp5").getroot()
+        assert [link.get("id") for link in parent.findall("children/li")] == [
+            "5.lp5", "1.lp5", "3.lp5", "2.lp5"
+        ], [link.get("id") for link in parent.findall("children/li")]
 
     print("add-article CLI installation and rollback checks passed")
 

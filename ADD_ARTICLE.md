@@ -20,8 +20,8 @@ the parent article. These changes happen in one command. For example:
 On success, the command reports the generated filename, such as
 `added article: 3.lp5`, on stderr. If `before-child-id` is supplied, it must be
 an existing direct child of the parent, and the new link is inserted before
-that child. Otherwise, the new link is appended. Other parent content and
-existing child order are preserved.
+that child. Otherwise, the new link is inserted at the beginning of the child
+list. Other parent content and existing child order are preserved.
 
 The command does not rewrite the selected weave index. If `-w` is supplied, it
 selects the index that will be considered stale; the next command that needs
