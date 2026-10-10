@@ -58,7 +58,7 @@ def main():
   // literal ]]]]><![CDATA[> remains code
 ]]></code>
     </section>
-    <children><li id="1.lp5"/></children>
+    <children/>
 </template>''').encode("utf-8")
         (source / "lp5.lp5").write_bytes(root_text)
         (source / "4.lp5").write_bytes(child_text)

@@ -41,11 +41,11 @@ def main():
   <children><li id="1.lp5"/><li id="2.lp5"/></children>
 </template>
 """)
-        write_article(source, "1.lp5", "<template><heading>Has child</heading><children><li id=\"3.lp5\"/><li id=\"4.lp5\"/><li id=\"dup.lp5\"/><li id=\"dup.lp5\"/></children></template>\n")
+        write_article(source, "1.lp5", "<template><heading>Has child</heading><children><li id=\"3.lp5\"/><li id=\"4.lp5\"/></children></template>\n")
         write_article(source, "2.lp5", "<template><heading>Remove me</heading></template>\n")
         write_article(source, "3.lp5", "<template><heading>Grandchild</heading></template>\n")
         write_article(source, "4.lp5", "<template><heading>Sibling leaf</heading></template>\n")
-        write_article(source, "dup.lp5", "<template><heading>Duplicate link target</heading></template>\n")
+        write_article(source, "dup.lp5", "<template><heading>Standalone</heading></template>\n")
         write_article(source, "orphan.lp5", "<template><heading>Orphan</heading></template>\n")
 
         def run(*arguments):
@@ -59,6 +59,10 @@ def main():
         initial = run("weave")
         assert initial.returncode == 0, initial.stderr
         weave_before_remove = (working / "weave.xml").read_bytes()
+        weave_root = ET.parse(working / "weave.xml").getroot()
+        assert weave_root.find("articles/article[@file='lp5.lp5']").get("parent") is None
+        assert weave_root.find("articles/article[@file='1.lp5']").get("parent") == "lp5.lp5"
+        assert weave_root.find("articles/article[@file='3.lp5']").get("parent") == "1.lp5"
 
         result = run("remove-article", "3.lp5")
         assert result.returncode == 0, result.stderr
@@ -66,7 +70,7 @@ def main():
         assert (working / "weave.xml").read_bytes() == weave_before_remove
         nested_parent = ET.parse(source / "1.lp5").getroot()
         assert [node.get("id") for node in nested_parent.findall("children/li")] == [
-            "4.lp5", "dup.lp5", "dup.lp5"
+            "4.lp5"
         ]
 
         # The next removal refreshes the selected weave against the current source.
@@ -80,6 +84,7 @@ def main():
         assert updated.find("section[@data-lp5-kind='explanation']/p/code").text == "inline"
         assert updated.findtext("section[@data-lp5-kind='code']/name") == "Example"
         assert updated.findtext("section[@data-lp5-kind='code']/code") == 'if (a < b) return "yes";\n'
+        assert "parent" not in updated.attrib
         assert run("check", str(source / "lp5.lp5")).returncode == 0
 
         # The command leaves its index alone; the next ordinary command refreshes it.

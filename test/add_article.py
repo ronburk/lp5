@@ -70,7 +70,12 @@ def main():
 
         checked = run("check", "3.lp5")
         assert checked.returncode == 0, checked.stderr
-        assert ET.parse(weave).find("articles/article[@file='3.lp5']") is not None
+        refreshed_weave = ET.parse(weave).getroot()
+        new_record = refreshed_weave.find("articles/article[@file='3.lp5']")
+        assert new_record is not None and new_record.get("parent") == "lp5.lp5"
+        root_record = refreshed_weave.find("articles/article[@file='lp5.lp5']")
+        assert root_record is not None and root_record.get("parent") is None
+        assert "parent" not in ET.parse(source / "3.lp5").getroot().attrib
 
         before_failure = {path.name: path.read_bytes() for path in source.iterdir()}
         invalid_link = run("add-article", "lp5.lp5", str(incoming), "missing.lp5")

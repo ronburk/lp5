@@ -6,7 +6,8 @@ lp5 remove-article <article-id.lp5>
 
 Removes an existing non-root article and its unique parent link. The article
 must be a leaf; remove or move its children first. The command refuses missing
-articles, orphans without a parent link, ambiguous parent links, and the root.
+articles, orphan roots without a parent link, and the root. Weave validation
+rejects ambiguous parent links before this command runs.
 
 The updated parent is generated and validated before either source file is
 changed. The command stages the original parent so ordinary filesystem errors
