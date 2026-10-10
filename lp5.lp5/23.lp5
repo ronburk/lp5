@@ -12,13 +12,29 @@
         <p>
             Dialog markup lives in named child templates inside
             <code>LP5-Dialog-Templates</code>. Each dialog has its own article, and
-            its bundle name matches the dialog template ID.
+            its bundle name matches the dialog template ID. The parent template
+            also contains styles shared by all modal dialogs.
         </p>
     </section>
     <section data-lp5-kind="code">
         <name>Dialog templates</name>
         <code><![CDATA[
 <template id="LP5-Dialog-Templates">
+    <style>
+        dialog:modal {
+            max-width: 25rem;
+            padding: 1.25rem;
+        }
+
+        dialog:modal button {
+            padding: 0.6rem 1.2rem;
+            font-size: 1rem;
+        }
+
+        dialog:modal [role="alert"] {
+            color: #a00;
+        }
+    </style>
     ]]><lp5- ref="LP5-Dialog-SelectCreateProject"/><![CDATA[
 </template>
 ]]></code>
