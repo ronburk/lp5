@@ -2,9 +2,8 @@
 <!--
      weave.xsl - make one XML snapshot of all discovered lp5 articles.
 
-     Examples (run from the repository root through the lp5 CLI):
-       ./lp5 weave
-       ./lp5 -w alternate.xml weave
+     Example (run from the project directory):
+       ./lp5 lp5 weave
 
      The result is an index for source-navigation tools, not tangled output.
      Each article is emitted in preorder, with the root article first. Article
@@ -43,8 +42,9 @@
     <!-- Do not pretty-print: serializer-inserted whitespace could alter code. -->
     <xsl:output method="xml" encoding="UTF-8" indent="no"/>
 
-    <!-- lp5.c passes the directory containing the input root article. -->
-    <xsl:param name="source-directory" select="'lp5.lp5'"/>
+    <!-- lp5.c supplies the project directory and project-named root article. -->
+    <xsl:param name="source-directory" select="'.'"/>
+    <xsl:param name="root-article" select="'root.lp5'"/>
 
     <!-- The rooted match excludes similarly named markup in explanations. -->
     <xsl:key name="weave-keywords-by-value" match="/articles/article/keywords/li"
@@ -110,8 +110,8 @@
         <xsl:for-each select="$graph/article">
             <xsl:variable name="file" select="string(@file)"/>
             <xsl:variable name="incoming" select="$graph/article/child[@file = $file]"/>
-            <xsl:if test="$file = 'lp5.lp5' and $incoming">
-                <xsl:message terminate="yes">weave: root article 'lp5.lp5' has incoming parent link(s): <xsl:for-each select="$incoming"><xsl:if test="position() &gt; 1">, </xsl:if>'<xsl:value-of select="../@file"/>'</xsl:for-each>.</xsl:message>
+            <xsl:if test="$file = $root-article and $incoming">
+                <xsl:message terminate="yes">weave: root article '<xsl:value-of select="$root-article"/>' has incoming parent link(s): <xsl:for-each select="$incoming"><xsl:if test="position() &gt; 1">, </xsl:if>'<xsl:value-of select="../@file"/>'</xsl:for-each>.</xsl:message>
             </xsl:if>
             <xsl:if test="count($incoming) &gt; 1">
                 <xsl:message terminate="yes">weave: article '<xsl:value-of select="$file"/>' has multiple parent links from <xsl:for-each select="$incoming"><xsl:if test="position() &gt; 1">, </xsl:if>'<xsl:value-of select="../@file"/>'</xsl:for-each>.</xsl:message>
@@ -127,7 +127,7 @@
                 <xsl:with-param name="document" select="."/>
                 <xsl:with-param name="source-root" select="$source-root"/>
                 <xsl:with-param name="available-files" select="$directory-entries"/>
-                <xsl:with-param name="location" select="'lp5.lp5'"/>
+                <xsl:with-param name="location" select="$root-article"/>
                 <xsl:with-param name="seen" select="'|'"/>
             </xsl:call-template>
         </xsl:variable>
@@ -137,7 +137,7 @@
         <!-- Orphan roots have no incoming link from any available article. -->
         <xsl:variable name="orphan-roots">
             <roots>
-                <xsl:for-each select="$graph/article[@file != 'lp5.lp5']">
+                <xsl:for-each select="$graph/article[@file != $root-article]">
                     <xsl:variable name="file" select="string(@file)"/>
                     <xsl:if test="not($graph/article/child[@file = $file])">
                         <orphan file="{$file}"/>

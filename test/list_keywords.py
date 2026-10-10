@@ -37,7 +37,7 @@ def main():
     executable = str(Path(sys.argv[1]).resolve())
     with tempfile.TemporaryDirectory(prefix="lp5-list-keywords-") as temporary:
         working = Path(temporary)
-        source = working / "source"
+        source = working / "lp5.lp5"
         source.mkdir()
         for stylesheet in ("weave.xsl", "tangle.xsl", "list-keywords.xsl", "search-keywords.xsl"):
             (working / stylesheet).symlink_to(PROJECT_DIR / stylesheet)
@@ -55,10 +55,9 @@ def main():
                     "雪": 1, "😀": 1, "-o": 1, "--": 1, "&amp;": 1, "\u00a0": 1}
         original = {p.name: p.read_bytes() for p in source.iterdir() if p.name != "weave.xml"}
 
-        def run(*arguments, environment=None, default_source=True):
-            options = ["-s", str(source)] if default_source else []
-            return subprocess.run([executable, *options, *arguments], cwd=working,
-                                  capture_output=True, env=environment)
+        def run(*arguments, project="lp5"):
+            return subprocess.run([executable, project, *arguments], cwd=working,
+                                  capture_output=True)
 
         cache = source / "weave.xml"
         assert not cache.exists()
@@ -76,29 +75,21 @@ def main():
         timestamp = cache.stat().st_mtime_ns
         listing(run("list-keywords"), expected, order)
         assert cache.stat().st_mtime_ns == timestamp
-        destination = working / "vocabulary.xml"
-        result = run("list-keywords", "-o", str(destination))
-        assert result.returncode == 0 and not result.stdout, result.stderr
-        listing(subprocess.CompletedProcess([], 0, destination.read_bytes(), b""), expected, order)
-
         # Fresh caches from before keyword-index was introduced still work.
         index.remove(index.find("keyword-index"))
         ET.ElementTree(index).write(cache, encoding="utf-8")
         listing(run("list-keywords"), expected, order)
         assert ET.parse(cache).getroot().find("keyword-index") is None
 
-        destination.write_bytes(b"keep this output")
         for arguments in (("extra",), ("--",), ("--all",), ("-m", "unused.map")):
-            result = run("list-keywords", "-o", str(destination), *arguments)
+            result = run("list-keywords", *arguments)
             assert result.returncode == 1 and not result.stdout and result.stderr
-            assert destination.read_bytes() == b"keep this output"
         for invalid in (b"<wrong/>", b"<lp5-weave/>",
                         b"<lp5-weave><articles/><articles/></lp5-weave>",
                         b'<lp5-weave xmlns="wrong"><articles/></lp5-weave>', b"<broken"):
             cache.write_bytes(invalid)
-            result = run("list-keywords", "-o", str(destination))
+            result = run("list-keywords")
             assert result.returncode == 1 and not result.stdout and result.stderr
-            assert destination.read_bytes() == b"keep this output"
         cache.write_bytes(b"<lp5-weave><articles/></lp5-weave>")
         listing(run("list-keywords"), {})
         cache.write_bytes(b"<lp5-weave><articles/><keyword-index/></lp5-weave>")
@@ -111,22 +102,11 @@ def main():
         expected["save article"] = 1
         expected["changed keyword"] = 1
         listing(run("list-keywords"), expected)
-        environment = dict(os.environ, LP5Source=str(source))
-        listing(run("list-keywords", environment=environment, default_source=False), expected)
-        environment["LP5Source"] = str(working / "does-not-exist")
-        listing(run("list-keywords", environment=environment), expected)
-
-        result = run("list-keywords", "-o", str(working))
-        assert result.returncode == 1 and not result.stdout and result.stderr
-        if Path("/dev/full").exists():
-            result = run("list-keywords", "-o", "/dev/full")
-            assert result.returncode == 1 and not result.stdout and result.stderr
-
-        empty_source = working / "empty"
+        empty_source = working / "empty.lp5"
         empty_source.mkdir()
-        write_article(empty_source, "lp5.lp5", [" \t\n\r "])
+        write_article(empty_source, "empty.lp5", [" \t\n\r "])
         cache.unlink()
-        listing(run("list-keywords", "-s", str(empty_source)), {})
+        listing(run("list-keywords", project="empty"), {})
 
     print("list-keywords acceptance checks passed")
 

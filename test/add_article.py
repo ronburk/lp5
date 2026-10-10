@@ -23,7 +23,7 @@ def main():
 
     with tempfile.TemporaryDirectory(prefix="lp5-add-article-cli-") as temporary:
         working = Path(temporary)
-        source = working / "source"
+        source = working / "lp5.lp5"
         source.mkdir()
         for stylesheet in ("add-article.xsl", "check.xsl", "tangle.xsl", "weave.xsl"):
             (working / stylesheet).symlink_to(PROJECT_DIR / stylesheet)
@@ -35,11 +35,11 @@ def main():
         write_article(source, "1.lp5", "<template><heading>First</heading></template>\n")
         write_article(source, "2.lp5", "<template><heading>Second</heading></template>\n")
 
-        weave = working / "weave.xml"
+        weave = source / "weave.xml"
 
         def run(*arguments):
             return subprocess.run(
-                [executable, "-s", str(source), "-w", str(weave), *arguments],
+                [executable, "lp5", *arguments],
                 cwd=working,
                 capture_output=True,
             )
@@ -88,7 +88,7 @@ def main():
 
         output_option = run("-o", str(working / "parent.xml"), "add-article",
                             "lp5.lp5", str(incoming))
-        assert output_option.returncode == 1 and b"-o is not valid" in output_option.stderr
+        assert output_option.returncode == 1 and b"unknown command" in output_option.stderr
         assert {path.name: path.read_bytes() for path in source.iterdir()} == before_failure
 
         occupied_candidate = source / "4.lp5"

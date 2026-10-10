@@ -40,23 +40,24 @@ def write_article(directory, filename, terms=None, children=(), bundle=None):
 
 
 def run(executable, working, source, *arguments):
-    result = subprocess.run([executable, "-s", str(source), *arguments],
+    project_name = source.name[:-4]
+    result = subprocess.run([executable, project_name, *arguments],
                             cwd=working, capture_output=True)
     assert result.returncode == 0, result.stderr.decode("utf-8")
     return result
 
 
-def check_index(document, terms_by_file, order):
+def check_index(document, terms_by_file, order, root_name="lp5.lp5"):
     assert document.tag == "lp5-weave"
     assert [child.tag for child in document] == ["articles", "bundles", "keyword-index"]
     article_order = [a.attrib["file"] for a in document.find("articles")]
     assert article_order == order, (article_order, order)
     articles = {a.attrib["file"]: a for a in document.find("articles")}
-    assert "parent" not in articles["lp5.lp5"].attrib
+    assert "parent" not in articles[root_name].attrib
     if "9.lp5" in articles:
-        assert articles["9.lp5"].attrib["parent"] == "lp5.lp5"
+        assert articles["9.lp5"].attrib["parent"] == root_name
         assert articles["7.lp5"].attrib["parent"] == "9.lp5"
-        assert articles["2.lp5"].attrib["parent"] == "lp5.lp5"
+        assert articles["2.lp5"].attrib["parent"] == root_name
         for filename in order[4:]:
             assert "parent" not in articles[filename].attrib
     expected = {}
@@ -84,7 +85,7 @@ def main():
     executable = str(Path(sys.argv[1]).resolve())
     with tempfile.TemporaryDirectory(prefix="lp5-keyword-index-") as temporary:
         working = Path(temporary)
-        source = working / "source"
+        source = working / "lp5.lp5"
         source.mkdir()
         for stylesheet in ("weave.xsl", "tangle.xsl", "check.xsl"):
             (working / stylesheet).symlink_to(PROJECT_DIR / stylesheet)
@@ -125,7 +126,7 @@ def main():
             if stored is not None:
                 assert [li.text for li in stored] == [li.text for li in original_keywords]
 
-        result = run(executable, working, source, "weave", "-o", str(source / "weave.xml"))
+        result = run(executable, working, source, "weave")
         assert result.stdout == b""
         check_index(ET.parse(source / "weave.xml").getroot(), terms, order)
         assert {p.name: p.read_bytes() for p in source.iterdir() if p.name != "weave.xml"} == original
@@ -138,13 +139,13 @@ def main():
         check_index(ET.parse(source / "weave.xml").getroot(), terms, order)
         assert {p.name: p.read_bytes() for p in source.iterdir() if p.name != "weave.xml"} == edited
 
-        empty_source = working / "empty"
+        empty_source = working / "empty.lp5"
         empty_source.mkdir()
-        write_article(empty_source, "lp5.lp5", ["\t\n\r "])
+        write_article(empty_source, "empty.lp5", ["\t\n\r "])
         result = run(executable, working, empty_source, "weave")
         assert result.stdout == b""
         check_index(ET.parse(empty_source / "weave.xml").getroot(),
-                    {"lp5.lp5": [" "]}, ["lp5.lp5"])
+                    {"empty.lp5": [" "]}, ["empty.lp5"], "empty.lp5")
     print("weave keyword index checks passed")
 
 

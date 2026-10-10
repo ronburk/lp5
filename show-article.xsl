@@ -7,7 +7,7 @@
     <xsl:output method="xml" encoding="UTF-8" indent="no"
                 omit-xml-declaration="no" cdata-section-elements="code"/>
 
-    <xsl:param name="article-file" select="'lp5.lp5'"/>
+    <xsl:param name="article-file" select="'root.lp5'"/>
 
     <xsl:template match="/">
         <xsl:call-template name="validate-article">

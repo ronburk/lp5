@@ -26,7 +26,7 @@ def main():
                            "weave.xsl", "show-article.xsl"):
             shutil.copyfile(PROJECT_DIR / stylesheet, working / stylesheet)
 
-        root = source / "lp5.lp5"
+        root = source / "project.lp5"
         target = source / "12.lp5"
         root.write_bytes(b"<broken")
         target.write_bytes(b"<also-broken")
@@ -55,9 +55,8 @@ def main():
         proposal.write_bytes(replacement)
         cache = source / "weave.xml"
 
-        def run(*arguments, environment=None, use_source=True, **options):
-            prefix = ["-s", str(source)] if use_source else []
-            return subprocess.run([executable, *prefix, "replace-article", *arguments],
+        def run(*arguments, environment=None, **options):
+            return subprocess.run([executable, "project", "replace-article", *arguments],
                                   cwd=working, env=environment, capture_output=True,
                                   **options)
 
@@ -106,19 +105,7 @@ def main():
 
         valid_root = b'<template><children><li id="12.lp5"/></children></template>\n'
         proposal.write_bytes(valid_root)
-        succeeds("lp5.lp5", valid_root, "lp5.lp5", str(proposal))
-
-        alternate = working / "alternate-index.xml"
-        alternate.write_bytes(b"preserve selected index")
-        alternate_before = (alternate.read_bytes(), alternate.stat().st_mtime_ns)
-        environment = dict(os.environ, LP5Source=str(source))
-        proposal.write_bytes(replacement)
-        succeeds("12.lp5", replacement, "-w", str(alternate), "12.lp5", str(proposal),
-                 environment=environment, use_source=False)
-        assert (alternate.read_bytes(), alternate.stat().st_mtime_ns) == alternate_before
-        assert (cache.read_bytes(), cache.stat().st_mtime_ns) == cache_before
-        environment["LP5Source"] = str(working / "missing-project")
-        succeeds("12.lp5", replacement, "12.lp5", str(proposal), environment=environment)
+        succeeds("project.lp5", valid_root, "project.lp5", str(proposal))
 
         utf16 = '<?xml version="1.0" encoding="UTF-16"?><template><heading>雪</heading></template>'
         proposal.write_bytes(utf16.encode("utf-16"))
@@ -249,7 +236,7 @@ int rename(const char *old_path, const char *new_path)
         proposal.write_bytes(replacement)
         succeeds("12.lp5", replacement, "12.lp5", str(proposal))
         assert (cache.read_bytes(), cache.stat().st_mtime_ns) == cache_before
-        result = subprocess.run([executable, "-s", str(source), "show-article", "12.lp5"],
+        result = subprocess.run([executable, "project", "show-article", "12.lp5"],
                                 cwd=working, capture_output=True)
         assert result.returncode == 0, result.stderr
         assert b"Changed Keyword" in cache.read_bytes()

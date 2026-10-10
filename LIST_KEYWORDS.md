@@ -1,13 +1,11 @@
 # List the indexed keyword vocabulary
 
 ```sh
-./lp5 [-s source-dir] [-w weave-file] [-o output-file] list-keywords
+./lp5 X list-keywords
 ```
 
-The command accepts no positional arguments or command-specific options. Global
-`-s`, `-w`, `-o`, and the `LP5Source` environment variable work as usual; `-m`
-is invalid. It refreshes `<source-dir>/weave.xml` by default through the same freshness check
-as `search-keywords`; `-w` selects a different index for both refresh and reading.
+The command accepts no arguments. It refreshes and reads the fixed project index
+`X.lp5/weave.xml` through the shared freshness check.
 
 Output is a UTF-8 XML document without a namespace, ending with a newline:
 
@@ -37,11 +35,10 @@ index is supported using its article records. Source articles are not modified.
 The cache must have a no-namespace `lp5-weave` root with exactly one direct
 `articles` child, which may be empty.
 
-Status 0 means success, including no keywords. Output goes to stdout, or to `-o`
-with stdout empty. Diagnostics go to stderr. Invalid arguments, cache failures,
-and transform failures return status 1 without result XML or truncating an
-existing output destination. Output I/O failures may leave partial output;
-discard output on nonzero exit status.
+Status 0 means success, including no keywords. Output goes to stdout.
+Diagnostics go to stderr. Invalid arguments, cache failures, and transform
+failures return status 1 without result XML. Output I/O failures may leave
+partial stdout; discard it on nonzero exit status.
 
 Build using the command at the top of `lp5.c`, then test:
 

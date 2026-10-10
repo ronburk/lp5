@@ -1,19 +1,16 @@
 # Discover and read code bundles
 
 ```sh
-./lp5 show-bundle                  # list every bundle name
-./lp5 show-bundle "Bundle name"    # read one bundle from weave.xml
-./lp5 -w other-index.xml show-bundle "Bundle name"
-./lp5 show-bundle weave.xml        # read the bundle named "weave.xml"
-./lp5 show-bundle ""               # read the unnamed bundle
-./lp5 show-bundle -- "weave.xml"   # read a bundle named weave.xml
-./lp5 show-bundle -- "-o"          # read a name equal to a global option
+./lp5 X show-bundle                  # list every bundle name
+./lp5 X show-bundle "Bundle name"    # read one bundle from weave.xml
+./lp5 X show-bundle weave.xml        # read the bundle named "weave.xml"
+./lp5 X show-bundle ""               # read the unnamed bundle
+./lp5 X show-bundle -- "weave.xml"   # read a bundle named weave.xml
+./lp5 X show-bundle -- "-o"          # read a name equal to a global option
 ```
 
-The index defaults to `weave.xml` inside the selected source directory.
-`-w <file>` selects another index for both freshness checking and reading. The shared freshness
-check runs first, using `LP5Source` (including environment and `-s` overrides).
-Global `-o` redirects output, and `-m` is invalid. No source articles are modified.
+The command reads the fixed project index `X.lp5/weave.xml`, refreshing it when
+needed. No source articles are modified.
 
 With no name, returns one UTF-8 XML document ending with a newline:
 
@@ -35,28 +32,18 @@ The supplied name undergoes XPath `normalize-space()`. Sections follow bundle
 order and retain code text, whitespace, inline name markup, and code references;
 references are not expanded. A nonexistent name succeeds with an empty bundle.
 
-The old two-argument form remains supported for selecting an explicit index:
-
-```sh
-./lp5 show-bundle other-index.xml "Bundle name"
-```
-
-Prefer `-w` when selecting an index so the freshness check and the command read
-the same file.
-
 With one argument, that argument is always the bundle name, even when it ends
 in `.xml` or matches a filename such as `weave.xml`. Use `--` when a bundle name
-collides with a global option; the token following it is always treated as the
-bundle name. The legacy two-argument form selects an explicit index and extracts
-the named bundle. Listing and extraction also work when applying the stylesheet
+collides with an option; the token following it is always treated as the
+bundle name. Listing and extraction also work when applying the stylesheet
 directly: omitted `code_name` lists names, and a string parameter (including
 empty) extracts one bundle. No string is reserved as an omission marker.
 
 The index must have a no-namespace `lp5-weave` root and exactly one direct
 `bundles` child. Empty `bundles` is valid. Invalid arguments/index/transforms or
-freshness failures return status 1, with diagnostics on stderr, no result XML,
-and no truncation of an existing output destination. Output I/O failures may
-leave partial output; discard it on nonzero exit status.
+freshness failures return status 1, with diagnostics on stderr and no result
+XML. Output I/O failures may leave partial stdout; discard it on nonzero exit
+status.
 
 Build with the command at the top of `lp5.c`, then run:
 

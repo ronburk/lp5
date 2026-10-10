@@ -1,15 +1,13 @@
 # Read one complete source article
 
 ```sh
-./lp5 [-s source-dir] [-o output-file] show-article [article-file.lp5]
+./lp5 X show-article [article-file.lp5]
 ```
 
-With no filename, reads `lp5.lp5` in the selected source directory. A supplied
+With no filename, reads the project root article `X.lp5`. A supplied
 filename must be a single filename ending in `.lp5`, as returned by weave and
-keyword search. It is resolved only under `LP5Source`; a same-named file in the
-working directory does not take precedence. Paths and suffix-free article IDs
-are not accepted. Global `-s`, `-o`, and the `LP5Source` environment variable
-work as usual; `-m` is invalid.
+keyword search. It is resolved only under `X.lp5`; paths and suffix-free article IDs are not
+accepted. The project directory and weave cache are derived from `X`.
 
 Output is one UTF-8 XML document without a wrapper namespace, ending in a newline:
 
@@ -49,11 +47,11 @@ with the same article validator as `check`. The command itself does not follow
 child links or code references. Source files are not modified; refreshing the
 generated weave cache is permitted.
 
-Status 0 means success. Output goes to stdout, or to `-o` with stdout empty.
+Status 0 means success. Output goes to stdout.
 Diagnostics go to stderr. Invalid arguments, missing/malformed/invalid articles,
-freshness failures, or transform failures return status 1 without result XML and
-without truncating an existing output destination. Output I/O failures may leave
-partial output; discard output whenever exit status is nonzero.
+freshness failures, or transform failures return status 1 without result XML.
+Output I/O failures may leave partial stdout; discard it whenever exit status is
+nonzero.
 
 Build using the command at the top of `lp5.c`, then test:
 
