@@ -6,12 +6,10 @@
      project. articles_dir is relative to weave.xml and has no trailing slash;
      article_file names the temporary XML article to add.
 
-     The result is the updated parent article. The generated child filename is
-     reported on stderr as "new-article-id: ..."; copy article_file to that
-     path, then replace the original parent with the result. Re-run weave.xsl
-     after adding one or more articles. Run additions serially: checking for an
-     available filename and creating it are separate steps. Candidate probes
-     may warn when a file does not exist; xsltproc continues and selects it.
+     This stylesheet produces the updated parent article. The lp5 add-article
+     command stages this result together with the new article and installs both
+     in the source directory. Candidate probes may warn when a file does not
+     exist; xsltproc continues and selects it.
 -->
 <xsl:stylesheet version="1.0"
     xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
@@ -54,11 +52,6 @@
                 <xsl:with-param name="articles-dir" select="$articles_dir"/>
             </xsl:call-template>
         </xsl:variable>
-
-        <xsl:message>
-            <xsl:text>new-article-id: </xsl:text>
-            <xsl:value-of select="$new-filename"/>
-        </xsl:message>
 
         <template>
             <xsl:text>&#10;    </xsl:text>

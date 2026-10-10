@@ -220,6 +220,14 @@ or reads the named bundle; pass `""` for unnamed code. See
 ./lp5 replace-article <article-id> <article-file>
 ```
 
+`add-article` validates the supplied article template, chooses an unused
+numeric `.lp5` filename, writes the article under the selected source directory,
+and adds its link to the parent in one command. It stages both files and rolls
+back the new article if the parent update cannot be installed. The input file is
+left untouched. Do not pass `-o`; the parent is updated in place. On success,
+the command reports `added article: <filename>` on stderr. The selected weave
+index is left stale and will be refreshed by the next command that needs it.
+
 `./lp5 replace-article <article-id> <article-file>` validates and replaces one
 existing source article, including its desired child links. It skips the weave
 freshness preflight and leaves the index untouched until a later command needs

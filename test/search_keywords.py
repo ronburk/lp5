@@ -165,14 +165,18 @@ def main():
         assert [s.attrib["article"] for s in bundle_root] == ["3.lp5"]
         incoming = working / "incoming.xml"
         incoming.write_text("<template><heading>New article</heading></template>")
-        added = run("add-article", "weave.xml", "lp5.lp5", str(incoming),
-                    "-o", str(working / "parent.xml"))
+        added = run("add-article", "weave.xml", "lp5.lp5", str(incoming))
         assert added.returncode == 0 and added.stdout == b"", added.stderr
-        parent = ET.parse(working / "parent.xml").getroot()
+        new_id = re.search(rb"added article: (\S+)", added.stderr)
+        assert new_id is not None, added.stderr
+        new_id = new_id.group(1).decode("ascii")
+        parent = ET.parse(source / "lp5.lp5").getroot()
         links = [li.attrib["id"] for li in parent.findall("children/li")]
-        assert len(links) == 4 and links[1:] == ["3.lp5", "1.lp5", "2.lp5"]
+        assert len(links) == 4 and links == [new_id, "3.lp5", "1.lp5", "2.lp5"]
         assert parent.find("heading").text == "Root"
-        assert snapshot(source) == original
+        assert (source / new_id).read_bytes() == incoming.read_bytes()
+        assert all((source / name).read_bytes() == contents
+                   for name, contents in original.items() if name != "lp5.lp5")
 
         literal = ["-o", "do-not-create.xml", "-s", "missing-directory", "-m", "do-not-create.map",
                    "--all", "--limit", "--"]
