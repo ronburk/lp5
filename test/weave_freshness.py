@@ -209,9 +209,15 @@ def main():
             executable, working_directory, source_directory,
             "-w", str(alternate_weave), "add-article", "lp5.lp5", str(new_article),
         )
-        assert added.returncode == 0, added.stderr
-        assert "new-article-id:" in added.stderr
-        assert ET.fromstring(added.stdout).tag == "template"
+        assert added.returncode == 0 and added.stdout == "", (
+            added.returncode, added.stdout, added.stderr
+        )
+        assert "added article: 3.lp5" in added.stderr
+        assert (source_directory / "3.lp5").read_bytes() == new_article.read_bytes()
+        added_parent = ET.parse(source_directory / "lp5.lp5").getroot()
+        assert [node.get("id") for node in added_parent.findall("children/li")] == [
+            "3.lp5", "1.lp5"
+        ]
         assert weave_file.read_text(encoding="utf-8") == "<lp5-weave><articles/><bundles/></lp5-weave>"
 
         # A custom output option may not silently redirect a selected weave.

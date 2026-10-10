@@ -1303,12 +1303,181 @@ static int command_weave(xsltStylesheetPtr stylesheet, int argc, char *argv[])
 
 static int ends_with(const char *text, const char *suffix);
 static int valid_xml_text(const char *text);
+static int valid_article_basename(const char *filename);
+static char *article_source_path(const char *filename);
+static FILE *create_replacement_file(char **temporary_name);
+static char *read_replacement_article(const char *filename, int *length);
+static char *temporary_sibling_path(const char *filename, const char *purpose);
+
+static xmlNodePtr article_children_node(xmlDocPtr document)
+{
+    xmlNodePtr root = xmlDocGetRootElement(document);
+    xmlNodePtr node;
+
+    if (root == NULL || !xmlStrEqual(root->name, BAD_CAST "template")) {
+        return NULL;
+    }
+    for (node = root->children; node != NULL; node = node->next) {
+        if (node->type == XML_ELEMENT_NODE &&
+                xmlStrEqual(node->name, BAD_CAST "children")) {
+            return node;
+        }
+    }
+    return NULL;
+}
+
+static int article_child_count(xmlNodePtr children)
+{
+    xmlNodePtr node;
+    int count = 0;
+
+    if (children == NULL) {
+        return 0;
+    }
+    for (node = children->children; node != NULL; node = node->next) {
+        if (node->type == XML_ELEMENT_NODE &&
+                xmlStrEqual(node->name, BAD_CAST "li")) {
+            ++count;
+        }
+    }
+    return count;
+}
+
+static int article_has_child(xmlNodePtr children, const char *filename)
+{
+    xmlNodePtr node;
+
+    if (children == NULL) {
+        return 0;
+    }
+    for (node = children->children; node != NULL; node = node->next) {
+        xmlChar *id;
+        int matches;
+        if (node->type != XML_ELEMENT_NODE ||
+                !xmlStrEqual(node->name, BAD_CAST "li")) {
+            continue;
+        }
+        id = xmlGetProp(node, BAD_CAST "id");
+        matches = id != NULL && strcmp((const char *) id, filename) == 0;
+        xmlFree(id);
+        if (matches) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static int find_added_article_id(const char *original_parent,
+        const char *updated_parent, char **added_id)
+{
+    xmlDocPtr original = xmlReadFile(original_parent, NULL, XML_PARSE_NONET);
+    xmlDocPtr updated = xmlReadFile(updated_parent, NULL, XML_PARSE_NONET);
+    xmlNodePtr original_children;
+    xmlNodePtr updated_children;
+    xmlNodePtr node;
+    int additions = 0;
+    int status = 1;
+
+    *added_id = NULL;
+    if (original == NULL || updated == NULL) {
+        fprintf(stderr, "lp5: cannot parse parent article while adding child\n");
+        goto done;
+    }
+    original_children = article_children_node(original);
+    updated_children = article_children_node(updated);
+    if (xmlDocGetRootElement(original) == NULL ||
+            xmlDocGetRootElement(updated) == NULL || updated_children == NULL ||
+            article_child_count(updated_children) !=
+                article_child_count(original_children) + 1) {
+        fprintf(stderr, "lp5: add-article produced an unexpected child list\n");
+        goto done;
+    }
+    for (node = updated_children->children; node != NULL; node = node->next) {
+        xmlChar *id;
+        if (node->type != XML_ELEMENT_NODE ||
+                !xmlStrEqual(node->name, BAD_CAST "li")) {
+            continue;
+        }
+        id = xmlGetProp(node, BAD_CAST "id");
+        if (id == NULL || !valid_article_basename((const char *) id)) {
+            xmlFree(id);
+            fprintf(stderr, "lp5: add-article produced an invalid child filename\n");
+            goto done;
+        }
+        if (!article_has_child(original_children, (const char *) id)) {
+            if (*added_id != NULL) {
+                xmlFree(id);
+                fprintf(stderr, "lp5: add-article produced multiple new child links\n");
+                goto done;
+            }
+            *added_id = (char *) malloc(xmlStrlen(id) + 1);
+            if (*added_id == NULL) {
+                xmlFree(id);
+                fprintf(stderr, "lp5: out of memory\n");
+                goto done;
+            }
+            memcpy(*added_id, id, xmlStrlen(id) + 1);
+            ++additions;
+        }
+        xmlFree(id);
+    }
+    if (additions != 1 || *added_id == NULL) {
+        fprintf(stderr, "lp5: add-article could not identify the new child link\n");
+        goto done;
+    }
+    status = 0;
+
+done:
+    if (status != 0) {
+        free(*added_id);
+        *added_id = NULL;
+    }
+    xmlFreeDoc(updated);
+    xmlFreeDoc(original);
+    return status;
+}
+
+static int install_new_file(const char *temporary, const char *target)
+{
+#ifdef _WIN32
+    if (!MoveFileExA(temporary, target, MOVEFILE_WRITE_THROUGH)) {
+        fprintf(stderr, "lp5: cannot install article '%s': Windows error %lu\n",
+            target, (unsigned long) GetLastError());
+        return 1;
+    }
+#else
+    if (link(temporary, target) != 0) {
+        fprintf(stderr, "lp5: cannot install article '%s': %s\n",
+            target, strerror(errno));
+        return 1;
+    }
+    if (remove(temporary) != 0) {
+        fprintf(stderr, "lp5: warning: could not remove staging file '%s': %s\n",
+            temporary, strerror(errno));
+    }
+#endif
+    return 0;
+}
 
 static int command_add_article(xsltStylesheetPtr stylesheet, int argc,
         char *argv[])
 {
     struct xslt_parameter parameters[4];
     const char *filename = LP5WeaveName;
+    const char *saved_output_name = LP5OutputName;
+    const char *article_filename;
+    char *parent_path = NULL;
+    char *new_article_path = NULL;
+    char *new_article_id = NULL;
+    char *staged_article_path = NULL;
+    char *updated_parent_path = NULL;
+    char *backup_parent_path = NULL;
+    char *article_contents = NULL;
+    FILE *staged_article = NULL;
+    struct stat input_status;
+    struct stat parent_status;
+    int article_length = 0;
+    int status = 1;
     int offset = 0;
 
     /* Keep the former index-first spelling working when -w is not supplied. */
@@ -1325,9 +1494,85 @@ static int command_add_article(xsltStylesheetPtr stylesheet, int argc,
     if (argc - offset < 3 || argc - offset > 4) {
         fprintf(stderr,
             "Usage: lp5 [-w weave-file] add-article <parent-id> <article-file> [before-child-id]\n");
-        return 1;
+        goto done;
+    }
+    if (saved_output_name != NULL) {
+        fprintf(stderr, "lp5: -o is not valid with add-article\n");
+        goto done;
+    }
+    if (!valid_article_basename(argv[1 + offset])) {
+        fprintf(stderr, "lp5: parent-id must be an article filename\n");
+        goto done;
     }
 
+    article_filename = argv[2 + offset];
+    parent_path = article_source_path(argv[1 + offset]);
+    if (parent_path == NULL) {
+        fprintf(stderr, "lp5: out of memory\n");
+        goto done;
+    }
+    if (stat(parent_path, &parent_status) != 0 ||
+            !LP5_ISREG(parent_status.st_mode)) {
+        fprintf(stderr, "lp5: parent article '%s' is not a regular file\n",
+            parent_path);
+        goto done;
+    }
+    article_contents = read_replacement_article(article_filename, &article_length);
+    if (article_contents == NULL) {
+        goto done;
+    }
+    staged_article = create_replacement_file(&staged_article_path);
+    if (staged_article == NULL) {
+        fprintf(stderr, "lp5: cannot stage new article: %s\n", strerror(errno));
+        goto done;
+    }
+    if (fwrite(article_contents, 1, (size_t) article_length, staged_article) !=
+            (size_t) article_length) {
+        fprintf(stderr, "lp5: cannot write staged article\n");
+        goto done;
+    }
+#ifdef _WIN32
+    if (stat(article_filename, &input_status) == 0 &&
+            _chmod(staged_article_path,
+                input_status.st_mode & (_S_IREAD | _S_IWRITE)) != 0) {
+#else
+    if (stat(article_filename, &input_status) == 0 &&
+            fchmod(fileno(staged_article), input_status.st_mode & 0777) != 0) {
+#endif
+        fprintf(stderr, "lp5: cannot preserve article file permissions: %s\n",
+            strerror(errno));
+        goto done;
+    }
+    if (fclose(staged_article) == EOF) {
+        staged_article = NULL;
+        fprintf(stderr, "lp5: cannot finish staging new article\n");
+        goto done;
+    }
+    staged_article = NULL;
+
+    updated_parent_path = NULL;
+    {
+        FILE *updated_parent = create_replacement_file(&updated_parent_path);
+        if (updated_parent == NULL) {
+            fprintf(stderr, "lp5: cannot stage updated parent: %s\n", strerror(errno));
+            goto done;
+        }
+#ifdef _WIN32
+        if (_chmod(updated_parent_path,
+                parent_status.st_mode & (_S_IREAD | _S_IWRITE)) != 0) {
+#else
+        if (fchmod(fileno(updated_parent), parent_status.st_mode & 0777) != 0) {
+#endif
+            fprintf(stderr, "lp5: cannot preserve parent article permissions: %s\n",
+                strerror(errno));
+            fclose(updated_parent);
+            goto done;
+        }
+        if (fclose(updated_parent) == EOF) {
+            fprintf(stderr, "lp5: cannot finish staging updated parent\n");
+            goto done;
+        }
+    }
     parameters[0].name = "parent_id";
     parameters[0].value = argv[1 + offset];
     parameters[1].name = "before_child_id";
@@ -1335,9 +1580,82 @@ static int command_add_article(xsltStylesheetPtr stylesheet, int argc,
     parameters[2].name = "articles_dir";
     parameters[2].value = LP5Source;
     parameters[3].name = "article_file";
-    parameters[3].value = argv[2 + offset];
-    return transform_file(stylesheet, filename, parameters, 4,
+    parameters[3].value = staged_article_path;
+    LP5OutputName = updated_parent_path;
+    status = transform_file(stylesheet, filename, parameters, 4,
         NULL, NULL, NULL);
+    status = finish_output(status);
+    LP5OutputName = saved_output_name;
+    if (status != 0 || find_added_article_id(parent_path, updated_parent_path,
+            &new_article_id) != 0) {
+        status = 1;
+        goto done;
+    }
+
+    new_article_path = article_source_path(new_article_id);
+    backup_parent_path = temporary_sibling_path(parent_path, "backup");
+    if (new_article_path == NULL || backup_parent_path == NULL) {
+        fprintf(stderr, "lp5: cannot create article installation paths\n");
+        status = 1;
+        goto done;
+    }
+    if (install_new_file(staged_article_path, new_article_path) != 0) {
+        status = 1;
+        goto done;
+    }
+    staged_article_path[0] = '\0';
+
+    if (rename(parent_path, backup_parent_path) != 0) {
+        fprintf(stderr, "lp5: cannot stage parent article '%s': %s\n",
+            parent_path, strerror(errno));
+        (void) remove(new_article_path);
+        status = 1;
+        goto done;
+    }
+    if (rename(updated_parent_path, parent_path) != 0) {
+        int saved_errno = errno;
+        if (rename(backup_parent_path, parent_path) != 0) {
+            fprintf(stderr,
+                "lp5: cannot install updated parent or restore original '%s'\n",
+                parent_path);
+        } else {
+            fprintf(stderr, "lp5: cannot install updated parent '%s': %s\n",
+                parent_path, strerror(saved_errno));
+        }
+        if (remove(new_article_path) != 0) {
+            fprintf(stderr, "lp5: could not remove staged article '%s': %s\n",
+                new_article_path, strerror(errno));
+        }
+        status = 1;
+        goto done;
+    }
+    if (remove(backup_parent_path) != 0) {
+        fprintf(stderr,
+            "lp5: warning: added '%s', but could not remove parent backup '%s': %s\n",
+            new_article_id, backup_parent_path, strerror(errno));
+    }
+    fprintf(stderr, "added article: %s\n", new_article_id);
+    status = 0;
+
+done:
+    LP5OutputName = saved_output_name;
+    if (staged_article != NULL) {
+        fclose(staged_article);
+    }
+    if (staged_article_path != NULL && staged_article_path[0] != '\0') {
+        (void) remove(staged_article_path);
+    }
+    if (updated_parent_path != NULL) {
+        (void) remove(updated_parent_path);
+    }
+    free(article_contents);
+    free(backup_parent_path);
+    free(updated_parent_path);
+    free(staged_article_path);
+    free(new_article_id);
+    free(new_article_path);
+    free(parent_path);
+    return status;
 }
 
 static int valid_article_basename(const char *filename)
@@ -1917,7 +2235,7 @@ failed:
         fclose(input);
     }
     free(contents);
-    fprintf(stderr, "lp5: cannot read replacement article '%s': %s\n",
+    fprintf(stderr, "lp5: cannot read article '%s': %s\n",
         filename, strerror(error));
     return NULL;
 }

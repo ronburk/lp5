@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Check that add-article preserves parent fields and child-link order."""
 
-import re
 import subprocess
 import tempfile
 import xml.etree.ElementTree as ET
@@ -103,16 +102,13 @@ def run_case(parent_children, before_child_id, expected_child_ids):
             text=True,
         )
 
-        new_id = re.search(r"new-article-id:\s*(\S+)", result.stderr)
-        assert new_id is not None, result.stderr
-        assert new_id.group(1) == "4.lp5", result.stderr
-
         output_root = ET.fromstring(result.stdout)
         assert output_root.tag == "template"
         output_children = output_root.find("children")
         assert output_children is not None
         child_ids = [child.get("id") for child in output_children.findall("li")]
         assert child_ids == expected_child_ids, child_ids
+        assert child_ids.count("4.lp5") == 1, child_ids
 
         source_fields = [
             element_value(element)
