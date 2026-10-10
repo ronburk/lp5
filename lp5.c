@@ -57,12 +57,33 @@ const char *LP5ProjectName;
 const char *LP5Source;
 const char *LP5RootArticleName;
 const char *LP5RootArticlePath;
-const char *LP5TangleOutputPath;
 const char *LP5OutputName;
 const char *LP5MapName;
 const char *LP5WeaveName;
 static FILE *LP5OutputFile;
 static char *source_entry_path(const char *directory, const char *filename);
+static char *append_suffix(const char *text, const char *suffix);
+static int ends_with(const char *text, const char *suffix);
+
+static int ascii_filename_equal(const char *left, const char *right)
+{
+    while (*left != '\0' && *right != '\0') {
+        unsigned char a = (unsigned char) *left++;
+        unsigned char b = (unsigned char) *right++;
+        if (a >= 'A' && a <= 'Z') a = (unsigned char) (a - 'A' + 'a');
+        if (b >= 'A' && b <= 'Z') b = (unsigned char) (b - 'A' + 'a');
+        if (a != b) return 0;
+    }
+    return *left == '\0' && *right == '\0';
+}
+
+static int ascii_filename_ends_with(const char *text, const char *suffix)
+{
+    size_t text_length = strlen(text);
+    size_t suffix_length = strlen(suffix);
+    return text_length >= suffix_length && ascii_filename_equal(
+        text + text_length - suffix_length, suffix);
+}
 
 #define LP5_EXTENSION_NAMESPACE "http://example.com/lp5ext"
 
@@ -971,8 +992,262 @@ static void usage_tangle(void)
 {
     fprintf(stderr,
         "Usage: lp5 <project-name> tangle\n"
-        "  Write the tangled program and ECMA-426 source map to the project directory.\n");
+        "  Write the unnamed bundle and each angle-bracket output bundle to the project directory.\n");
     exit(1);
+}
+
+struct tangle_output {
+    char *bundle;
+    char *filename;
+    char *map_filename;
+};
+
+static char *duplicate_string(const char *text)
+{
+    size_t length = strlen(text);
+    char *copy = (char *) malloc(length + 1);
+    if (copy != NULL) {
+        memcpy(copy, text, length + 1);
+    }
+    return copy;
+}
+
+static int valid_output_basename(const char *name)
+{
+    const unsigned char *p = (const unsigned char *) name;
+    size_t length = strlen(name);
+    if (length == 0 || strcmp(name, ".") == 0 || strcmp(name, "..") == 0 ||
+            ascii_filename_equal(name, "weave.xml") ||
+            ascii_filename_ends_with(name, ".lp5") ||
+            name[length - 1] == '.' || name[length - 1] == ' ') {
+        return 0;
+    }
+    for (; *p != '\0'; ++p) {
+        if (*p < 32 || strchr("/\\:<>\"|?*", *p) != NULL) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+static void free_tangle_outputs(struct tangle_output *outputs, size_t count)
+{
+    size_t i;
+    for (i = 0; i < count; ++i) {
+        free(outputs[i].bundle);
+        free(outputs[i].filename);
+        free(outputs[i].map_filename);
+    }
+    free(outputs);
+}
+
+static xmlNodePtr find_article_record(xmlNodePtr articles, const char *filename)
+{
+    xmlNodePtr article;
+    for (article = articles->children; article != NULL; article = article->next) {
+        xmlChar *file;
+        xmlNodePtr found;
+        if (article->type != XML_ELEMENT_NODE ||
+                xmlStrcmp(article->name, BAD_CAST "article") != 0) {
+            continue;
+        }
+        file = xmlGetProp(article, BAD_CAST "file");
+        found = file != NULL && strcmp((const char *) file, filename) == 0 ?
+            article : NULL;
+        xmlFree(file);
+        if (found != NULL) return found;
+    }
+    return NULL;
+}
+
+static int article_record_is_rooted(xmlNodePtr articles, const char *filename)
+{
+    xmlNodePtr article = find_article_record(articles, filename);
+    while (article != NULL) {
+        xmlChar *file = xmlGetProp(article, BAD_CAST "file");
+        xmlChar *parent;
+        int is_root = file != NULL &&
+            strcmp((const char *) file, LP5RootArticleName) == 0;
+        xmlFree(file);
+        if (is_root) return 1;
+        parent = xmlGetProp(article, BAD_CAST "parent");
+        if (parent == NULL) return 0;
+        article = find_article_record(articles, (const char *) parent);
+        xmlFree(parent);
+    }
+    return 0;
+}
+
+static int bundle_is_rooted(xmlNodePtr articles, xmlNodePtr bundle)
+{
+    xmlNodePtr section;
+    for (section = bundle->children; section != NULL; section = section->next) {
+        xmlChar *article;
+        int rooted;
+        if (section->type != XML_ELEMENT_NODE ||
+                xmlStrcmp(section->name, BAD_CAST "section") != 0) {
+            continue;
+        }
+        article = xmlGetProp(section, BAD_CAST "article");
+        rooted = article != NULL && article_record_is_rooted(articles,
+            (const char *) article);
+        xmlFree(article);
+        if (rooted) return 1;
+    }
+    return 0;
+}
+
+static int append_tangle_output(struct tangle_output **outputs,
+        size_t *count, const char *bundle, const char *basename,
+        const char *map_basename)
+{
+    struct tangle_output *grown;
+    char *filename;
+    char *map_filename;
+    size_t i;
+
+    if (!valid_output_basename(basename) ||
+            !valid_output_basename(map_basename)) {
+        fprintf(stderr, "lp5: invalid tangle output filename '%s'\n", basename);
+        return 1;
+    }
+    filename = source_entry_path(LP5Source, basename);
+    map_filename = source_entry_path(LP5Source, map_basename);
+    if (filename == NULL || map_filename == NULL) {
+        fprintf(stderr, "lp5: out of memory\n");
+        free(filename);
+        free(map_filename);
+        return 1;
+    }
+    for (i = 0; i < *count; ++i) {
+        if (ascii_filename_equal(filename, (*outputs)[i].filename) ||
+                ascii_filename_equal(filename, (*outputs)[i].map_filename) ||
+                ascii_filename_equal(map_filename, (*outputs)[i].filename) ||
+                ascii_filename_equal(map_filename, (*outputs)[i].map_filename)) {
+            fprintf(stderr, "lp5: tangle output filename collision at '%s'\n",
+                basename);
+            free(filename);
+            free(map_filename);
+            return 1;
+        }
+    }
+    grown = (struct tangle_output *) realloc(*outputs,
+        (*count + 1) * sizeof(**outputs));
+    if (grown == NULL) {
+        fprintf(stderr, "lp5: out of memory\n");
+        free(filename);
+        free(map_filename);
+        return 1;
+    }
+    *outputs = grown;
+    grown[*count].bundle = duplicate_string(bundle);
+    grown[*count].filename = filename;
+    grown[*count].map_filename = map_filename;
+    if (grown[*count].bundle == NULL) {
+        free(filename);
+        free(map_filename);
+        return 1;
+    }
+    ++*count;
+    return 0;
+}
+
+static int collect_tangle_outputs(struct tangle_output **outputs,
+        size_t *count)
+{
+    xmlDocPtr weave = xmlReadFile(LP5WeaveName, NULL, XML_PARSE_NONET);
+    xmlNodePtr root;
+    xmlNodePtr articles;
+    xmlNodePtr bundle_list;
+    xmlNodePtr bundle;
+    char *default_name = append_suffix(LP5ProjectName, ".out");
+    char *default_map = append_suffix(LP5ProjectName, ".map");
+    int status = 0;
+
+    *outputs = NULL;
+    *count = 0;
+    if (default_name == NULL || default_map == NULL ||
+            append_tangle_output(outputs, count, "", default_name,
+                default_map) != 0) {
+        free(default_name);
+        free(default_map);
+        xmlFreeDoc(weave);
+        return 1;
+    }
+    free(default_name);
+    free(default_map);
+    if (weave == NULL || (root = xmlDocGetRootElement(weave)) == NULL ||
+            xmlStrcmp(root->name, BAD_CAST "lp5-weave") != 0) {
+        fprintf(stderr, "lp5: cannot read current weave index '%s'\n", LP5WeaveName);
+        xmlFreeDoc(weave);
+        return 1;
+    }
+    bundle_list = root->children;
+    while (bundle_list != NULL &&
+            !(bundle_list->type == XML_ELEMENT_NODE &&
+              xmlStrcmp(bundle_list->name, BAD_CAST "bundles") == 0)) {
+        bundle_list = bundle_list->next;
+    }
+    if (bundle_list == NULL) {
+        fprintf(stderr, "lp5: weave index has no bundle list\n");
+        xmlFreeDoc(weave);
+        return 1;
+    }
+    articles = root->children;
+    while (articles != NULL &&
+            !(articles->type == XML_ELEMENT_NODE &&
+              xmlStrcmp(articles->name, BAD_CAST "articles") == 0)) {
+        articles = articles->next;
+    }
+    if (articles == NULL) {
+        fprintf(stderr, "lp5: weave index has no article list\n");
+        xmlFreeDoc(weave);
+        return 1;
+    }
+    for (bundle = bundle_list->children; bundle != NULL; bundle = bundle->next) {
+        xmlChar *name;
+        size_t length;
+        char *filename;
+        char *map_basename;
+        if (bundle->type != XML_ELEMENT_NODE ||
+                xmlStrcmp(bundle->name, BAD_CAST "bundle") != 0) {
+            continue;
+        }
+        name = xmlGetProp(bundle, BAD_CAST "name");
+        if (name == NULL) continue;
+        length = strlen((const char *) name);
+        if (length < 3 || name[0] != '<' || name[length - 1] != '>') {
+            xmlFree(name);
+            continue;
+        }
+        if (!bundle_is_rooted(articles, bundle)) {
+            fprintf(stderr,
+                "lp5: output bundle '%s' has no definition reachable from the root article\n",
+                (const char *) name);
+            xmlFree(name);
+            status = 1;
+            break;
+        }
+        filename = (char *) malloc(length - 1);
+        if (filename == NULL) {
+            xmlFree(name);
+            status = 1;
+            break;
+        }
+        memcpy(filename, name + 1, length - 2);
+        filename[length - 2] = '\0';
+        map_basename = append_suffix(filename, ".map");
+        if (map_basename == NULL || append_tangle_output(outputs, count,
+                (const char *) name, filename, map_basename) != 0) {
+            status = 1;
+        }
+        free(map_basename);
+        free(filename);
+        xmlFree(name);
+        if (status) break;
+    }
+    xmlFreeDoc(weave);
+    return status;
 }
 
 static xmlDocPtr read_tangle_root_article(const char *filename)
@@ -1022,45 +1297,57 @@ static xmlDocPtr read_tangle_root_article(const char *filename)
 
 static int command_tangle(xsltStylesheetPtr stylesheet, int argc, char *argv[])
 {
-    struct xslt_parameter parameters[4];
-    xmlDocPtr document;
-    char *directory;
+    struct tangle_output *outputs = NULL;
+    size_t output_count = 0;
+    size_t i;
+    int status = 0;
 
     (void) argv;
     if (argc != 1) {
         fprintf(stderr, "lp5: tangle takes no filename arguments.\n");
         usage_tangle();
     }
-    LP5OutputName = LP5TangleOutputPath;
-    document = read_tangle_root_article(LP5RootArticlePath);
-    directory = input_directory(LP5RootArticlePath);
-    if (directory == NULL) {
-        fprintf(stderr, "lp5: out of memory\n");
-        xmlFreeDoc(document);
+    if (collect_tangle_outputs(&outputs, &output_count) != 0) {
+        free_tangle_outputs(outputs, output_count);
         return 1;
     }
-    parameters[0].name = "root-location";
-    parameters[0].value = LP5RootArticlePath;
-    parameters[1].name = "source-directory";
-    parameters[1].value = directory;
-    parameters[2].name = "source-map-enabled";
-    parameters[2].value = "true";
-    {
+    for (i = 0; i < output_count; ++i) {
+        struct xslt_parameter parameters[6];
+        xmlDocPtr document;
+        char *directory;
         char marker_name[64];
         static unsigned long marker_sequence;
-        const char *marker_name_parameter;
-        int status;
-
         snprintf(marker_name, sizeof(marker_name), "lp5sm%lx%lx",
             (unsigned long) time(NULL), marker_sequence++);
-        marker_name_parameter = marker_name;
+        document = read_tangle_root_article(LP5RootArticlePath);
+        directory = input_directory(LP5RootArticlePath);
+        if (directory == NULL) {
+            fprintf(stderr, "lp5: out of memory\n");
+            xmlFreeDoc(document);
+            status = 1;
+            break;
+        }
+        parameters[0].name = "root-location";
+        parameters[0].value = LP5RootArticlePath;
+        parameters[1].name = "source-directory";
+        parameters[1].value = directory;
+        parameters[2].name = "source-map-enabled";
+        parameters[2].value = "true";
         parameters[3].name = "source-map-marker-name";
         parameters[3].value = marker_name;
-        status = transform_file(stylesheet, LP5RootArticlePath, parameters,
-            4, document, LP5MapName, marker_name_parameter);
+        parameters[4].name = "root-bundle-enabled";
+        parameters[4].value = i == 0 ? "false" : "true";
+        parameters[5].name = "root-bundle";
+        parameters[5].value = outputs[i].bundle;
+        LP5OutputName = outputs[i].filename;
+        status = transform_file(stylesheet, LP5RootArticlePath, parameters, 6,
+            document, outputs[i].map_filename, marker_name);
         free(directory);
-        return status;
+        status = finish_output(status);
+        if (status != 0) break;
     }
+    free_tangle_outputs(outputs, output_count);
+    return status;
 }
 
 static int article_file_is_readable(const char *filename)
@@ -2465,22 +2752,16 @@ static int configure_project(const char *name)
             LP5RootArticleName);
         LP5WeaveName = source_entry_path(LP5Source, "weave.xml");
         {
-            char *output_basename = append_suffix(name, ".out");
             char *map_basename = append_suffix(name, ".map");
-            if (output_basename != NULL) {
-                LP5TangleOutputPath = source_entry_path(LP5Source,
-                    output_basename);
-            }
             if (map_basename != NULL) {
                 LP5MapName = source_entry_path(LP5Source, map_basename);
             }
-            free(output_basename);
             free(map_basename);
         }
     }
     if (LP5Source == NULL || LP5RootArticleName == NULL ||
             LP5RootArticlePath == NULL || LP5WeaveName == NULL ||
-            LP5TangleOutputPath == NULL || LP5MapName == NULL) {
+            LP5MapName == NULL) {
         fprintf(stderr, "lp5: out of memory\n");
         return 1;
     }
@@ -2492,7 +2773,6 @@ static void free_project_paths(void)
     free((void *) LP5Source);
     free((void *) LP5RootArticleName);
     free((void *) LP5RootArticlePath);
-    free((void *) LP5TangleOutputPath);
     free((void *) LP5MapName);
     free((void *) LP5WeaveName);
 }
@@ -2681,7 +2961,8 @@ static void print_usage(const char *program)
         "Usage: %s <project-name> <command> [arguments...]\n"
         "       Commands: help, tangle, check, weave, add-article, remove-article, replace-article, show-bundle, search, search-keywords, list-keywords, show-article\n"
         "       A project named X uses X.lp5/X.lp5 as its root article.\n"
-        "       weave writes X.lp5/weave.xml. tangle writes X.lp5/X.out and X.lp5/X.map.\n"
+        "       weave writes X.lp5/weave.xml. tangle writes the unnamed bundle to X.lp5/X.out and X.lp5/X.map.\n"
+        "       Code names like <app.js> also write X.lp5/app.js and X.lp5/app.js.map.\n"
         "       Commands: check <article-file>, add-article <parent-id> <article-file> [before-child-id],\n"
         "       replace-article <article-id> <article-file>, remove-article <article-id.lp5>,\n"
         "       show-article [article-file.lp5], show-bundle [code-name], search [--all] [--] TEXT...,\n"
