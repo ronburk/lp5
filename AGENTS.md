@@ -1,8 +1,8 @@
 # lp5 Agent Instructions
 
-Each agent must use its own private clone of lp5. Never search for or reuse a
-checkout, worktree, or branch created by another agent, even if it appears
-clean. If you do not already have your own clone, create one:
+Reuse an existing usable, agent-owned checkout and preserve unrelated local
+changes. Never reuse a checkout, worktree, or branch created by another agent,
+even if it appears clean. If you have no usable private checkout, create one:
 
 ```sh
 git clone https://github.com/ronburk/lp5.git lp5
@@ -10,7 +10,53 @@ git clone https://github.com/ronburk/lp5.git lp5
 
 An extra Git worktree is unnecessary when your private clone is isolated.
 
-Before editing, fetch from GitHub and verify the checkout's branch and base commit. Preserve unrelated local changes and use a task-specific branch. Before merging a PR, fetch again; if `main` has advanced, update the branch and rerun relevant checks. Merge only when the PR is conflict-free. Use the GitHub connector for remote writes when available.
+Explicit user and Project Instructions take precedence over conflicting
+workflow guidance here. Reuse instructions already read unless the file has
+changed.
+
+## Continue work without repeating setup
+
+- Before beginning a new change, fetch from GitHub and establish the checkout's
+  branch and base commit. Use a task-specific branch. A follow-up message
+  continuing the same change does not require repeating setup.
+- Preserve completed edits, builds, test results, commits, branches, and PRs
+  across turns. Reuse them when they remain applicable.
+- Run checks relevant to the change. Repeat them only when code, dependencies,
+  or relevant base changes could invalidate their results, or a required check
+  demands it. Documentation-only changes normally need review and
+  `git diff --check`, not an application build or runtime tests.
+- A request to submit or merge completed work means perform the remaining
+  publication steps. Do not restart implementation or repeat setup and
+  validation without a concrete reason.
+
+## Publish and merge
+
+- Before merging, check the PR's current mergeability and required checks.
+  Merge when it is conflict-free and checks pass. Do not routinely fetch,
+  rebase, or rerun tests merely because publication is about to occur.
+- When supported, supply the expected PR head commit to the merge operation
+  so an unexpected change to the PR prevents merging unreviewed work.
+- If the base changes or merging fails, inspect the actual cause. Update the
+  branch and rerun affected checks when necessary. A concurrent commit does
+  not by itself require rebuilding or retesting everything.
+- Confirm merge success. Bring the local checkout up to date with a
+  fast-forward when appropriate, preserving unrelated work.
+- Explain the problem, changes, resulting behavior, validation, and material
+  limitations in the PR description. Include relevant harness observations
+  without copying routine tool logs.
+
+### LP5 shorthand commands
+
+These shortcuts apply when the user uses them in an LP5 project chat:
+
+- `smpr`: finish outstanding implementation and relevant validation, publish
+  the change, submit a detailed PR, and merge when conflict-free and checks pass.
+- `pr`: finish outstanding implementation and relevant validation, publish
+  the change, and submit a detailed PR. Leave it open for review.
+- `test`: run the relevant tests and report the results.
+
+Reuse work already completed for that change. If an action cannot be completed,
+explain what blocked it and finish independent work.
 
 ## GitHub connector tools and approval diagnostics
 
@@ -19,54 +65,24 @@ For all GitHub remote writes, use the established
 publication: `create_blob`, `create_tree`, `create_commit`, `create_branch`,
 `update_ref`, `create_pull_request`, and `merge_pull_request`, as well as other
 remote-write operations. Prefer the same family for reads when available.
-Discover the exposed tools and inspect their schemas before choosing an
-interface; do not invent a tool name or assume a tool is unavailable without
-checking.
+Inspect exposed tool definitions before first use. Reuse definitions and
+verified repository information already obtained during the task; rediscover
+or reread them only when needed. Do not invent tool names, argument schemas,
+or connector/link paths, or assume a tool is unavailable without checking.
 
-These tool names specify the agent's invocation interface; using them does
-not guarantee that OpenAI Work will omit approval prompts.
+Prefer publishing related file changes in one commit when the available tools
+support it. Reuse the task's branch and PR. Check each write result before
+dependent operations and use the returned SHAs. Avoid redundant API calls and
+tight polling while GitHub calculates mergeability or runs checks.
 
-For example, `mcp__codex_apps__github_create_blob` takes:
-
-```json
-{
-    "repository_full_name": "ronburk/lp5",
-    "content": "<base64-file-contents>",
-    "encoding": "base64"
-}
-```
-
-Supply the actual encoded file contents. The tool also accepts `encoding`
-`"utf-8"` for literal text. Check every result before passing its returned SHA
-to the next operation; do not proceed after a failed write.
-
-For remote branch creation, `mcp__codex_apps__github_create_branch` takes:
-
-```json
-{
-    "repository_full_name": "ronburk/lp5",
-    "branch_name": "<task-branch>",
-    "sha": "<commit-sha>"
-}
-```
-
-Supply the actual task branch and existing commit SHA; when publishing a
-connector-created commit, use that commit's SHA. The tool also accepts
-`base_ref` instead of `sha`; provide exactly one. Creating a local branch with
-`git switch -c <task-branch>` is a separate operation.
-
-In a confirmed `mcp__codex_apps__github_create_blob` invocation using
-`repository_full_name`, `content`, and `encoding`, the approval popup displayed
-a generic `call_tool` path `/connector_.../link_.../create_blob` with `Repository`
-and `Content` labels. The popup's representation alone is therefore not
-evidence that an agent chose a different tool, connection, or argument schema.
-Use the exposed tool definition and literal invocation to establish what was
-called; do not diagnose interface substitution from screenshots alone.
+Tool names identify the invocation interface; they do not guarantee that
+OpenAI Work will omit approval prompts. A popup may display a generic
+`call_tool` connector path and different argument labels. Use the exposed
+definition and actual invocation to establish what was called; the popup's
+appearance alone does not establish an interface substitution.
 
 If a named tool is unavailable, report that and identify the alternative
-before using it. Follow its actual exposed schema rather than copying another
-tool's argument names. Do not invent or manually reconstruct connector/link
-paths from a popup.
+before using it. Follow the alternative's actual exposed schema.
 
 Treat `isError: true` with `user rejected MCP tool call` as an approval
 rejection, not a GitHub API failure or evidence of invalid arguments. Report
@@ -78,13 +94,11 @@ For repeated "Always allow" prompts, record the available tool definition,
 literal invocation (omit large file payloads and secrets), exact returned
 result, and whether the prompt repeated for the same operation. A successful
 call in another chat does not establish this chat's tools or approval policy.
-Account authorization and app action confirmations are separate controls; see
+When investigating approval behavior, consult current official guidance; see
 [OpenAI Work cloud security](https://learn.chatgpt.com/docs/enterprise/chatgpt-work-cloud-security)
 and [agent approvals](https://learn.chatgpt.com/docs/agent-approvals-security).
-As of October 6, 2026, the official documentation reviewed did not establish
-the cause of the project's repeated GitHub prompts or the scope/persistence
-of this popup's "Always allow" choice. Do not promise that choosing a particular
-tool name will eliminate prompts or claim a confirmed outage or regression.
+Do not promise that choosing a particular tool name will eliminate prompts,
+or claim a confirmed outage or regression without evidence.
 
 ## OpenAI Work environment recovery
 
@@ -125,7 +139,10 @@ permissions allow, and continue any work that is still possible.
 
 ## Install build dependencies
 
-Install `xsltproc` before building or testing XSLT work. On Ubuntu or Debian, use:
+Check dependencies only when needed for the task or after an environment
+reset. Reuse working installations; documentation edits and publication alone
+do not require installing build tools. If dependencies for building or testing
+XSLT work are missing, on Ubuntu or Debian use:
 
 ```sh
 sudo apt-get update
@@ -155,7 +172,10 @@ apt-get -o APT::Sandbox::User=root \
 
 ## Build the C launcher
 
-Build `./lp5` in the checkout root before running CLI commands or their tests:
+Reuse the existing `./lp5` executable when it was built from the current
+launcher source and still runs. Build it in the checkout root when missing,
+when `lp5.c` changes, or when environment changes make the existing build
+unusable:
 
 ```sh
 gcc -std=c99 -Wall -Wextra -pedantic -o lp5 lp5.c $(xslt-config --cflags --libs) -lexslt
@@ -166,7 +186,9 @@ Keep the executable in the checkout directory; `lp5` is already in `.gitignore`.
 ## Build the HTML program
 
 The main program is generated from the root article `lp5.lp5/lp5.lp5` by
-`tangle.xsl`. Run this command from the repository root:
+`tangle.xsl`. Build it when requested or needed to validate source changes;
+reuse an applicable generated output for follow-up publication. Run this
+command from the repository root:
 
 ```sh
 ./lp5 -o lp5.html tangle lp5.lp5/lp5.lp5
@@ -190,6 +212,14 @@ including orphans. Canonicalization applies XPath `normalize-space()` followed
 by ASCII A-Z to a-z folding; other characters are preserved exactly. Keyword
 entries are whole terms, so commas and other punctuation are ordinary data.
 The original `<keywords><li>` entries remain in the article records.
+
+## Use the LP5 harness for article work
+
+Use `./lp5` to locate, inspect, and modify articles through supported commands.
+Reuse article reads while the source is unchanged. Let commands refresh the
+weave index when needed instead of running `weave` before every operation.
+Record and report harness failures and concrete improvements that would make
+the work easier.
 
 `./lp5 search-keywords [--all] -- KEYWORD [KEYWORD ...]` searches this snapshot
 after the shared weave freshness check. See [SEARCH_KEYWORDS.md](SEARCH_KEYWORDS.md)
@@ -280,7 +310,9 @@ In OpenAI Work, cloud Chrome may reject `file://` URLs and may have
 `showDirectoryPicker` undefined. This is an environment limitation, not
 evidence that browser testing is unavailable.
 
-Use the provided `sites-preview` runner and CUA browser:
+Use browser testing when needed to verify UI behavior. Reuse an applicable
+preview and browser session instead of restarting them for each follow-up.
+For initial setup, use the provided `sites-preview` runner and CUA browser:
 
 1. Keep the checkout beneath `/workspace`.
 2. Use this checkout's existing `package.json` `dev` script, which runs
