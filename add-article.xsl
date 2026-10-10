@@ -8,11 +8,13 @@
 
      This stylesheet produces the updated parent article. The lp5 add-article
      command stages this result together with the new article and installs both
-     in the source directory. Candidate probes may warn when a file does not
-     exist; xsltproc continues and selects it.
+     in the source directory. The launcher supplies my:ls() so filename
+     selection can check directory entries without opening candidate articles.
 -->
 <xsl:stylesheet version="1.0"
-    xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+    xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
+    xmlns:my="http://example.com/lp5ext"
+    exclude-result-prefixes="my">
 
     <xsl:import href="tangle.xsl"/>
 
@@ -47,9 +49,11 @@
             <xsl:with-param name="location" select="$article_file"/>
         </xsl:call-template>
 
+        <xsl:variable name="available-articles"
+            select="my:ls($articles_dir)[@type = 'file']"/>
         <xsl:variable name="new-filename">
             <xsl:call-template name="new-article-filename">
-                <xsl:with-param name="articles-dir" select="$articles_dir"/>
+                <xsl:with-param name="available-articles" select="$available-articles"/>
             </xsl:call-template>
         </xsl:variable>
 
@@ -143,7 +147,7 @@
 
     <!-- Called with weave.xml as the source. Returns a basename such as 19.lp5. -->
     <xsl:template name="new-article-filename">
-        <xsl:param name="articles-dir"/>
+        <xsl:param name="available-articles"/>
 
         <!-- Select the largest numeric article filename from the weave. -->
         <xsl:variable name="max-id">
@@ -160,31 +164,28 @@
         </xsl:variable>
 
         <xsl:call-template name="try-article-filename">
-            <xsl:with-param name="articles-dir" select="$articles-dir"/>
+            <xsl:with-param name="available-articles" select="$available-articles"/>
             <xsl:with-param name="candidate"
                 select="number(concat('0', string($max-id))) + 1"/>
         </xsl:call-template>
     </xsl:template>
 
     <!--
-         Skip candidates that already resolve to an article file. This assumes
-         existing .lp5 files are well-formed XML; malformed files may look
-         unavailable to document(). XSLT 1.0 numbers also have finite integer
-         precision, so extremely large numeric IDs are outside this algorithm's
-         range.
+         Use the source-directory inventory for existence checks, so malformed
+         article content cannot make an occupied filename look available.
+         XSLT 1.0 numbers also have finite integer precision, so extremely large
+         numeric IDs are outside this algorithm's range.
     -->
     <xsl:template name="try-article-filename">
-        <xsl:param name="articles-dir"/>
+        <xsl:param name="available-articles"/>
         <xsl:param name="candidate"/>
 
         <xsl:variable name="filename" select="concat($candidate, '.lp5')"/>
-        <xsl:variable name="existing"
-            select="document(concat($articles-dir, '/', $filename), /)"/>
 
         <xsl:choose>
-            <xsl:when test="$existing/*">
+            <xsl:when test="$available-articles[@name = $filename]">
                 <xsl:call-template name="try-article-filename">
-                    <xsl:with-param name="articles-dir" select="$articles-dir"/>
+                    <xsl:with-param name="available-articles" select="$available-articles"/>
                     <xsl:with-param name="candidate" select="$candidate + 1"/>
                 </xsl:call-template>
             </xsl:when>
