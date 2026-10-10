@@ -1,4 +1,7 @@
 <template>
+    <children>
+        <li id="24.lp5"/>
+    </children>
     <heading>Dialog templates</heading>
     <keywords>
         <li>dialog</li>
