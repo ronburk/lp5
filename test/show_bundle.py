@@ -61,14 +61,14 @@ def main():
         article(source, "8.lp5", "--")
         names = ["", "Bundle & Names", special, "__CODE_NAME_PARAMETER_REQUIRED__",
                  "weave.xml", "-o", "--"]
-        original = {p.name: p.read_bytes() for p in source.iterdir()}
+        original = {p.name: p.read_bytes() for p in source.iterdir() if p.name != "weave.xml"}
 
         def run(*args, environment=None, default_source=True):
             options = ["-s", str(source)] if default_source else []
             return subprocess.run([executable, *options, *args], cwd=working,
                                   env=environment, capture_output=True)
 
-        cache = working / "weave.xml"
+        cache = source / "weave.xml"
         assert not cache.exists()
         check_list(run("show-bundle"), names)
         timestamp = cache.stat().st_mtime_ns
@@ -90,7 +90,7 @@ def main():
             assert root.tag == "bundle" and root.attrib == {"name": name}
             assert len(root) > 0
             if name not in ("-o", "--"):
-                old = run("show-bundle", "weave.xml", name)
+                old = run("show-bundle", str(cache), name)
                 assert old.returncode == 0 and old.stdout == result.stdout, old.stderr
                 new = run("show-bundle", name)
                 assert new.returncode == 0 and new.stdout == result.stdout, new.stderr
@@ -115,7 +115,7 @@ def main():
         xml_named = run("show-bundle", "--", "weave.xml")
         assert xml_named.returncode == 0
         assert ET.fromstring(xml_named.stdout).attrib == {"name": "weave.xml"}
-        assert {p.name: p.read_bytes() for p in source.iterdir()} == original
+        assert {p.name: p.read_bytes() for p in source.iterdir() if p.name != "weave.xml"} == original
 
         output = working / "bundles.xml"
         result = run("show-bundle", "-o", str(output))
@@ -126,11 +126,11 @@ def main():
         assert len(ET.parse(output).getroot()) == 2
 
         if shutil.which("xsltproc"):
-            direct = subprocess.run(["xsltproc", "show-bundle.xsl", "weave.xml"],
+            direct = subprocess.run(["xsltproc", "show-bundle.xsl", str(cache)],
                                     cwd=working, capture_output=True)
             check_list(direct, names)
             direct = subprocess.run(["xsltproc", "--stringparam", "code_name", "",
-                                     "show-bundle.xsl", "weave.xml"], cwd=working, capture_output=True)
+                                     "show-bundle.xsl", str(cache)], cwd=working, capture_output=True)
             assert direct.returncode == 0 and ET.fromstring(direct.stdout).attrib == {"name": ""}
 
         # The legacy two-argument form still reads its explicit index file.

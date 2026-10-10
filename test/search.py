@@ -77,7 +77,7 @@ def main():
         article(source, "8.lp5", keywords=("priorityneedle",))
         for number in range(20, 45):
             article(source, f"{number}.lp5", explanation="shared marker in an orphan article")
-        original = {path.name: path.read_bytes() for path in source.iterdir()}
+        original = {path.name: path.read_bytes() for path in source.iterdir() if path.name != "weave.xml"}
 
         def run(*args):
             return subprocess.run([executable, "-s", str(source), *args], cwd=working,
@@ -170,7 +170,7 @@ def main():
         assert ordinary.returncode == 0, ordinary.stderr
         assert ET.fromstring(ordinary.stdout).attrib["total"] == "0"
         assert search(["absent phrase"]).attrib["total"] == "0"
-        assert {path.name: path.read_bytes() for path in source.iterdir()} == original
+        assert {path.name: path.read_bytes() for path in source.iterdir() if path.name != "weave.xml"} == original
 
         output = working / "results.xml"
         redirected = run("-o", str(output), "search", "--all", "--", "save", "reload")

@@ -69,14 +69,14 @@ def main():
         # A working-directory collision must never change project selection.
         (working / "lp5.lp5").write_bytes(b"<template><heading>wrong root</heading></template>")
         (working / "4.lp5").write_bytes(b"<template><heading>wrong article</heading></template>")
-        original = {p.name: p.read_bytes() for p in source.iterdir()}
+        original = {p.name: p.read_bytes() for p in source.iterdir() if p.name != "weave.xml"}
 
         def run(*arguments, environment=None, default_source=True):
             options = ["-s", str(source)] if default_source else []
             return subprocess.run([executable, *options, *arguments], cwd=working,
                                   env=environment, capture_output=True)
 
-        cache = working / "weave.xml"
+        cache = source / "weave.xml"
         assert not cache.exists()
         template = check(run("show-article"), "lp5.lp5", root_text)
         assert cache.exists()
@@ -87,7 +87,7 @@ def main():
         assert b"<![CDATA[" in result.stdout and b'<lp5- ref="unresolved &amp; name"/>' in result.stdout
         for filename in ("lp5.lp5", "1.lp5", special, "-notes.lp5"):
             check(run("show-article", filename), filename, original[filename])
-        assert {p.name: p.read_bytes() for p in source.iterdir()} == original
+        assert {p.name: p.read_bytes() for p in source.iterdir() if p.name != "weave.xml"} == original
         cache_time = cache.stat().st_mtime_ns
         check(run("show-article", "4.lp5"), "4.lp5", child_text)
         assert cache.stat().st_mtime_ns == cache_time

@@ -21,7 +21,7 @@ are ordinary data. The first standalone `--` is required; every subsequent
 argument is a literal keyword, including another `--` or strings equal to options.
 Before the separator, `--all` is allowed once; other command arguments are errors.
 Global `-s`, `-w`, `-o`, and `LP5Source` retain their existing behavior. The
-index defaults to `weave.xml`; `-w` selects another index for reading and
+index defaults to `<source-dir>/weave.xml`; `-w` selects another index for reading and
 freshness checking. Global options are removed before dispatch only up to `--`.
 `-m` is invalid for search.
 
@@ -89,7 +89,7 @@ unique identifiers; read the article identified by `file` for complete content.
 ## Cache and errors
 
 Search uses the existing shared `ensure_weave_current()` preflight and reads
-`weave.xml` from the working directory by default, or the selected `-w` file.
+`weave.xml` from the selected source directory by default, or the selected `-w` file.
 Its keyword index provides membership;
 the article records provide metadata and ordering. A fresh older cache lacking
 the keyword index is supported by deriving membership from its article records.

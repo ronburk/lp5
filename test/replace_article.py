@@ -53,7 +53,7 @@ def main():
 </template>
 '''.replace("\n", "\r\n").encode("utf-8")
         proposal.write_bytes(replacement)
-        cache = working / "weave.xml"
+        cache = source / "weave.xml"
 
         def run(*arguments, environment=None, use_source=True, **options):
             prefix = ["-s", str(source)] if use_source else []

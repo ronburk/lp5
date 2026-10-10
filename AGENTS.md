@@ -196,9 +196,11 @@ command from the repository root:
 
 The launcher registers the `my:ls` extension required by the current
 stylesheets; running `tangle.xsl` or `weave.xsl` directly with ordinary
-`xsltproc` fails with an unregistered-function error. For setup checks, use
-`-w` and `-o` with temporary paths to avoid changing the tracked `lp5.html`
-or creating `weave.xml` in the checkout.
+`xsltproc` fails with an unregistered-function error. Use the default weave
+index for ordinary work. It is an ignored, disposable cache inside the source
+directory, refreshed automatically as source articles change. Generated
+`lp5.html` files are also ignored build outputs; regenerate them with `tangle`
+rather than committing them.
 
 The transform follows each `<children>` link and assembles the unnamed code
 sections, recursively expanding named code references. It validates articles
@@ -236,7 +238,9 @@ from the same snapshot. See [LIST_KEYWORDS.md](LIST_KEYWORDS.md) for its contrac
 template; omitting the filename selects `lp5.lp5` under `LP5Source`.
 See [SHOW_ARTICLE.md](SHOW_ARTICLE.md) for its XML contract and navigation.
 
-The weave index defaults to `weave.xml`. Use `-w <file>` to choose another index;
+The weave index defaults to `<source-dir>/weave.xml` (normally
+`lp5.lp5/weave.xml`). `-s` and `LP5Source` select the source directory.
+Use `-w <file>` only when an explicit alternate index is needed;
 the freshness check reads and refreshes that selected file. `weave` writes there
 by default. `add-article` uses it as input, and `show-bundle`, `search`,
 `search-keywords`, and `list-keywords` read it. `show-bundle` lists bundle names,

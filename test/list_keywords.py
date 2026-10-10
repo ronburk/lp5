@@ -53,14 +53,14 @@ def main():
         expected = {"shared": 3, "save article": 2, "a": 1, "z": 1,
                     special.replace("O'Reilly", "o'reilly"): 1, "ÉtÉ": 1, "été": 1,
                     "雪": 1, "😀": 1, "-o": 1, "--": 1, "&amp;": 1, "\u00a0": 1}
-        original = {p.name: p.read_bytes() for p in source.iterdir()}
+        original = {p.name: p.read_bytes() for p in source.iterdir() if p.name != "weave.xml"}
 
         def run(*arguments, environment=None, default_source=True):
             options = ["-s", str(source)] if default_source else []
             return subprocess.run([executable, *options, *arguments], cwd=working,
                                   capture_output=True, env=environment)
 
-        cache = working / "weave.xml"
+        cache = source / "weave.xml"
         assert not cache.exists()
         order = listing(run("list-keywords"), expected)
         index = ET.parse(cache).getroot()
@@ -70,7 +70,7 @@ def main():
             result = run("search-keywords", "--", value)
             assert result.returncode == 0, result.stderr
             assert int(ET.fromstring(result.stdout).attrib["total"]) == count
-        assert {p.name: p.read_bytes() for p in source.iterdir()} == original
+        assert {p.name: p.read_bytes() for p in source.iterdir() if p.name != "weave.xml"} == original
 
         # No source reads or refresh when the generated cache is already current.
         timestamp = cache.stat().st_mtime_ns

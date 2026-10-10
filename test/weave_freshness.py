@@ -55,7 +55,7 @@ def main():
             encoding="utf-8",
         )
 
-        weave_file = working_directory / "weave.xml"
+        weave_file = source_directory / "weave.xml"
         checked_file = working_directory / "checked.xml"
         woven = run(executable, working_directory, source_directory, "weave")
         assert woven.returncode == 0, woven.stderr

@@ -108,11 +108,11 @@ def main():
                           children, "Bundle" if filename in ("9.lp5", "2.lp5") else None)
         order = ["lp5.lp5", "9.lp5", "7.lp5", "2.lp5", "0.lp5"]
         order += [f"{n}.lp5" for n in range(30, 55)] + ["a&z.lp5"]
-        original = {p.name: p.read_bytes() for p in source.iterdir()}
+        original = {p.name: p.read_bytes() for p in source.iterdir() if p.name != "weave.xml"}
 
         result = run(executable, working, source, "weave")
         assert result.stdout == b""
-        document = ET.parse(working / "weave.xml").getroot()
+        document = ET.parse(source / "weave.xml").getroot()
         check_index(document, terms, order)
         values = [k.attrib["value"] for k in document.find("keyword-index")]
         assert [v for v in values if v in ("a-key", "b-key", "z-key")] == ["a-key", "b-key", "z-key"]
@@ -125,25 +125,25 @@ def main():
             if stored is not None:
                 assert [li.text for li in stored] == [li.text for li in original_keywords]
 
-        result = run(executable, working, source, "weave", "-o", "weave.xml")
+        result = run(executable, working, source, "weave", "-o", str(source / "weave.xml"))
         assert result.stdout == b""
-        check_index(ET.parse(working / "weave.xml").getroot(), terms, order)
-        assert {p.name: p.read_bytes() for p in source.iterdir()} == original
+        check_index(ET.parse(source / "weave.xml").getroot(), terms, order)
+        assert {p.name: p.read_bytes() for p in source.iterdir() if p.name != "weave.xml"} == original
 
         terms["9.lp5"] = ["changed keyword"]
         write_article(source, "9.lp5", terms["9.lp5"], ("7.lp5",), "Bundle")
-        os.utime(working / "weave.xml", ns=(0, 0))
-        edited = {p.name: p.read_bytes() for p in source.iterdir()}
+        os.utime(source / "weave.xml", ns=(0, 0))
+        edited = {p.name: p.read_bytes() for p in source.iterdir() if p.name != "weave.xml"}
         run(executable, working, source, "check", "9")
-        check_index(ET.parse(working / "weave.xml").getroot(), terms, order)
-        assert {p.name: p.read_bytes() for p in source.iterdir()} == edited
+        check_index(ET.parse(source / "weave.xml").getroot(), terms, order)
+        assert {p.name: p.read_bytes() for p in source.iterdir() if p.name != "weave.xml"} == edited
 
         empty_source = working / "empty"
         empty_source.mkdir()
         write_article(empty_source, "lp5.lp5", ["\t\n\r "])
         result = run(executable, working, empty_source, "weave")
         assert result.stdout == b""
-        check_index(ET.parse(working / "weave.xml").getroot(),
+        check_index(ET.parse(empty_source / "weave.xml").getroot(),
                     {"lp5.lp5": [" "]}, ["lp5.lp5"])
     print("weave keyword index checks passed")
 

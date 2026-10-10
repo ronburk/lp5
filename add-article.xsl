@@ -3,8 +3,9 @@
      add-article.xsl - add one article to a parent's child list.
 
      Run from the project root, with weave.xml generated from the current
-     project. articles_dir is relative to weave.xml and has no trailing slash;
-     article_file names the temporary XML article to add.
+     project. articles_dir is a filesystem path relative to the working
+     directory (or absolute); article_file is the absolute URI of the staged
+     article supplied by the launcher. It is independent of the index location.
 
      This stylesheet produces the updated parent article. The lp5 add-article
      command stages this result together with the new article and installs both

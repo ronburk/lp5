@@ -6,7 +6,7 @@
 
 The command accepts no positional arguments or command-specific options. Global
 `-s`, `-w`, `-o`, and the `LP5Source` environment variable work as usual; `-m`
-is invalid. It refreshes `weave.xml` by default through the same freshness check
+is invalid. It refreshes `<source-dir>/weave.xml` by default through the same freshness check
 as `search-keywords`; `-w` selects a different index for both refresh and reading.
 
 Output is a UTF-8 XML document without a namespace, ending with a newline:
