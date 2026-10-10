@@ -26,7 +26,7 @@ list. Other parent content and existing child order are preserved.
 The command does not rewrite the selected weave index. If `-w` is supplied, it
 selects the index that will be considered stale; the next command that needs
 the index refreshes it through the normal freshness check. Without `-w`, the
-default weave index is used. The legacy index-first form remains accepted when
+default `<source-dir>/weave.xml` index is used. The legacy index-first form remains accepted when
 `-w` is omitted:
 
 ```sh

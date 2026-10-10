@@ -11,6 +11,7 @@
 
 #include <libexslt/exslt.h>
 #include <libxml/parser.h>
+#include <libxml/uri.h>
 #include <libxml/chvalid.h>
 #include <libxml/xpathInternals.h>
 #include <libxslt/extensions.h>
@@ -55,7 +56,7 @@ typedef int (*command_function)(xsltStylesheetPtr stylesheet, int argc,
 const char *LP5Source = "lp5.lp5";
 const char *LP5OutputName;
 const char *LP5MapName;
-const char *LP5WeaveName = "weave.xml";
+const char *LP5WeaveName;
 static int LP5WeaveNameSpecified;
 static FILE *LP5OutputFile;
 
@@ -655,7 +656,7 @@ static int write_json_string(FILE *file, const char *text)
     return fputc('"', file) == EOF;
 }
 
-static char *source_map_root_uri(void)
+static char *working_directory_uri(void)
 {
     size_t capacity = 256;
     char *directory = NULL;
@@ -742,7 +743,7 @@ static int write_source_map(const char *filename, const char *generated_file,
         const struct source_map_positions *positions)
 {
     FILE *file = fopen(filename, "wb");
-    char *source_root = source_map_root_uri();
+    char *source_root = working_directory_uri();
     unsigned long line;
     size_t position_index = 0;
     long long previous_source = 0;
@@ -1473,6 +1474,7 @@ static int command_add_article(xsltStylesheetPtr stylesheet, int argc,
     char *updated_parent_path = NULL;
     char *backup_parent_path = NULL;
     char *article_contents = NULL;
+    xmlChar *staged_article_uri = NULL;
     FILE *staged_article = NULL;
     struct stat input_status;
     struct stat parent_status;
@@ -1579,8 +1581,21 @@ static int command_add_article(xsltStylesheetPtr stylesheet, int argc,
     parameters[1].value = argc - offset == 4 ? argv[3 + offset] : "";
     parameters[2].name = "articles_dir";
     parameters[2].value = LP5Source;
+    {
+        char *base_uri = working_directory_uri();
+        xmlChar *path_uri = xmlPathToURI(BAD_CAST staged_article_path);
+        if (base_uri != NULL && path_uri != NULL) {
+            staged_article_uri = xmlBuildURI(path_uri, BAD_CAST base_uri);
+        }
+        free(base_uri);
+        xmlFree(path_uri);
+        if (staged_article_uri == NULL) {
+            fprintf(stderr, "lp5: cannot resolve staged article path\n");
+            goto done;
+        }
+    }
     parameters[3].name = "article_file";
-    parameters[3].value = staged_article_path;
+    parameters[3].value = (const char *) staged_article_uri;
     LP5OutputName = updated_parent_path;
     status = transform_file(stylesheet, filename, parameters, 4,
         NULL, NULL, NULL);
@@ -1649,6 +1664,7 @@ done:
         (void) remove(updated_parent_path);
     }
     free(article_contents);
+    xmlFree(staged_article_uri);
     free(backup_parent_path);
     free(updated_parent_path);
     free(staged_article_path);
@@ -2752,7 +2768,7 @@ static void print_usage(const char *program)
         "       %s show-bundle [code-name] (omit name to list bundles; use \"\" for unnamed code)\n"
         "       %s [-s source-dir] [-w weave-file] [-o output-file] <stylesheet.xsl|stylesheet.xslt> [xml-file] [other args...]\n"
         "       Source directory defaults to lp5.lp5; LP5Source sets the environment default.\n"
-        "       The weave file defaults to weave.xml; -w selects another weave file.\n"
+        "       The weave file defaults to <source-dir>/weave.xml; -w selects another weave file.\n"
         "       -s, -w, -o, and -m options may appear anywhere before --; they are removed before command dispatch.\n"
         "       -m map-file applies only to tangle.\n"
         "       Use --help or the help command to display this usage.\n",
@@ -2760,7 +2776,7 @@ static void print_usage(const char *program)
         program, program, program, program);
 }
 
-int main(int argc, char *argv[])
+static int run_main(int argc, char *argv[])
 {
     xsltStylesheetPtr stylesheet;
     const char *environment_source;
@@ -2804,6 +2820,14 @@ int main(int argc, char *argv[])
     if (first_argument >= argc) {
         print_usage(argv[0]);
         return 1;
+    }
+
+    if (!LP5WeaveNameSpecified) {
+        LP5WeaveName = source_entry_path(LP5Source, "weave.xml");
+        if (LP5WeaveName == NULL) {
+            fprintf(stderr, "lp5: out of memory\n");
+            return 1;
+        }
     }
 
     if (!is_stylesheet_name(argv[first_argument])) {
@@ -2893,4 +2917,13 @@ int main(int argc, char *argv[])
     xsltCleanupGlobals();
     xmlCleanupParser();
     return finish_output(status);
+}
+
+int main(int argc, char *argv[])
+{
+    int status = run_main(argc, argv);
+    if (!LP5WeaveNameSpecified) {
+        free((void *) LP5WeaveName);
+    }
+    return status;
 }

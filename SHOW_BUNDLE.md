@@ -10,8 +10,8 @@
 ./lp5 show-bundle -- "-o"          # read a name equal to a global option
 ```
 
-The index defaults to `weave.xml` in the working directory. `-w <file>` selects
-another index for both freshness checking and reading. The shared freshness
+The index defaults to `weave.xml` inside the selected source directory.
+`-w <file>` selects another index for both freshness checking and reading. The shared freshness
 check runs first, using `LP5Source` (including environment and `-s` overrides).
 Global `-o` redirects output, and `-m` is invalid. No source articles are modified.
 

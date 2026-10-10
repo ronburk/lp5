@@ -47,7 +47,7 @@ def write_article(source, filename, keywords=None, children=(), heading=None,
 
 
 def snapshot(source):
-    return {p.name: p.read_bytes() for p in source.iterdir()}
+    return {p.name: p.read_bytes() for p in source.iterdir() if p.name != "weave.xml"}
 
 
 def check_result(data, mode, terms, source, order):
@@ -158,14 +158,14 @@ def main():
         assert len(search(["Été"]).find("results")) == 0
         assert snapshot(source) == original
 
-        bundle = run("show-bundle", "weave.xml", "ioStore & More")
+        bundle = run("show-bundle", str(source / "weave.xml"), "ioStore & More")
         assert bundle.returncode == 0, bundle.stderr
         bundle_root = ET.fromstring(bundle.stdout)
         assert bundle_root.attrib == {"name": "ioStore & More"}
         assert [s.attrib["article"] for s in bundle_root] == ["3.lp5"]
         incoming = working / "incoming.xml"
         incoming.write_text("<template><heading>New article</heading></template>")
-        added = run("add-article", "weave.xml", "lp5.lp5", str(incoming))
+        added = run("add-article", str(source / "weave.xml"), "lp5.lp5", str(incoming))
         assert added.returncode == 0 and added.stdout == b"", added.stderr
         new_id = re.search(rb"added article: (\S+)", added.stderr)
         assert new_id is not None, added.stderr
@@ -210,7 +210,7 @@ def main():
             result = run("search-keywords", "-o", "/dev/full", "--", "persistence")
             assert result.returncode == 1 and result.stderr
 
-        cache = working / "weave.xml"
+        cache = source / "weave.xml"
         cache_bytes = cache.read_bytes()
         # A valid fresh cache may predate keyword-index; source records suffice.
         legacy = ET.fromstring(cache_bytes)
