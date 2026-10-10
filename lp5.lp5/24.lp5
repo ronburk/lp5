@@ -1,0 +1,60 @@
+<template>
+    <heading>Select/Create Project Dialog</heading>
+    <keywords>
+        <li>dialog</li>
+        <li>project selection</li>
+        <li>project creation</li>
+        <li>modal</li>
+    </keywords>
+    <section data-lp5-kind="explanation">
+        <p>
+            This article defines the Select/Create Project dialog. Its bundle
+            name matches the dialog template's <code>id</code>, so the parent
+            dialog-template container can insert it with a code reference.
+            The action names are handled by the generic modal dialog operation.
+        </p>
+    </section>
+    <section data-lp5-kind="code">
+        <name>LP5-Dialog-SelectCreateProject</name>
+        <code><![CDATA[
+<template id="LP5-Dialog-SelectCreateProject">
+    <style>
+        .LP5-SelectCreateProject {
+            max-width: 25rem;
+            padding: 1.25rem;
+            text-align: center;
+        }
+
+        .LP5-SelectCreateProject h2 {
+            margin: 0 0 1rem;
+            font-size: 1.25rem;
+        }
+
+        .LP5-SelectCreateProject .dialog-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+        }
+
+        .LP5-SelectCreateProject button {
+            padding: 0.6rem 1.2rem;
+            font-size: 1rem;
+        }
+
+        .LP5-SelectCreateProject [role="alert"] {
+            color: #a00;
+        }
+    </style>
+    <dialog class="LP5-SelectCreateProject"
+            aria-labelledby="LP5-SelectCreateProject-title">
+        <h2 id="LP5-SelectCreateProject-title">Select or Create a Project</h2>
+        <div class="dialog-buttons">
+            <button type="button" autofocus data-action="Select">Select</button>
+            <button type="button" data-action="Create">Create</button>
+        </div>
+        <p data-name="selectionError" role="alert"></p>
+    </dialog>
+</template>
+]]></code>
+    </section>
+</template>
