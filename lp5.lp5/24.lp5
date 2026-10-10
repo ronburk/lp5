@@ -19,35 +19,24 @@
         <code><![CDATA[
 <template id="LP5-Dialog-SelectCreateProject">
     <style>
-        .LP5-SelectCreateProject {
-            max-width: 25rem;
-            padding: 1.25rem;
+        .LP5-Dialog-SelectCreateProject {
             text-align: center;
         }
 
-        .LP5-SelectCreateProject h2 {
+        .LP5-Dialog-SelectCreateProject h2 {
             margin: 0 0 1rem;
             font-size: 1.25rem;
         }
 
-        .LP5-SelectCreateProject .dialog-buttons {
+        .LP5-Dialog-SelectCreateProject .dialog-buttons {
             display: flex;
             justify-content: center;
             gap: 1rem;
         }
-
-        .LP5-SelectCreateProject button {
-            padding: 0.6rem 1.2rem;
-            font-size: 1rem;
-        }
-
-        .LP5-SelectCreateProject [role="alert"] {
-            color: #a00;
-        }
     </style>
-    <dialog class="LP5-SelectCreateProject"
-            aria-labelledby="LP5-SelectCreateProject-title">
-        <h2 id="LP5-SelectCreateProject-title">Select or Create a Project</h2>
+    <dialog class="LP5-Dialog-SelectCreateProject"
+            aria-labelledby="LP5-Dialog-SelectCreateProject-title">
+        <h2 id="LP5-Dialog-SelectCreateProject-title">Select or Create a Project</h2>
         <div class="dialog-buttons">
             <button type="button" autofocus data-action="Select">Select</button>
             <button type="button" data-action="Create">Create</button>
