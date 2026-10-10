@@ -1,2 +1,2 @@
-<template><section data-lp5-kind="code"><name>Outermost scope object names</name><code><![CDATA[controller: controller,
-operations: operations,]]></code></section></template>
+<template><section data-lp5-kind="code"><name>Outermost scope object names</name><code><![CDATA[controller: controller, // window.LP5.controller
+operations: operations, // window.LP5.operations]]></code></section></template>
