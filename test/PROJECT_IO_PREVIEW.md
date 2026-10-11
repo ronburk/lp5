@@ -1,20 +1,20 @@
 # LP5 project-I/O cloud-browser test
 
-This is a test-only preview server. It serves only `new.html`, the test-control
-and regression modules, and the three fixture articles; all other paths return 404. It is not part of the production
-application.
+This test covers the older `new.html` application. Its test-only preview serves
+only `new.html`, the test-control and regression modules, and the three fixture
+articles; all other paths return 404. It is not part of the generated LP5
+rewrite or the production application.
 
-Run it with the preview system's provided bind host and forwarded port, if any:
+Start it through the checkout's preview runner:
 
 ```sh
-python3 test/preview_server.py --host 0.0.0.0 --port 8000
+sites-preview start "$PWD"
 ```
 
-The server also accepts an optional positional `host port` pair and the
-`HOST` / `PORT` environment variables. Open the preview system's HTTP(S) URL
-for `/new.html?test=1`; use that supplied URL rather than `file://` or a guessed
-loopback address. The ordinary `/new.html` URL keeps the native production
-backend.
+Open the returned preview URL with `/new.html?test=1`; use that supplied URL
+rather than `file://` or a guessed loopback address. The ordinary `/new.html`
+URL keeps the native production backend. This test does not verify the
+generated LP5 rewrite or establish that its startup code has a test adapter.
 
 ## Visible browser checks
 

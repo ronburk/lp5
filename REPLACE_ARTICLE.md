@@ -35,7 +35,7 @@ Success returns status 0 with no stdout output. Errors return status 1 and
 diagnostics on stderr. The target filename is the existing article filename. Use `--` after the
 command when an operand is spelled like an option.
 
-Build `./lp5` in the checkout root as described in `AGENTS.md`, then test:
+Build `./lp5` in the checkout root as described in `HARNESS.md`, then test:
 
 ```sh
 python3 test/replace_article.py ./lp5
