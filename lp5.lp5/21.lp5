@@ -18,7 +18,7 @@
             <li><code><![CDATA[return]]></code>, or reach the end of the generator: finish the operation. The generator result has <code><![CDATA[done === true]]></code>, so the controller pops it and resumes the parent with the same command. Any returned value is ignored. If no parent remains, dispatch ends.</li>
         </ol>
         <p>A <code><![CDATA[ModalDialog]]></code> command carries a <code><![CDATA[dialogName]]></code> key identifying the dialog-specific operation. The base handler switches on that key and yields the selected primed operation. The controller then sends the same initial command to the child.</p>
-        <p><code><![CDATA[SelectCreateProject]]></code> is the operation for the startup project dialog. It receives the initial <code><![CDATA[ModalDialog]]></code> command and remains the active handler; its dialog behavior will be implemented in this operation. The dialog template's DOM id is separate from this operation key.</p>
+        <p><code><![CDATA[SelectCreateProject]]></code> is the operation for the startup project dialog. It receives the initial command and calls <code><![CDATA[showModalDialog]]></code> with the dialog template's DOM id. The helper finds that child template inside <code><![CDATA[LP5-Dialog-Templates]]></code>, clones its content, prepends a clone of the shared modal styles, appends the content to the document body, and calls <code><![CDATA[showModal()]]></code>. It returns immediately; the operation remains the active handler and can receive later commands while the dialog is open.</p>
         <p><code><![CDATA[operations]]></code> installs the primed base handler with <code><![CDATA[controller.init(handler)]]></code> before any commands are dispatched.</p>
     </section>
     <section data-lp5-kind="code">
@@ -31,9 +31,35 @@ let operations = (() => {
         return handler;
     }
 
+    function showModalDialog(dialogName) {
+        const templates = document.getElementById("LP5-Dialog-Templates");
+        if (!(templates instanceof HTMLTemplateElement))
+            throw new Error("Missing LP5-Dialog-Templates template");
+
+        const template = templates.content.querySelector(`#${dialogName}`);
+        if (!(template instanceof HTMLTemplateElement))
+            throw new Error(`Missing dialog template: ${dialogName}`);
+
+        const sharedStyle = templates.content.querySelector(":scope > style");
+        if (!(sharedStyle instanceof HTMLStyleElement))
+            throw new Error("Missing shared dialog styles");
+
+        const content = template.content.cloneNode(true);
+        content.prepend(sharedStyle.cloneNode(true));
+
+        const dialog = content.querySelector("dialog");
+        if (!dialog)
+            throw new Error(`Dialog template has no dialog element: ${dialogName}`);
+
+        document.body.append(content);
+        dialog.showModal();
+    }
+
     function* SelectCreateProject(self) {
+        let command = yield self();
+        showModalDialog("LP5-Dialog-SelectCreateProject");
         while (true) {
-            let command = yield self();
+            command = yield self();
         }
     }
 
