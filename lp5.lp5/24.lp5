@@ -7,12 +7,7 @@
         <li>modal</li>
     </keywords>
     <section data-lp5-kind="explanation">
-        <p>
-            This article defines the Select/Create Project dialog. Its bundle
-            name matches the dialog template's <code>id</code>, so the parent
-            dialog-template container can insert it with a code reference.
-            The action names are handled by the generic modal dialog operation.
-        </p>
+        <p>This article defines the Select/Create Project dialog markup. Its code bundle name matches the dialog template's DOM <code><![CDATA[id]]></code>, so the parent dialog-template container can insert it with a code reference. The dialog-specific behavior belongs to the <code><![CDATA[SelectCreateProject]]></code> operation, selected by the logical <code><![CDATA[dialogName]]></code> on a <code><![CDATA[ModalDialog]]></code> command.</p>
     </section>
     <section data-lp5-kind="code">
         <name>LP5-Dialog-SelectCreateProject</name>
