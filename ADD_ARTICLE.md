@@ -31,7 +31,7 @@ input, or transformation failures leave the source articles unchanged. The paren
 is updated in place. Use `--` after the command when an operand is spelled like
 an option.
 
-Build `./lp5` in the checkout root as described in `AGENTS.md`, then test:
+Build `./lp5` in the checkout root as described in `HARNESS.md`, then test:
 
 ```sh
 python3 test/add_article.py ./lp5
