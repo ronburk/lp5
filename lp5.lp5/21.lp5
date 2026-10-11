@@ -7,17 +7,19 @@
         <li>command handler</li>
         <li>initialization</li>
         <li>to_handler</li>
+        <li>modal dialog</li>
     </keywords>
     <section data-lp5-kind="explanation">
-        <p><code>operations</code> holds the application's multi-step command handlers. Each handler is a generator object, created and primed by <code>to_handler</code>. The generator receives <code>self</code>, a function that returns its own object; calling <code>self()</code> after construction avoids accessing the object before it exists.</p>
-        <p>Each operation can produce one of three outcomes when <code>controller</code> resumes it with <code>handler.next(command)</code>:</p>
+        <p><code><![CDATA[operations]]></code> holds the application's multi-step command handlers. Each handler is a generator object, created and primed by <code><![CDATA[to_handler]]></code>. The generator receives <code><![CDATA[self]]></code>, a function that returns its own object; calling <code><![CDATA[self()]]></code> after construction avoids accessing the object before it exists.</p>
+        <p>Each operation can produce one of three outcomes when <code><![CDATA[controller]]></code> resumes it with <code><![CDATA[handler.next(command)]]></code>:</p>
         <ol>
-            <li><code>yield self()</code>: remain the current handler. The controller stops dispatching this command; the next command resumes the same operation.</li>
-            <li><code>yield child</code>, where <code>child</code> is another primed generator object: call a child operation. The controller pushes <code>child</code> onto <code>handlerStack</code> and immediately dispatches the same command to it.</li>
-            <li><code>return</code>, or reach the end of the generator: finish the operation. The generator result has <code>done === true</code>, so the controller pops it and resumes the parent with the same command. Any returned value is ignored. If no parent remains, dispatch ends.</li>
+            <li><code><![CDATA[yield self()]]></code>: remain the current handler. The controller stops dispatching this command; the next command resumes the same operation.</li>
+            <li><code><![CDATA[yield child]]></code>, where <code><![CDATA[child]]></code> is another primed generator object: call a child operation. The controller pushes <code><![CDATA[child]]></code> onto <code><![CDATA[handlerStack]]></code> and immediately dispatches the same command to it.</li>
+            <li><code><![CDATA[return]]></code>, or reach the end of the generator: finish the operation. The generator result has <code><![CDATA[done === true]]></code>, so the controller pops it and resumes the parent with the same command. Any returned value is ignored. If no parent remains, dispatch ends.</li>
         </ol>
-        <p>The <code>ModalDialog</code> command also has a <code>dialogName</code> field containing the name of the dialog template to invoke. For example: <code>{ name: "ModalDialog", dialogName: "LP5-Dialog-SelectCreateProject" }</code>. The modal dialog operation receives this complete command object; its current stub does not yet instantiate the dialog.</p>
-        <p><code>baseOperationsHandler</code> receives commands and normally ignores them, yielding <code>self()</code> to remain the current handler. When <code>command.name</code> is <code>"ModalDialog"</code>, it pushes a primed <code>modalDialogOperation</code> as a child handler. The stub consumes that command and remains the current handler. <code>operations</code> installs the primed base handler with <code>controller.init(handler)</code> before any commands are dispatched.</p>
+        <p>A <code><![CDATA[ModalDialog]]></code> command carries a <code><![CDATA[dialogName]]></code> key identifying the dialog-specific operation. The base handler switches on that key and yields the selected primed operation. The controller then sends the same initial command to the child.</p>
+        <p><code><![CDATA[SelectCreateProject]]></code> is the operation for the startup project dialog. It receives the initial <code><![CDATA[ModalDialog]]></code> command and remains the active handler; its dialog behavior will be implemented in this operation. The dialog template's DOM id is separate from this operation key.</p>
+        <p><code><![CDATA[operations]]></code> installs the primed base handler with <code><![CDATA[controller.init(handler)]]></code> before any commands are dispatched.</p>
     </section>
     <section data-lp5-kind="code">
         <name>Outermost scope objects</name>
@@ -29,7 +31,7 @@ let operations = (() => {
         return handler;
     }
 
-    function* modalDialogOperation(self) {
+    function* SelectCreateProject(self) {
         while (true) {
             let command = yield self();
         }
@@ -38,8 +40,13 @@ let operations = (() => {
     function* baseOperationsHandler(self) {
         while (true) {
             let command = yield self();
-            if (command.name === "ModalDialog")
-                yield to_handler(modalDialogOperation);
+            if (command.name === "ModalDialog") {
+                switch (command.dialogName) {
+                case "SelectCreateProject":
+                    yield to_handler(SelectCreateProject);
+                    break;
+                }
+            }
         }
     }
 
