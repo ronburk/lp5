@@ -14,7 +14,8 @@ order:
   keyword. Whitespace between list items is allowed. The editor trims terms,
   ignores empty terms, and permits an empty element for legacy articles.
 - `<section data-lp5-kind="explanation">` (optional): explanatory HTML/XML
-  content. Inline HTML `<code>` elements here are ordinary inline code.
+  content. This content is rendered as HTML, so it must use ordinary markup;
+  do not wrap explanation text or inline HTML `<code>` content in CDATA.
 - `<section data-lp5-kind="code">` (optional): one code section containing
   exactly one `<name>` and one `<code>` child.
 
@@ -30,6 +31,11 @@ fragment, omit the code section.
 
 `data-lp5-kind` distinguishes explanation and code sections from inline HTML
 `<code>` markup in explanations.
+
+CDATA is meaningful only inside `<code>` in a code section. In explanation
+content, CDATA delimiters are parsed as comments by the HTML renderer and the
+enclosed text will not display. The article editor rejects CDATA anywhere
+inside an explanation section.
 
 A **bundle** is the ordered set of code sections that share the same `<name>`
 value. A named bundle is not required to be unique to one article; all matching

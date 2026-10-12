@@ -48,7 +48,7 @@ def main():
     <!-- source comment --><?test keep?>
     <heading>  A <b>marked up</b> heading &amp; more  </heading>
     <keywords><li> Mixed Case </li><li> Mixed Case </li><li> </li><li>&lt;/keyword&gt; &amp; quoted</li></keywords>
-    <section data-lp5-kind="explanation"><p>First <em>second</em> tail<code>x &lt; y</code>''' + "雪😀" * 3000 + '''</p></section>
+    <section data-lp5-kind="explanation"><p>First <em>second</em> tail<code><![CDATA[x < y]]></code>''' + "雪😀" * 3000 + '''</p></section>
     <section data-lp5-kind="code">
         <name>Bundle <i>name</i></name>
         <code><![CDATA[  if (a < b && c > d) {
@@ -84,6 +84,12 @@ def main():
         returned = check(result, "4.lp5", child_text)
         assert "// literal ]]> remains code" in "".join(returned.find("section[@data-lp5-kind='code']/code").itertext())
         assert b"<![CDATA[" in result.stdout and b'<lp5- ref="unresolved &amp; name"/>' in result.stdout
+        explanation = returned.find("section[@data-lp5-kind='explanation']")
+        assert explanation is not None
+        assert explanation.findtext("p/code") == "x < y"
+        explanation_xml = ET.tostring(explanation, encoding="unicode")
+        assert "<![CDATA[" not in explanation_xml
+        assert b"<code>x &lt; y</code>" in result.stdout
         for filename in ("project.lp5", "1.lp5", special, "-notes.lp5"):
             check(run("show-article", filename), filename, original[filename])
         assert {p.name: p.read_bytes() for p in source.iterdir() if p.name != "weave.xml"} == original

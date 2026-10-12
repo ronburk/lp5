@@ -37,9 +37,14 @@ with another `show-article` call provides the next navigation step.
 
 This is a parsed XML copy, not a byte-for-byte file transfer. XML declarations,
 entity spellings, quote styles, and original CDATA boundaries are not preserved.
-Text inside `code` elements is serialized as CDATA, with references remaining
-XML elements. Document-level comments, processing instructions, and the doctype
-outside `template` are not part of the returned template.
+Text inside `<code>` in the code section is serialized as CDATA, with references
+remaining XML elements. Explanation markup, including inline `<code>`, is
+serialized as ordinary XML. Document-level comments, processing instructions,
+and the doctype outside `template` are not part of the returned template.
+
+The result is for inspection and navigation, not a byte-for-byte source copy.
+Do not copy its explanation CDATA delimiters into an article: explanation
+content is rendered as HTML, where those delimiters can hide the enclosed text.
 
 The existing weave freshness preflight runs before dispatch, as with other read
 commands. The article is then read directly from its source file and validated
