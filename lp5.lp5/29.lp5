@@ -4,24 +4,44 @@
         <li>model</li>
         <li>project</li>
         <li>directory handle</li>
+        <li>IndexedDB</li>
     </keywords>
     <section data-lp5-kind="explanation">
-        <p><code>window.LP5.model</code> holds the application's project state. <code>model.directoryHandle</code> starts as <code>null</code>; <code>model.setDirectoryHandle(handle)</code> installs a selected directory handle, or clears it with <code>null</code>.</p>
-        <p>The model holds state in memory. Permission requests, project loading, and IndexedDB persistence are separate operations. Once loading is implemented, the handle and loaded articles should be installed together after a successful load.</p>
+        <p><code>window.LP5.model</code> owns the current directory handle privately; it exposes no getter for that handle. Its interface is <code>await model.selectProject(handle)</code>, which stores the supplied handle in IndexedDB and then installs it as the current selection. It returns no handle.</p>
+        <p>The <code>LP5</code> database, version 1, has a <code>project</code> object store. The <code>directoryHandle</code> key holds the most recently selected handle. Selection waits for the write transaction to complete, rather than merely for its write request to succeed. If storage fails, the Promise rejects and the current in-memory selection is preserved. The database connection closes after the transaction.</p>
+        <p>Restoring the saved selection, checking permissions, and loading project articles remain later work. The model does not open the picker or perform UI work.</p>
     </section>
     <section data-lp5-kind="code">
         <name>JavaScript units</name>
         <code><![CDATA[let model = (() => {
     let directoryHandle = null;
 
-    function setDirectoryHandle(handle) {
-        directoryHandle = handle;
+    async function selectProject(handle) {
+        const database = await new Promise((resolve, reject) => {
+            const request = indexedDB.open("LP5", 1);
+            request.onupgradeneeded = () => {
+                request.result.createObjectStore("project");
+            };
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+
+        try {
+            await new Promise((resolve, reject) => {
+                const transaction = database.transaction("project", "readwrite");
+                transaction.oncomplete = () => resolve();
+                transaction.onabort = () => reject(
+                    transaction.error || new Error("Project selection storage aborted")
+                );
+                transaction.objectStore("project").put(handle, "directoryHandle");
+            });
+            directoryHandle = handle;
+        } finally {
+            database.close();
+        }
     }
 
-    return {
-        get directoryHandle() { return directoryHandle; },
-        setDirectoryHandle
-    };
+    return { selectProject };
 })();
 ]]></code>
     </section>
