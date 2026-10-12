@@ -18,7 +18,7 @@
             <li><code><![CDATA[return]]></code>, or reach the end of the generator: finish the operation. The generator result has <code><![CDATA[done === true]]></code>, so the controller pops it and resumes the parent with the same command. Any returned value is ignored. If no parent remains, dispatch ends.</li>
         </ol>
         <p>A <code><![CDATA[ModalDialog]]></code> command carries a <code><![CDATA[dialogName]]></code> key identifying the dialog-specific operation. The base handler switches on that key and yields the selected primed operation. The controller then sends the same initial command to the child.</p>
-        <p><code><![CDATA[SelectCreateProject]]></code> is the operation for the startup project dialog. It receives the initial command and calls <code><![CDATA[showModalDialog]]></code> with the dialog template's DOM id. The helper finds that child template inside <code><![CDATA[LP5-Dialog-Templates]]></code>, clones its content, prepends a clone of the first child shared modal style, and appends the content to the document body. It replaces any cloned script elements with fresh script elements so the dialog-specific code runs, then calls <code><![CDATA[showModal()]]></code>. It returns immediately; the operation remains the active handler and can receive later commands while the dialog is open.</p>
+        <p><code><![CDATA[SelectCreateProject]]></code> is the operation for the startup project dialog. It receives the initial command and calls <code><![CDATA[showModalDialog]]></code> with the dialog template's DOM id. The helper finds that child template inside <code><![CDATA[LP5-Dialog-Templates]]></code>, clones its content, prepends a clone of the first child shared modal style, and appends the content to the document body, which runs the cloned dialog script, then calls <code><![CDATA[showModal()]]></code>. It returns immediately; the operation remains the active handler and can receive later commands while the dialog is open.</p>
         <p>The dialog buttons dispatch <code><![CDATA[Select]]></code> and <code><![CDATA[Create]]></code> commands. The operation refers those commands to the not-yet-written <code><![CDATA[SelectProjectOperation]]></code> and <code><![CDATA[CreateProjectOperation]]></code> bundles.</p>
         <p><code><![CDATA[operations]]></code> installs the primed base handler with <code><![CDATA[controller.init(handler)]]></code> before any commands are dispatched.</p>
     </section>
@@ -53,13 +53,6 @@ let operations = (() => {
             throw new Error(`Dialog template has no dialog element: ${dialogName}`);
 
         document.body.append(content);
-        for (const script of dialog.querySelectorAll("script")) {
-            const activeScript = document.createElement("script");
-            for (const attribute of script.attributes)
-                activeScript.setAttribute(attribute.name, attribute.value);
-            activeScript.textContent = script.textContent;
-            script.replaceWith(activeScript);
-        }
         dialog.showModal();
     }
 
