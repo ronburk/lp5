@@ -25,6 +25,7 @@
     <xsl:param name="before_child_id" select="''"/>
     <xsl:param name="articles_dir" select="'__ARTICLES_DIR_REQUIRED__'"/>
     <xsl:param name="article_file" select="'__ARTICLE_FILE_REQUIRED__'"/>
+    <xsl:param name="article_location" select="$article_file"/>
 
     <xsl:template match="/">
         <xsl:if test="$parent_id = '__PARENT_ID_REQUIRED__' or
@@ -47,7 +48,7 @@
         <xsl:variable name="new-article" select="document($article_file, /)"/>
         <xsl:call-template name="validate-article">
             <xsl:with-param name="document" select="$new-article"/>
-            <xsl:with-param name="location" select="$article_file"/>
+            <xsl:with-param name="location" select="$article_location"/>
         </xsl:call-template>
 
         <xsl:variable name="available-articles"

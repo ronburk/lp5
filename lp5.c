@@ -1649,7 +1649,7 @@ static int install_new_file(const char *temporary, const char *target)
 static int command_add_article(xsltStylesheetPtr stylesheet, int argc,
         char *argv[])
 {
-    struct xslt_parameter parameters[4];
+    struct xslt_parameter parameters[5];
     const char *filename = LP5WeaveName;
     const char *saved_output_name = LP5OutputName;
     const char *article_filename;
@@ -1765,8 +1765,10 @@ static int command_add_article(xsltStylesheetPtr stylesheet, int argc,
     }
     parameters[3].name = "article_file";
     parameters[3].value = (const char *) staged_article_uri;
+    parameters[4].name = "article_location";
+    parameters[4].value = article_filename;
     LP5OutputName = updated_parent_path;
-    status = transform_file(stylesheet, filename, parameters, 4,
+    status = transform_file(stylesheet, filename, parameters, 5,
         NULL, NULL, NULL);
     status = finish_output(status);
     LP5OutputName = saved_output_name;

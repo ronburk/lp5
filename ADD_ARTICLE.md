@@ -5,8 +5,11 @@
 ```
 
 `parent-id` is the filename of an existing article under the project directory
-`X.lp5`. `article-file` is a path to a complete new article template in normal
-LP5 XML format. The input file is left untouched.
+`X.lp5`. `article-file` is a path to a complete new LP5 source article in normal
+LP5 XML format. Its XML document root must be `<template>`; the
+`<lp5-article>` wrapper returned by `show-article` is for display and is not a
+valid input file. The input file is left untouched. See
+[`SHOW_ARTICLE.md`](SHOW_ARTICLE.md) for the display command's output format.
 
 The command validates the template, chooses an unused numeric `.lp5` filename,
 installs the article in `X.lp5`, and adds a link to it in
