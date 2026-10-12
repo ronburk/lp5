@@ -15,7 +15,7 @@
         <p><code>util.mountTemplate(tplOrId, parent, ctx)</code> clones a template's content and removes its first script element before inserting the clone. The script's text is compiled with <code>scriptToFunction</code> and the parameters <code>elementByID</code> and <code>ctx</code>. The map contains the cloned content's elements with ids. Nested template contents are not searched. The clone is appended before the compiled function is called, so it can focus or measure its elements; the function's result is returned, or <code>null</code> when there is no script. A script syntax error is thrown before the clone is attached.</p>
     </section>
     <section data-lp5-kind="code">
-        <name>Outermost scope objects</name>
+        <name>JavaScript units</name>
         <code><![CDATA[let util = (() => {
     function scriptToFunction(code, name, ...args) {
         let failure = null;
