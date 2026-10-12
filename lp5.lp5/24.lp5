@@ -8,7 +8,7 @@
     </keywords>
     <section data-lp5-kind="explanation">
         <p>This article defines the Select/Create Project dialog markup. Its code bundle name matches the dialog template's DOM <code>id</code>, so the parent dialog-template container can insert it with a code reference. The dialog-specific behavior belongs to the <code>SelectCreateProject</code> operation, selected by the logical <code>dialogName</code> on a <code>ModalDialog</code> command.</p>
-        <p>The dialog is mounted with <code>util.mountTemplate</code>, which compiles its script with an <code>elementByID</code> map. Each button has a unique id, allowing the script to bind directly to it. The Select button has a direct click handler that dispatches the <code>SelectProject</code> command. The Create button is not wired yet. The script returns the dialog element so the operations helper can call <code>showModal()</code> after mounting.</p>
+        <p>The dialog is mounted with <code>util.mountTemplate</code>, which compiles its script with an <code>elementByID</code> map. Each button has a unique id, allowing the script to bind directly to it. The Select button has a direct click handler that dispatches the <code>SelectProject</code> command using <code>dispatchImmediate</code>, so the directory picker is invoked during the click before control returns to the browser. The Create button is not wired yet. The script returns the dialog element so the operations helper can call <code>showModal()</code> after mounting.</p>
     </section>
     <section data-lp5-kind="code">
         <name>SelectCreateProject</name>
@@ -40,7 +40,7 @@
         <p data-name="selectionError" role="alert"></p>
         <script>
             elementByID["SelectCreateProject-Select"].addEventListener("click", () => {
-                window.LP5.controller.dispatch({ name: "SelectProject" });
+                window.LP5.controller.dispatchImmediate({ name: "SelectProject" });
             });
             return elementByID["SelectCreateProject-dialog"];
         </script>
