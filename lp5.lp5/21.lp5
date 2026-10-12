@@ -57,7 +57,7 @@ let operations = (() => {
 
     function* SelectCreateProject(self) {
         let command = yield self();
-        showModalDialog("LP5-Dialog-SelectCreateProject");
+        showModalDialog("SelectCreateProject");
         while (true) {
             command = yield self();
         }
