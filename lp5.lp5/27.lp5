@@ -1,18 +1,24 @@
 <template>
+    <children>
+        <li id="29.lp5"/>
+        <li id="20.lp5"/>
+        <li id="21.lp5"/>
+        <li id="26.lp5"/>
+    </children>
     <heading>JavaScript units</heading>
     <keywords>
         <li>JavaScript</li>
         <li>units</li>
+        <li>model</li>
         <li>controller</li>
         <li>operations</li>
         <li>utility</li>
     </keywords>
     <section data-lp5-kind="explanation">
-        <p>These code fragments define the top-level JavaScript units assembled inside <code>window.LP5</code>. Each unit owns one part of the application; the following articles explain the controller, operations, and utilities.</p>
+        <p>These code fragments define the top-level JavaScript units assembled inside <code>window.LP5</code>. Each unit owns one part of the application; the following articles explain the model, controller, operations, and utilities.</p>
     </section>
-    <children>
-        <li id="20.lp5"/>
-        <li id="21.lp5"/>
-        <li id="26.lp5"/>
-    </children>
+    <section data-lp5-kind="code">
+        <name>JavaScript units</name>
+        <code><lp5- ref="model"/></code>
+    </section>
 </template>

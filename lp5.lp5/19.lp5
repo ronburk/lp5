@@ -1,7 +1,8 @@
 <template>
     <section data-lp5-kind="code">
         <name>Outermost scope object names</name>
-        <code><![CDATA[controller: controller, // window.LP5.controller
+        <code><![CDATA[model: model, // window.LP5.model
+controller: controller, // window.LP5.controller
 operations: operations, // window.LP5.operations
 util: util, // window.LP5.util]]></code>
     </section>
