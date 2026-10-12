@@ -17,8 +17,4 @@
     <section data-lp5-kind="explanation">
         <p>These code fragments define the top-level JavaScript units assembled inside <code>window.LP5</code>. Each unit owns one part of the application; the following articles explain the model, controller, operations, and utilities.</p>
     </section>
-    <section data-lp5-kind="code">
-        <name>JavaScript units</name>
-        <code><lp5- ref="model"/></code>
-    </section>
 </template>
