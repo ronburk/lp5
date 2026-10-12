@@ -8,7 +8,7 @@
     </keywords>
     <section data-lp5-kind="explanation">
         <p>This article defines the Select/Create Project dialog markup. Its code bundle name matches the dialog template's DOM <code>id</code>, so the parent dialog-template container can insert it with a code reference. The dialog-specific behavior belongs to the <code>SelectCreateProject</code> operation, selected by the logical <code>dialogName</code> on a <code>ModalDialog</code> command.</p>
-        <p>When mounted, the dialog script body is compiled with <code>LP5.util.scriptToFunction</code>. The wrapper supplies an <code>elementByID</code> map, so each button has a unique id and the script can bind directly to it. Clicking a button dispatches a command named by its <code>data-action</code>.</p>
+        <p>The dialog is mounted with <code>util.mountTemplate</code>, which compiles its script with an <code>elementByID</code> map. Each button has a unique id, allowing the script to bind directly to it. Clicking Select dispatches <code>SelectProject</code>; clicking Create dispatches <code>Create</code>. The script returns the dialog element so the operations helper can call <code>showModal()</code> after mounting.</p>
     </section>
     <section data-lp5-kind="code">
         <name>SelectCreateProject</name>
@@ -30,11 +30,11 @@
             gap: 1rem;
         }
     </style>
-    <dialog class="SelectCreateProject"
+    <dialog id="SelectCreateProject-dialog" class="SelectCreateProject"
             aria-labelledby="SelectCreateProject-title">
         <h2 id="SelectCreateProject-title">Select or Create a Project</h2>
         <div class="dialog-buttons">
-            <button id="SelectCreateProject-Select" type="button" autofocus data-action="Select">Select</button>
+            <button id="SelectCreateProject-Select" type="button" autofocus data-action="SelectProject">Select</button>
             <button id="SelectCreateProject-Create" type="button" data-action="Create">Create</button>
         </div>
         <p data-name="selectionError" role="alert"></p>
@@ -47,6 +47,7 @@
                     });
                 });
             }
+            return elementByID["SelectCreateProject-dialog"];
         </script>
     </dialog>
 </template>
