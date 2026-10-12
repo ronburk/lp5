@@ -58,11 +58,12 @@ let operations = (() => {
     }
 
     function* SelectProject(self) {
-        yield self();
         window.showDirectoryPicker().catch(error => {
             if (error.name !== "AbortError")
                 console.error(error);
         });
+        // The first yield lets to_handler() prime this handler.
+        yield;
     }
 
     function* SelectCreateProject(self) {
