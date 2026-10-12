@@ -30,7 +30,7 @@
     <script>
         "use strict";
         window.LP5 = (function () {
-            ]]><lp5- ref="Outermost scope objects"/><![CDATA[
+            ]]><lp5- ref="JavaScript units"/><![CDATA[
             return {
                 ]]><lp5- ref="Outermost scope object names"/><![CDATA[
                 };
