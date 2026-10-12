@@ -1,8 +1,10 @@
 <template>
-    <heading>Script to function</heading>
+    <heading>Template utilities</heading>
     <keywords>
         <li>script</li>
         <li>function</li>
+        <li>template</li>
+        <li>mount</li>
         <li>syntax error</li>
         <li>utility</li>
     </keywords>
@@ -10,9 +12,10 @@
         <p><code><![CDATA[util.scriptToFunction(code, name, ...args)]]></code> parses code as the body of a new function whose parameter names are supplied in <code><![CDATA[args]]></code>. The returned function is not called here.</p>
         <p>To define the function and get it back, this helper appends a temporary classic script to the document head. While that script runs, <code><![CDATA[document.currentScript]]></code> refers to the temporary script element. The assignment to its <code><![CDATA[fn]]></code> property carries the generated function back to this helper; after append returns, the helper reads <code><![CDATA[script.fn]]></code> and removes the script.</p>
         <p>A syntax error in the generated script is reported through the window <code><![CDATA[error]]></code> event, so the helper captures that event and throws a <code><![CDATA[SyntaxError]]></code> with the template name, line, and source text.</p>
+        <p><code><![CDATA[util.mountTemplate(tplOrId, parent, ctx)]]></code> clones a template's content and removes its first script element before inserting the clone. The script's text is compiled with <code><![CDATA[scriptToFunction]]></code> and the parameters <code><![CDATA[elementByID]]></code> and <code><![CDATA[ctx]]></code>. The map contains the cloned content's elements with ids. Nested template contents are not searched. The clone is appended before the compiled function is called, so it can focus or measure its elements; the function's result is returned, or <code><![CDATA[null]]></code> when there is no script. A script syntax error is thrown before the clone is attached.</p>
     </section>
     <section data-lp5-kind="code">
-        <name>JavaScript units</name>
+        <name>Outermost scope objects</name>
         <code><![CDATA[let util = (() => {
     function scriptToFunction(code, name, ...args) {
         let failure = null;
@@ -41,7 +44,29 @@
         );
     }
 
-    return { scriptToFunction };
+    function mountTemplate(tplOrId, parent, ctx) {
+        const name = typeof tplOrId === "string" ? tplOrId : tplOrId?.id || "template";
+        const tpl = typeof tplOrId === "string"
+            ? document.getElementById(tplOrId)
+            : tplOrId;
+        if (!tpl) throw new Error(`LP5.mountTemplate: no template "${name}"`);
+
+        const clone = document.importNode(tpl.content, true);
+        const script = clone.querySelector("script");
+        const code = script?.textContent;
+        script?.remove();
+
+        const elementByID = {};
+        for (const el of clone.querySelectorAll("[id]")) elementByID[el.id] = el;
+        const fn = code?.trim()
+            ? scriptToFunction(code, name, "elementByID", "ctx")
+            : null;
+
+        parent.append(clone);
+        return fn ? fn(elementByID, ctx) : null;
+    }
+
+    return { scriptToFunction, mountTemplate };
 })();
 ]]></code>
     </section>
