@@ -1,0 +1,48 @@
+<template>
+    <heading>Script to function</heading>
+    <keywords>
+        <li>script</li>
+        <li>function</li>
+        <li>syntax error</li>
+        <li>utility</li>
+    </keywords>
+    <section data-lp5-kind="explanation">
+        <p><code><![CDATA[util.scriptToFunction(code, name, ...args)]]></code> parses code as the body of a new function whose parameter names are supplied in <code><![CDATA[args]]></code>. The returned function is not called here.</p>
+        <p>To define the function and get it back, this helper appends a temporary classic script to the document head. While that script runs, <code><![CDATA[document.currentScript]]></code> refers to the temporary script element. The assignment to its <code><![CDATA[fn]]></code> property carries the generated function back to this helper; after append returns, the helper reads <code><![CDATA[script.fn]]></code> and removes the script.</p>
+        <p>A syntax error in the generated script is reported through the window <code><![CDATA[error]]></code> event, so the helper captures that event and throws a <code><![CDATA[SyntaxError]]></code> with the template name, line, and source text.</p>
+    </section>
+    <section data-lp5-kind="code">
+        <name>Outermost scope objects</name>
+        <code><![CDATA[let util = (() => {
+    function scriptToFunction(code, name, ...args) {
+        let failure = null;
+        const onError = e => { failure = e; };
+        addEventListener("error", onError);
+
+        const script = document.createElement("script");
+        script.textContent =
+            `document.currentScript.fn = function (${args.join(", ")}) {${code}\n};\n` +
+            `//# sourceURL=lp5-${name}.js`;
+
+        document.head.append(script); // Runs synchronously.
+        script.remove();
+        removeEventListener("error", onError);
+
+        // currentScript identifies the executing script element. Its temporary fn property
+        // carries the newly defined function back here; defining it did not call its body.
+        if (script.fn) return script.fn;
+
+        const line = failure?.lineno || null;
+        const sourceLine = line ? (code.split("\n")[line - 1] ?? "").trim() : "";
+        throw new SyntaxError(
+            `template "${name}" script, line ${line ?? "?"}: ` +
+            `${failure?.message ?? "syntax error"}` +
+            (sourceLine ? `\n    ${sourceLine}` : "")
+        );
+    }
+
+    return { scriptToFunction };
+})();
+]]></code>
+    </section>
+</template>
