@@ -10,7 +10,7 @@
         <p>The model holds state in memory. Permission requests, project loading, and IndexedDB persistence are separate operations. Once loading is implemented, the handle and loaded articles should be installed together after a successful load.</p>
     </section>
     <section data-lp5-kind="code">
-        <name>model</name>
+        <name>JavaScript units</name>
         <code><![CDATA[let model = (() => {
     let directoryHandle = null;
 
