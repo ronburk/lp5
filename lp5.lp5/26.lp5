@@ -12,7 +12,7 @@
         <p>A syntax error in the generated script is reported through the window <code><![CDATA[error]]></code> event, so the helper captures that event and throws a <code><![CDATA[SyntaxError]]></code> with the template name, line, and source text.</p>
     </section>
     <section data-lp5-kind="code">
-        <name>Outermost scope objects</name>
+        <name>JavaScript units</name>
         <code><![CDATA[let util = (() => {
     function scriptToFunction(code, name, ...args) {
         let failure = null;

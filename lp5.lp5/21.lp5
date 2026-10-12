@@ -23,7 +23,7 @@
         <p><code><![CDATA[operations]]></code> installs the primed base handler with <code><![CDATA[controller.init(handler)]]></code> before any commands are dispatched.</p>
     </section>
     <section data-lp5-kind="code">
-        <name>Outermost scope objects</name>
+        <name>JavaScript units</name>
         <code><![CDATA[
 let operations = (() => {
     function to_handler(generator) {

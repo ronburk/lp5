@@ -13,7 +13,7 @@
         <p>Dispatch throws an explicit error until initialization installs the command handler. Each handler is a generator object. Call <code>init(handler)</code> once to install the first handler. The stack is undefined until initialization creates it. An empty stack still records that initialization has occurred, so a second call throws an error even after dispatch removes the last handler.</p>
     </section>
     <section data-lp5-kind="code">
-        <name>Outermost scope objects</name>
+        <name>JavaScript units</name>
         <code><![CDATA[let controller = (() => {
     let handlerStack; // top of stack is current command handler
 
