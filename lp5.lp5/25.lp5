@@ -8,7 +8,7 @@
     </keywords>
     <section data-lp5-kind="explanation">
         <p>This module script runs after the browser has parsed the document, so the dialog templates are available. The earlier classic script has already initialized <code><![CDATA[window.LP5.controller]]></code>.</p>
-        <p>Startup dispatches a <code><![CDATA[ModalDialog]]></code> command with the logical operation key <code><![CDATA[SelectCreateProject]]></code>. The base handler uses that key to call the dialog-specific operation. The dialog's DOM template retains its separate id, <code><![CDATA[LP5-Dialog-SelectCreateProject]]></code>.</p>
+        <p>Startup dispatches a <code><![CDATA[ModalDialog]]></code> command with the logical operation key <code><![CDATA[SelectCreateProject]]></code>. The base handler uses that key to call the dialog-specific operation. The dialog template's DOM id is also <code><![CDATA[SelectCreateProject]]></code>.</p>
     </section>
     <section data-lp5-kind="code">
         <name>Startup code</name>

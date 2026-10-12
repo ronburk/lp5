@@ -10,28 +10,28 @@
         <p>This article defines the Select/Create Project dialog markup. Its code bundle name matches the dialog template's DOM <code><![CDATA[id]]></code>, so the parent dialog-template container can insert it with a code reference. The dialog-specific behavior belongs to the <code><![CDATA[SelectCreateProject]]></code> operation, selected by the logical <code><![CDATA[dialogName]]></code> on a <code><![CDATA[ModalDialog]]></code> command.</p>
     </section>
     <section data-lp5-kind="code">
-        <name>LP5-Dialog-SelectCreateProject</name>
+        <name>SelectCreateProject</name>
         <code><![CDATA[
-<template id="LP5-Dialog-SelectCreateProject">
+<template id="SelectCreateProject">
     <style>
-        .LP5-Dialog-SelectCreateProject {
+        .SelectCreateProject {
             text-align: center;
         }
 
-        .LP5-Dialog-SelectCreateProject h2 {
+        .SelectCreateProject h2 {
             margin: 0 0 1rem;
             font-size: 1.25rem;
         }
 
-        .LP5-Dialog-SelectCreateProject .dialog-buttons {
+        .SelectCreateProject .dialog-buttons {
             display: flex;
             justify-content: center;
             gap: 1rem;
         }
     </style>
-    <dialog class="LP5-Dialog-SelectCreateProject"
-            aria-labelledby="LP5-Dialog-SelectCreateProject-title">
-        <h2 id="LP5-Dialog-SelectCreateProject-title">Select or Create a Project</h2>
+    <dialog class="SelectCreateProject"
+            aria-labelledby="SelectCreateProject-title">
+        <h2 id="SelectCreateProject-title">Select or Create a Project</h2>
         <div class="dialog-buttons">
             <button type="button" autofocus data-action="Select">Select</button>
             <button type="button" data-action="Create">Create</button>
