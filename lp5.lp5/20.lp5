@@ -10,7 +10,8 @@
     <section data-lp5-kind="explanation">
         <p>Command dispatch is a kind of hierarchical state machine, implemented with a stack where push is a "call" and pop is a "return".</p>
         <p>Each command is an object with at least a <code>name</code> field identifying the command. Additional fields carry its arguments. The controller passes the same object to each handler involved in dispatch.</p>
-        <p>Dispatch throws an explicit error until initialization installs the command handler. Each handler is a generator object. Call <code>init(handler)</code> once to install the first handler. The stack is undefined until initialization creates it. An empty stack still records that initialization has occurred, so a second call throws an error even after dispatch removes the last handler.</p>
+        <p><code>dispatch(command)</code> queues command handling in a microtask, allowing the current handler to suspend before another command reaches it. Producers of async completion commands use this default method without scheduling their own microtasks. <code>dispatchImmediate(command)</code> handles a command synchronously; use it when an operation must call a browser API during the originating user activation, such as the Select button opening the directory picker. Parent/child handoffs remain synchronous within either form of dispatch.</p>
+        <p>Both dispatch methods throw an explicit error until initialization installs the command handler. Each handler is a generator object. Call <code>init(handler)</code> once to install the first handler. The stack is undefined until initialization creates it. An empty stack still records that initialization has occurred, so a second call throws an error even after dispatch removes the last handler.</p>
     </section>
     <section data-lp5-kind="code">
         <name>JavaScript units</name>
@@ -21,7 +22,16 @@
         if (handlerStack !== undefined)
             throw new Error("Controller has already been initialized");
         handlerStack = [handler];
-        result.dispatch = baseCommandHandler;
+        result.dispatch = dispatch;
+        result.dispatchImmediate = baseCommandHandler;
+    }
+
+    function dispatch(command) {
+        queueMicrotask(() => baseCommandHandler(command));
+    }
+
+    function notInitialized() {
+        throw new Error("Controller has not been initialized");
     }
 
     function baseCommandHandler(command) {
@@ -38,7 +48,8 @@
 
     let result = {
         init: init,
-        dispatch: () => { throw new Error("Controller has not been initialized"); }
+        dispatch: notInitialized,
+        dispatchImmediate: notInitialized
     };
     return result;
 })();

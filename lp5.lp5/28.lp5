@@ -9,7 +9,7 @@
     <section data-lp5-kind="explanation">
         <p><code>selectProjectAndDispatch</code> is nested inside the <code>SelectProject</code> generator by a bundle reference. The generator starts it during priming, before yielding, so <code>showDirectoryPicker()</code> runs during the Select button's user activation.</p>
         <p>The async function awaits the picker and converts its outcome into one command: <code>ProjectDirectoryPicked</code> carries the directory handle; <code>ProjectPickerAborted</code> and <code>ProjectPickerFailed</code> carry the error. <code>AbortError</code> can mean dismissal, a restricted directory, or permission refusal.</p>
-        <p>Completion dispatch is queued so the generator is suspended and installed on the handler stack before it receives the command, even when calling an unavailable picker throws before reaching <code>await</code>. Dispatch runs outside the picker error handler so an error in command handling is not classified as a picker failure.</p>
+        <p>The controller queues ordinary <code>dispatch</code> calls, so the generator is suspended and installed on the handler stack before it receives the command, even when calling an unavailable picker throws before reaching <code>await</code>. Dispatch runs outside the picker error handler so an error in command handling is not classified as a picker failure.</p>
     </section>
     <section data-lp5-kind="code">
         <name>SelectProject async work</name>
@@ -28,8 +28,7 @@ async function selectProjectAndDispatch() {
         };
     }
 
-    // Also defer completion when the API is unavailable and the call throws.
-    queueMicrotask(() => controller.dispatch(command));
+    controller.dispatch(command);
 }
 ]]></code>
     </section>
