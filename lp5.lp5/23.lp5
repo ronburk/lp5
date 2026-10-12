@@ -2,7 +2,7 @@
         <li id="24.lp5"/>
     </children><heading>Dialog templates</heading><keywords><li>dialog</li><li>template</li><li>modal</li></keywords><section data-lp5-kind="explanation"><p>
     Dialog markup lives in named child templates inside
-    <code><![CDATA[LP5-Dialog-Templates]]></code>. Each dialog has its own article, and
+    <code>LP5-Dialog-Templates</code>. Each dialog has its own article, and
     its bundle name matches the dialog template ID. The parent template
     also contains styles shared by all modal dialogs.
 </p>

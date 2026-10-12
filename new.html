@@ -4061,6 +4061,18 @@ state awaitArticleDelete
                                  this.sections[child.tagName] = child;
                              }
                          }
+                        const explanation = this.sections.explanation;
+                        if(explanation){
+                            const nodes = [explanation];
+                            while(nodes.length){
+                                const parent = nodes.pop();
+                                for(const child of parent.childNodes){
+                                    assert(child.nodeType !== Node.CDATA_SECTION_NODE,
+                                           'Explanation content must use ordinary markup, not CDATA');
+                                    nodes.push(child);
+                                }
+                            }
+                        }
                          const children = this.sections.children;
                          if(children){
                              for(const child of children.childNodes){

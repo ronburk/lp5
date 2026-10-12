@@ -7,8 +7,8 @@
         <li>modal</li>
     </keywords>
     <section data-lp5-kind="explanation">
-        <p>This article defines the Select/Create Project dialog markup. Its code bundle name matches the dialog template's DOM <code><![CDATA[id]]></code>, so the parent dialog-template container can insert it with a code reference. The dialog-specific behavior belongs to the <code><![CDATA[SelectCreateProject]]></code> operation, selected by the logical <code><![CDATA[dialogName]]></code> on a <code><![CDATA[ModalDialog]]></code> command.</p>
-        <p>When mounted, the dialog script body is compiled with <code><![CDATA[LP5.util.scriptToFunction]]></code>. The wrapper supplies an <code><![CDATA[elementByID]]></code> map, so each button has a unique id and the script can bind directly to it. Clicking a button dispatches a command named by its <code><![CDATA[data-action]]></code>.</p>
+        <p>This article defines the Select/Create Project dialog markup. Its code bundle name matches the dialog template's DOM <code>id</code>, so the parent dialog-template container can insert it with a code reference. The dialog-specific behavior belongs to the <code>SelectCreateProject</code> operation, selected by the logical <code>dialogName</code> on a <code>ModalDialog</code> command.</p>
+        <p>When mounted, the dialog script body is compiled with <code>LP5.util.scriptToFunction</code>. The wrapper supplies an <code>elementByID</code> map, so each button has a unique id and the script can bind directly to it. Clicking a button dispatches a command named by its <code>data-action</code>.</p>
     </section>
     <section data-lp5-kind="code">
         <name>SelectCreateProject</name>
