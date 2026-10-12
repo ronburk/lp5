@@ -7,7 +7,7 @@
         <li>modal</li>
     </keywords>
     <section data-lp5-kind="explanation">
-        <p>This article defines the Select/Create Project dialog markup. Its code bundle name matches the dialog template's DOM <code><![CDATA[id]]></code>, so the parent dialog-template container can insert it with a code reference. The dialog-specific behavior belongs to the <code><![CDATA[SelectCreateProject]]></code> operation, selected by the logical <code><![CDATA[dialogName]]></code> on a <code><![CDATA[ModalDialog]]></code> command.</p>
+        <p>This article defines the Select/Create Project dialog markup. Its code bundle name matches the dialog template's DOM <code><![CDATA[id]]></code>, so the parent dialog-template container can insert it with a code reference. The dialog-specific behavior belongs to the <code><![CDATA[SelectCreateProject]]></code> operation, selected by the logical <code><![CDATA[dialogName]]></code> on a <code><![CDATA[ModalDialog]]></code> command. Its script listens for button clicks and dispatches a command named by the clicked button's <code><![CDATA[data-action]]></code>.</p>
     </section>
     <section data-lp5-kind="code">
         <name>SelectCreateProject</name>
@@ -37,6 +37,18 @@
             <button type="button" data-action="Create">Create</button>
         </div>
         <p data-name="selectionError" role="alert"></p>
+        <script>
+            (() => {
+                const dialog = document.currentScript.parentElement;
+                for (const button of dialog.querySelectorAll("button[data-action]")) {
+                    button.addEventListener("click", () => {
+                        window.LP5.controller.dispatch({
+                            name: button.dataset.action
+                        });
+                    });
+                }
+            })();
+        </script>
     </dialog>
 </template>
 ]]></code>
