@@ -18,8 +18,8 @@
             <li><code>return</code>, or reach the end of the generator: finish the operation. The generator result has <code>done === true</code>, so the controller pops it and resumes the parent with the same command. Any returned value is ignored. If no parent remains, dispatch ends.</li>
         </ol>
         <p>A <code>ModalDialog</code> command carries a <code>dialogName</code> key identifying the dialog-specific operation. The base handler switches on that key and yields the selected primed operation. The controller then sends the same initial command to the child.</p>
-        <p><code>SelectCreateProject</code> is the operation for the startup project dialog. It receives the initial command and calls <code>showModalDialog</code> with the dialog template's DOM id. The helper finds that child template inside <code>LP5-Dialog-Templates</code>, clones its content, prepends a clone of the first child shared modal style, and appends the content to the document body, which runs the cloned dialog script, then calls <code>showModal()</code>. It returns immediately; the operation remains the active handler and can receive later commands while the dialog is open.</p>
-        <p>The dialog buttons dispatch <code>Select</code> and <code>Create</code> commands. The operation refers those commands to the not-yet-written <code>SelectProjectOperation</code> and <code>CreateProjectOperation</code> bundles.</p>
+        <p><code>SelectCreateProject</code> is the operation for the startup project dialog. It receives the initial command and calls <code>showModalDialog</code> with the dialog template's DOM id. The helper finds that child template inside <code>LP5-Dialog-Templates</code> and uses <code>util.mountTemplate</code> to clone and append it while compiling its script with the element-ID map. The script returns the mounted dialog. The helper inserts a clone of the first child shared modal style before the dialog's own style, then calls <code>showModal()</code>. It returns immediately; the operation remains the active handler and can receive later commands while the dialog is open.</p>
+        <p>The Select button dispatches <code>SelectProject</code>. The <code>SelectCreateProject</code> operation yields the new <code>SelectProject</code> handler for that command. The handler invokes <code>showDirectoryPicker()</code> synchronously while the button's user activation is still active, then returns; cancellation is ignored and other picker errors are logged. Handling the selected directory is a later step. The Create button still dispatches <code>Create</code>, which refers to the not-yet-written <code>CreateProjectOperation</code> bundle.</p>
         <p><code>operations</code> installs the primed base handler with <code>controller.init(handler)</code> before any commands are dispatched.</p>
     </section>
     <section data-lp5-kind="code">
@@ -45,15 +45,24 @@ let operations = (() => {
         if (!(sharedStyle instanceof HTMLStyleElement))
             throw new Error("Missing shared dialog styles");
 
-        const content = template.content.cloneNode(true);
-        content.prepend(sharedStyle.cloneNode(true));
+        const dialog = util.mountTemplate(template, document.body);
+        if (!(dialog instanceof HTMLDialogElement))
+            throw new Error(`Dialog template script did not return a dialog: ${dialogName}`);
 
-        const dialog = content.querySelector("dialog");
-        if (!dialog)
-            throw new Error(`Dialog template has no dialog element: ${dialogName}`);
+        const dialogStyle = dialog.previousElementSibling;
+        if (!(dialogStyle instanceof HTMLStyleElement))
+            throw new Error(`Dialog template has no dialog styles: ${dialogName}`);
 
-        document.body.append(content);
+        dialogStyle.before(sharedStyle.cloneNode(true));
         dialog.showModal();
+    }
+
+    function* SelectProject(self) {
+        yield self();
+        window.showDirectoryPicker().catch(error => {
+            if (error.name !== "AbortError")
+                console.error(error);
+        });
     }
 
     function* SelectCreateProject(self) {
@@ -62,8 +71,8 @@ let operations = (() => {
         while (true) {
             command = yield self();
             switch (command.name) {
-            case "Select":
-                yield ]]><lp5- ref="SelectProjectOperation"/><![CDATA[;
+            case "SelectProject":
+                yield to_handler(SelectProject);
                 break;
             case "Create":
                 yield ]]><lp5- ref="CreateProjectOperation"/><![CDATA[;
