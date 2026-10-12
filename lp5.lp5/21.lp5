@@ -1,4 +1,7 @@
 <template>
+    <children>
+        <li id="28.lp5"/>
+    </children>
     <heading>Operations</heading>
     <keywords>
         <li>operations</li>
@@ -19,7 +22,7 @@
         </ol>
         <p>A <code>ModalDialog</code> command carries a <code>dialogName</code> key identifying the dialog-specific operation. The base handler switches on that key and yields the selected primed operation. The controller then sends the same initial command to the child.</p>
         <p><code>SelectCreateProject</code> is the operation for the startup project dialog. It receives the initial command and calls <code>showModalDialog</code> with the dialog template's DOM id. The helper finds that child template inside <code>LP5-Dialog-Templates</code> and uses <code>util.mountTemplate</code> to clone and append it while compiling its script with the element-ID map. The script returns the mounted dialog. The helper inserts a clone of the first child shared modal style before the dialog's own style, then calls <code>showModal()</code>. It returns immediately; the operation remains the active handler and can receive later commands while the dialog is open.</p>
-        <p>The Select button dispatches <code>SelectProject</code>. The <code>SelectCreateProject</code> operation yields the new <code>SelectProject</code> handler for that command. The handler invokes <code>showDirectoryPicker()</code> synchronously while the button's user activation is still active. Its priming yield precedes receipt of the initiating command; it then waits for a picker outcome, ignoring unrelated commands. Promise callbacks dispatch <code>ProjectDirectoryPicked</code> with the directory handle, <code>ProjectPickerAborted</code> with an <code>AbortError</code>, or <code>ProjectPickerFailed</code> with another error. Synchronous picker failures are converted to rejected promises so dispatch occurs after the handler has been installed. <code>AbortError</code> does not establish that the user dismissed the picker; it can also represent browser restrictions or permission refusal. Abort and failure finish the operation and restore the dialog handler; failures are logged. The success branch marks where project loading remains to be implemented. The Create button still dispatches <code>Create</code>, which refers to the not-yet-written <code>CreateProjectOperation</code> bundle.</p>
+        <p>The Select button dispatches <code>SelectProject</code>. The <code>SelectCreateProject</code> operation yields the new <code>SelectProject</code> handler for that command. The handler starts its nested <code>selectProjectAndDispatch</code> async function, stored in a separate child article, before its priming yield. That function invokes <code>showDirectoryPicker()</code> synchronously while the button's user activation is still active. Its priming yield precedes receipt of the initiating command; it then waits for a picker outcome, ignoring unrelated commands. The async function awaits the picker and dispatches <code>ProjectDirectoryPicked</code> with the directory handle, <code>ProjectPickerAborted</code> with an <code>AbortError</code>, or <code>ProjectPickerFailed</code> with another error. Completion dispatch is queued so it occurs after the handler has been installed, including when the picker API is unavailable. <code>AbortError</code> does not establish that the user dismissed the picker; it can also represent browser restrictions or permission refusal. Abort and failure finish the operation and restore the dialog handler; failures are logged. The success branch marks where project loading remains to be implemented. The Create button still dispatches <code>Create</code>, which refers to the not-yet-written <code>CreateProjectOperation</code> bundle.</p>
         <p><code>operations</code> installs the primed base handler with <code>controller.init(handler)</code> before any commands are dispatched.</p>
     </section>
     <section data-lp5-kind="code">
@@ -58,25 +61,8 @@ let operations = (() => {
     }
 
     function* SelectProject(self) {
-        let picker;
-        try {
-            picker = window.showDirectoryPicker();
-        } catch (error) {
-            // Defer a synchronous failure until this handler is on the stack.
-            picker = Promise.reject(error);
-        }
-        picker.then(
-            directoryHandle => controller.dispatch({
-                name: "ProjectDirectoryPicked",
-                directoryHandle
-            }),
-            error => controller.dispatch({
-                name: error.name === "AbortError"
-                    ? "ProjectPickerAborted"
-                    : "ProjectPickerFailed",
-                error
-            })
-        );
+        ]]><lp5- ref="SelectProject async work"/><![CDATA[
+        selectProjectAndDispatch();
 
         // Priming; the next resume receives the initiating SelectProject command.
         yield;
