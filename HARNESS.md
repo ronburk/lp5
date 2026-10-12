@@ -86,6 +86,8 @@ remain in article records.
 Use the harness's supported commands rather than opening source articles
 directly. Reuse article reads while their source is unchanged. Record harness
 failures and concrete improvements that would make the work easier.
+`show-article` is for inspecting a source article; its `<lp5-article>` output
+wrapper is not an article file that can be passed to `add-article`.
 
 ```sh
 ./lp5 X show-article [article-file.lp5]
@@ -133,7 +135,9 @@ installs the article, and adds its parent link atomically. It leaves the input
 untouched and the weave index stale for normal refresh. The default insertion
 point is the beginning of the parent's child list. `before-child-id`, when
 provided, must be an existing direct child. It reports the generated filename
-on stderr. Use `--` when an operand looks like an option. See
+on stderr. The input must be a complete LP5 XML source document whose root is
+`<template>`; do not pass the `<lp5-article>` wrapper returned by
+`show-article`. Use `--` when an operand looks like an option. See
 [ADD_ARTICLE.md](ADD_ARTICLE.md) for rollback behavior and its test.
 
 `remove-article` removes a non-root leaf and its unique parent link; it refuses

@@ -86,6 +86,19 @@ def main():
         assert missing_input.returncode != 0
         assert {path.name: path.read_bytes() for path in source.iterdir()} == before_failure
 
+        wrapped_input = working / "shown-article.xml"
+        wrapped_input.write_text(
+            '<lp5-article version="1" file="4.lp5">'
+            '<template><heading>Shown article</heading></template>'
+            '</lp5-article>\n',
+            encoding="utf-8",
+        )
+        invalid_article = run("add-article", "lp5.lp5", str(wrapped_input))
+        assert invalid_article.returncode != 0
+        assert str(wrapped_input).encode() in invalid_article.stderr, invalid_article.stderr
+        assert b"document root must be <template>" in invalid_article.stderr, invalid_article.stderr
+        assert {path.name: path.read_bytes() for path in source.iterdir()} == before_failure
+
         output_option = run("-o", str(working / "parent.xml"), "add-article",
                             "lp5.lp5", str(incoming))
         assert output_option.returncode == 1 and b"unknown command" in output_option.stderr
