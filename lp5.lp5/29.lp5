@@ -1,0 +1,28 @@
+<template>
+    <heading>Model</heading>
+    <keywords>
+        <li>model</li>
+        <li>project</li>
+        <li>directory handle</li>
+    </keywords>
+    <section data-lp5-kind="explanation">
+        <p><code>window.LP5.model</code> holds the application's project state. <code>model.directoryHandle</code> starts as <code>null</code>; <code>model.setDirectoryHandle(handle)</code> installs a selected directory handle, or clears it with <code>null</code>.</p>
+        <p>The model holds state in memory. Permission requests, project loading, and IndexedDB persistence are separate operations. Once loading is implemented, the handle and loaded articles should be installed together after a successful load.</p>
+    </section>
+    <section data-lp5-kind="code">
+        <name>model</name>
+        <code><![CDATA[let model = (() => {
+    let directoryHandle = null;
+
+    function setDirectoryHandle(handle) {
+        directoryHandle = handle;
+    }
+
+    return {
+        get directoryHandle() { return directoryHandle; },
+        setDirectoryHandle
+    };
+})();
+]]></code>
+    </section>
+</template>
