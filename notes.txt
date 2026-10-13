@@ -1,3 +1,27 @@
+2026/10/13 - Browser testing tools
+==================================
+* sites-preview is an OpenAI-supplied compiled executable. It starts and
+  manages the checkout's configured preview server and reports a
+  browser-accessible URL. Its internal networking is unexamined.
+* test/preview_server.py is LP5's Python HTTP server. It serves allowlisted
+  application, test, and fixture files. "Project preview server" and
+  "Python HTTP server" refer to this same program.
+* Cloud Chrome loads those files over HTTP. Its exact machine arrangement
+  is unknown; do not assume it can access checkout files through file://.
+* cua_repl independently controls the browser: navigation, page inspection,
+  screenshots, clicks, typing, and keys. The connection is identified as cdp,
+  suggesting Chrome DevTools Protocol, but the implementation is unverified.
+* Test adapters substitute controlled file I/O before application startup.
+  new.html?test=1 uses HTTP fixture reads and in-memory writes, allowing UI
+  testing without a native directory picker.
+* The rewrite currently opens successfully at /lp5.lp5/lp5.out. Its separate
+  model test page passed 161 checks (OPFS unavailable). Full project-loading
+  UI tests still need a picker substitute and completion of the Select
+  success handler.
+
+HTTP delivers files; cua_repl operates the browser. Native directory picking,
+external filesystem permissions, and handle persistence need separate coverage.
+
 BUGS
 ====
 [ ] failed load article should be treated special, can't edit it.
