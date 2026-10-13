@@ -1,0 +1,43 @@
+<template>
+    <heading>View</heading>
+    <keywords>
+        <li>view</li>
+        <li>modal dialog</li>
+    </keywords>
+    <section data-lp5-kind="explanation">
+        <p><code>window.LP5.view</code> owns presentation helpers. <code>view.showModalDialog(dialogName)</code> locates the named child template inside <code>LP5-Dialog-Templates</code> and uses <code>util.mountTemplate</code> to clone and append it while compiling its script with the element-ID map. The script returns the mounted dialog.</p>
+        <p>The helper inserts a clone of the shared modal style before the dialog's own style and calls <code>showModal()</code>. It returns immediately; command legality and operation state remain with the operations unit.</p>
+    </section>
+    <section data-lp5-kind="code">
+        <name>JavaScript units</name>
+        <code><![CDATA[let view = (() => {
+    function showModalDialog(dialogName) {
+        const templates = document.getElementById("LP5-Dialog-Templates");
+        if (!(templates instanceof HTMLTemplateElement))
+            throw new Error("Missing LP5-Dialog-Templates template");
+
+        const template = templates.content.querySelector(`#${dialogName}`);
+        if (!(template instanceof HTMLTemplateElement))
+            throw new Error(`Missing dialog template: ${dialogName}`);
+
+        const sharedStyle = templates.content.firstElementChild;
+        if (!(sharedStyle instanceof HTMLStyleElement))
+            throw new Error("Missing shared dialog styles");
+
+        const dialog = util.mountTemplate(template, document.body);
+        if (!(dialog instanceof HTMLDialogElement))
+            throw new Error(`Dialog template script did not return a dialog: ${dialogName}`);
+
+        const dialogStyle = dialog.previousElementSibling;
+        if (!(dialogStyle instanceof HTMLStyleElement))
+            throw new Error(`Dialog template has no dialog styles: ${dialogName}`);
+
+        dialogStyle.before(sharedStyle.cloneNode(true));
+        dialog.showModal();
+    }
+
+    return { showModalDialog };
+})();
+]]></code>
+    </section>
+</template>

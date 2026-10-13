@@ -2,6 +2,7 @@
     <children>
         <li id="29.lp5"/>
         <li id="20.lp5"/>
+        <li id="31.lp5"/>
         <li id="21.lp5"/>
         <li id="26.lp5"/>
     </children>
@@ -12,9 +13,10 @@
         <li>model</li>
         <li>controller</li>
         <li>operations</li>
+        <li>view</li>
         <li>utility</li>
     </keywords>
     <section data-lp5-kind="explanation">
-        <p>These code fragments define the top-level JavaScript units assembled inside <code>window.LP5</code>. Each unit owns one part of the application; the following articles explain the model, controller, operations, and utilities.</p>
+        <p>These code fragments define the top-level JavaScript units assembled inside <code>window.LP5</code>. Each unit owns one part of the application; the following articles explain the model, controller, operations, view, and utilities.</p>
     </section>
 </template>
