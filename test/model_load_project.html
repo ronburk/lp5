@@ -171,6 +171,12 @@ async function run() {
             }
         }
     }
+    for (const heading of ["", "<heading>Example <i>title</i></heading>"]) {
+        cases.push(["invalid code name with " + (heading ? "title" : "no title"),
+            {"fixture.lp5": article([], "CSS <i>declarations</i>", "", heading)},
+            'fixture.lp5' + (heading ? ' ("Example title")' : '') +
+                ': Code name must contain only text; found:\n<name>CSS <i>declarations</i></name>']);
+    }
     for (const [name, files, expected] of cases) {
         await model.selectProject(directory(files));
         let failed = false;

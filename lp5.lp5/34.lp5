@@ -2,7 +2,7 @@
     <heading>Article XML validation</heading>
     <keywords><li>model</li><li>project loading</li></keywords>
     <section data-lp5-kind="explanation">
-        <p>Each article owns a detached XML document. The document is the source of truth for child order, sections, and code references; rendered HTML belongs to the view. Editing should use a cloned document as a draft, then serialize it with <code>XMLSerializer</code> when saving. Original source text is not retained, so byte-for-byte formatting preservation is not promised.</p><p>Validation rejects malformed XML, invalid article structure, unsafe child filenames, and CDATA in explanations. No article scripts are executed. Child links must name plain <code>.lp5</code> files in the selected directory. Code bundle names use the harness's XML-whitespace normalization.</p>
+        <p>Each article owns a detached XML document. The document is the source of truth for child order, sections, and code references; rendered HTML belongs to the view. Editing should use a cloned document as a draft, then serialize it with <code>XMLSerializer</code> when saving. Original source text is not retained, so byte-for-byte formatting preservation is not promised.</p><p>Validation rejects malformed XML, invalid article structure, unsafe child filenames, and CDATA in explanations. No article scripts are executed. Child links must name plain <code>.lp5</code> files in the selected directory. Code bundle names use the harness's XML-whitespace normalization. Code-name errors include the article title when present and serialize the offending <code>&lt;name&gt;</code> element so embedded markup is visible in the plain-text fatal report.</p>
     </section>
     <section data-lp5-kind="code">
         <name>Model article XML</name>
@@ -53,7 +53,10 @@ function childFilenames(article) {
 
 function parseArticle(filename, parentFilename, text) {
     const document = new DOMParser().parseFromString(text, "application/xml");
-    const fail = message => { throw new Error(`${filename}: ${message}`); };
+    let title = "";
+    const fail = message => {
+        throw new Error(`${filename}${title ? ` (${JSON.stringify(title)})` : ""}: ${message}`);
+    };
     const parseError = Array.from(document.getElementsByTagName("parsererror")).find(node =>
         node.namespaceURI === "http://www.mozilla.org/newlayout/xml/parsererror.xml" ||
         node.namespaceURI === "http://www.w3.org/1999/xhtml"
@@ -71,6 +74,7 @@ function parseArticle(filename, parentFilename, text) {
     );
     const article = { filename, document, parentFilename };
     const sections = articleSections(article);
+    title = sections.heading?.textContent.trim() || "";
     if (sections.children) {
         for (const link of childElements(sections.children, [Node.COMMENT_NODE], fail)) {
             if (link.tagName !== "li" ||
@@ -103,7 +107,8 @@ function parseArticle(filename, parentFilename, text) {
         if (elements.length !== 2 || !name || !code)
             fail("Code section requires exactly one <name> and one <code>");
         if (!textOnly(name))
-            fail("Code name must contain only text");
+            fail("Code name must contain only text; found:\n" +
+                new XMLSerializer().serializeToString(name));
         for (const node of code.childNodes) {
             if (whitespace(node) || node.nodeType === Node.CDATA_SECTION_NODE)
                 continue;
