@@ -1,0 +1,64 @@
+<template>
+    <heading>Code bundle indexes</heading>
+    <keywords><li>model</li><li>project loading</li></keywords>
+    <section data-lp5-kind="explanation">
+        <p>Bundles collect defining articles in depth-first document order. Referrer indexes identify the articles using each bundle, without repeating an article for multiple references. These are derived from the source XML after the entire reachable tree is loaded.</p><p>This first loader treats undefined bundle references and recursive bundle expansion as fatal, even in unused bundles. It also rejects unsafe output declarations and collisions with loaded article files or reserved generated filenames. These checks do not read unlinked articles.</p>
+    </section>
+    <section data-lp5-kind="code">
+        <name>Model bundle indexes</name>
+        <code><![CDATA[function indexBundles(loadedArticles, projectName) {
+    const bundles = new Map();
+    const referrers = new Map();
+    const dependencies = new Map();
+    for (const article of loadedArticles.values()) {
+        const section = articleSections(article).code;
+        if (!section)
+            continue;
+        const name = normalizeBundleName(
+            Array.from(section.children).find(node => node.tagName === "name").textContent
+        );
+        if (!bundles.has(name)) {
+            bundles.set(name, []);
+            dependencies.set(name, new Set());
+        }
+        bundles.get(name).push(article);
+        const code = Array.from(section.children).find(node => node.tagName === "code");
+        for (const ref of code.getElementsByTagName("lp5-")) {
+            const target = normalizeBundleName(ref.getAttribute("ref"));
+            dependencies.get(name).add(target);
+            if (!referrers.has(target))
+                referrers.set(target, new Set());
+            referrers.get(target).add(article);
+        }
+        if (name.startsWith("<") && name.endsWith(">")) {
+            const output = name.slice(1, -1);
+            if (!output || /[<>:"/\\|?*\x00-\x1f]/.test(output) || output === "." || output === ".." ||
+                loadedArticles.has(output) || output === projectName.slice(0, -4) + ".out" ||
+                output === projectName.slice(0, -4) + ".map" || output === "weave.xml")
+                throw new Error(`${article.filename}: Invalid output filename '${output}'`);
+        }
+    }
+    for (const [name, articles] of referrers) {
+        if (!bundles.has(name))
+            throw new Error(`${[...articles][0].filename}: Undefined code bundle '${name}'`);
+    }
+    const visiting = new Set();
+    const visited = new Set();
+    function visit(name, path) {
+        if (visiting.has(name))
+            throw new Error(`Code bundle cycle: ${[...path, name].map(n => JSON.stringify(n)).join(" -> ")}`);
+        if (visited.has(name))
+            return;
+        visiting.add(name);
+        for (const target of dependencies.get(name))
+            visit(target, [...path, name]);
+        visiting.delete(name);
+        visited.add(name);
+    }
+    for (const name of bundles.keys())
+        visit(name, []);
+    return { bundles, referrers };
+}
+]]></code>
+    </section>
+</template>

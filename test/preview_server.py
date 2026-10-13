@@ -34,6 +34,10 @@ class PreviewHandler(BaseHTTPRequestHandler):
 
         if path == "/new.html":
             target = REPO_ROOT / "new.html"
+        elif path == "/lp5.lp5/lp5.out":
+            target = REPO_ROOT / "lp5.lp5" / "lp5.out"
+        elif path == "/test/model_load_project.html":
+            target = REPO_ROOT / "test" / "model_load_project.html"
         elif path in {"/test/project_io_controls.js", "/test/move_article.js", "/test/output_selection.js"}:
             target = REPO_ROOT / "test" / relative.name
         elif relative.parts[:1] == ("test-fixtures",):
@@ -56,6 +60,8 @@ class PreviewHandler(BaseHTTPRequestHandler):
 
         body = resolved.read_bytes()
         content_type = mimetypes.guess_type(resolved.name)[0] or "application/octet-stream"
+        if path == "/lp5.lp5/lp5.out":
+            content_type = "text/html"
         self.send_response(200)
         self.send_header("Content-Type", f"{content_type}; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
