@@ -17,9 +17,23 @@ function checkFilename(filename, suffix = ".lp5") {
         throw new Error(`Invalid filename: ${filename}`);
 }
 
+const whitespace = node => node.nodeType === Node.TEXT_NODE && /^[ \t\r\n]*$/.test(node.textContent);
+
+function childElements(parent, ignoredTypes, fail) {
+    return Array.from(parent.childNodes).filter(node => {
+        if (node.nodeType === Node.ELEMENT_NODE && !node.namespaceURI)
+            return true;
+        if (!whitespace(node) && !ignoredTypes.includes(node.nodeType))
+            fail(`Unexpected content inside <${parent.tagName}>`);
+        return false;
+    });
+}
+
 function articleSections(article) {
+    const fail = message => { throw new Error(`${article.filename}: ${message}`); };
     const sections = {};
-    for (const element of article.document.documentElement.children) {
+    for (const element of childElements(article.document.documentElement,
+        [Node.COMMENT_NODE, Node.PROCESSING_INSTRUCTION_NODE], fail)) {
         const section = element.tagName === "section";
         const kind = section ? element.getAttribute("data-lp5-kind") : element.tagName;
         const allowed = section ? ["explanation", "code"] : ["children", "heading", "keywords"];
@@ -52,24 +66,14 @@ function parseArticle(filename, parentFilename, text) {
     if (document.doctype)
         fail("Article documents must not contain a DOCTYPE");
 
-    const whitespace = node => node.nodeType === Node.TEXT_NODE && /^[ \t\r\n]*$/.test(node.textContent);
     const textOnly = element => Array.from(element.childNodes).every(node =>
         node.nodeType === Node.TEXT_NODE || node.nodeType === Node.CDATA_SECTION_NODE
     );
     const article = { filename, document, parentFilename };
-    for (const node of document.documentElement.childNodes) {
-        if (node.nodeType === Node.COMMENT_NODE || node.nodeType === Node.PROCESSING_INSTRUCTION_NODE ||
-            whitespace(node))
-            continue;
-        if (node.nodeType !== Node.ELEMENT_NODE || node.namespaceURI)
-            fail("Unexpected text or CDATA inside <template>");
-    }
     const sections = articleSections(article);
     if (sections.children) {
-        for (const link of sections.children.childNodes) {
-            if (whitespace(link) || link.nodeType === Node.COMMENT_NODE)
-                continue;
-            if (link.nodeType !== Node.ELEMENT_NODE || link.tagName !== "li" || link.namespaceURI ||
+        for (const link of childElements(sections.children, [Node.COMMENT_NODE], fail)) {
+            if (link.tagName !== "li" ||
                 link.attributes.length !== 1 || !link.hasAttribute("id") ||
                 link.children.length || Array.from(link.childNodes).some(node => !whitespace(node)))
                 fail('<children> requires empty <li id="name.lp5"/> links');
@@ -78,10 +82,8 @@ function parseArticle(filename, parentFilename, text) {
         }
     }
     if (sections.keywords) {
-        for (const keyword of sections.keywords.childNodes) {
-            if (whitespace(keyword))
-                continue;
-            if (keyword.nodeType !== Node.ELEMENT_NODE || keyword.tagName !== "li" || keyword.namespaceURI || !textOnly(keyword))
+        for (const keyword of childElements(sections.keywords, [], fail)) {
+            if (keyword.tagName !== "li" || !textOnly(keyword))
                 fail("<keywords> requires text-only <li> elements");
         }
     }
@@ -95,13 +97,10 @@ function parseArticle(filename, parentFilename, text) {
         }
     }
     if (sections.code) {
-        const elements = Array.from(sections.code.children);
+        const elements = childElements(sections.code, [Node.COMMENT_NODE], fail);
         const name = elements.find(node => node.tagName === "name");
         const code = elements.find(node => node.tagName === "code");
-        if (elements.length !== 2 || !name || !code || name.namespaceURI || code.namespaceURI ||
-            Array.from(sections.code.childNodes).some(node =>
-                node.nodeType !== Node.ELEMENT_NODE && !whitespace(node) &&
-                node.nodeType !== Node.COMMENT_NODE))
+        if (elements.length !== 2 || !name || !code)
             fail("Code section requires exactly one <name> and one <code>");
         if (!textOnly(name))
             fail("Code name must contain only text");
