@@ -1,0 +1,127 @@
+<template>
+    <heading>Article XML validation</heading>
+    <keywords><li>model</li><li>project loading</li></keywords>
+    <section data-lp5-kind="explanation">
+        <p>Each article owns a detached XML document. The document is the source of truth for child order, sections, and code references; rendered HTML belongs to the view. Editing should use a cloned document as a draft, then serialize it with <code>XMLSerializer</code> when saving. Original source text is not retained, so byte-for-byte formatting preservation is not promised.</p><p>Validation rejects malformed XML, invalid article structure, unsafe child filenames, and CDATA in explanations. No article scripts are executed. Child links must name plain <code>.lp5</code> files in the selected directory. Code bundle names use the harness's XML-whitespace normalization.</p>
+    </section>
+    <section data-lp5-kind="code">
+        <name>Model article XML</name>
+        <code><![CDATA[function normalizeBundleName(name) {
+    return name.replace(/^[ \t\r\n]+|[ \t\r\n]+$/g, "")
+        .replace(/[ \t\r\n]+/g, " ");
+}
+
+function checkFilename(filename, suffix = ".lp5") {
+    if (typeof filename !== "string" || filename.length <= suffix.length ||
+        !filename.endsWith(suffix) || /[<>:"/\\|?*\x00-\x1f]/.test(filename))
+        throw new Error(`Invalid filename: ${filename}`);
+}
+
+function articleSections(article) {
+    const sections = {};
+    for (const element of article.document.documentElement.children) {
+        const kind = element.tagName === "section"
+            ? element.getAttribute("data-lp5-kind") : element.tagName;
+        sections[kind] = element;
+    }
+    return sections;
+}
+
+function childFilenames(article) {
+    const children = articleSections(article).children;
+    return Array.from(children?.children || [], link => link.getAttribute("id"));
+}
+
+function parseArticle(filename, parentFilename, text) {
+    const document = new DOMParser().parseFromString(text, "application/xml");
+    const fail = message => { throw new Error(`${filename}: ${message}`); };
+    const parseError = Array.from(document.getElementsByTagName("parsererror")).find(node =>
+        node.namespaceURI === "http://www.mozilla.org/newlayout/xml/parsererror.xml" ||
+        node.namespaceURI === "http://www.w3.org/1999/xhtml"
+    );
+    if (parseError)
+        fail(`Invalid XML: ${parseError.textContent.trim()}`);
+    if (document.documentElement?.tagName !== "template" ||
+        document.documentElement.namespaceURI)
+        fail("Article root must be <template> without a namespace");
+    if (document.doctype)
+        fail("Article documents must not contain a DOCTYPE");
+
+    const whitespace = node => node.nodeType === Node.TEXT_NODE && /^[ \t\r\n]*$/.test(node.textContent);
+    const textOnly = element => Array.from(element.childNodes).every(node =>
+        node.nodeType === Node.TEXT_NODE || node.nodeType === Node.CDATA_SECTION_NODE
+    );
+    const article = { filename, document, parentFilename };
+    const seen = new Set();
+    for (const node of document.documentElement.childNodes) {
+        if (node.nodeType === Node.COMMENT_NODE || node.nodeType === Node.PROCESSING_INSTRUCTION_NODE ||
+            whitespace(node))
+            continue;
+        if (node.nodeType !== Node.ELEMENT_NODE || node.namespaceURI)
+            fail("Unexpected text or CDATA inside <template>");
+        const kind = node.tagName === "section"
+            ? node.getAttribute("data-lp5-kind") : node.tagName;
+        if (!["children", "heading", "keywords", "explanation", "code"].includes(kind) ||
+            (node.tagName !== "section" && !["children", "heading", "keywords"].includes(node.tagName)))
+            fail(`Unexpected <${node.tagName}> or section kind '${kind}'`);
+        if (seen.has(kind))
+            fail(`Duplicate ${kind}`);
+        seen.add(kind);
+    }
+    const sections = articleSections(article);
+    if (sections.children) {
+        for (const link of sections.children.childNodes) {
+            if (whitespace(link) || link.nodeType === Node.COMMENT_NODE)
+                continue;
+            if (link.nodeType !== Node.ELEMENT_NODE || link.tagName !== "li" || link.namespaceURI ||
+                link.attributes.length !== 1 || !link.hasAttribute("id") ||
+                link.children.length || Array.from(link.childNodes).some(node => !whitespace(node)))
+                fail('<children> requires empty <li id="name.lp5"/> links');
+            try { checkFilename(link.getAttribute("id")); }
+            catch (error) { fail(error.message); }
+        }
+    }
+    if (sections.keywords) {
+        for (const keyword of sections.keywords.childNodes) {
+            if (whitespace(keyword))
+                continue;
+            if (keyword.nodeType !== Node.ELEMENT_NODE || keyword.tagName !== "li" || keyword.namespaceURI || !textOnly(keyword))
+                fail("<keywords> requires text-only <li> elements");
+        }
+    }
+    if (sections.explanation) {
+        const nodes = [sections.explanation];
+        while (nodes.length) {
+            const node = nodes.pop();
+            if (node.nodeType === Node.CDATA_SECTION_NODE)
+                fail("Explanation content must not use CDATA");
+            nodes.push(...node.childNodes);
+        }
+    }
+    if (sections.code) {
+        const elements = Array.from(sections.code.children);
+        const name = elements.find(node => node.tagName === "name");
+        const code = elements.find(node => node.tagName === "code");
+        if (elements.length !== 2 || !name || !code || name.namespaceURI || code.namespaceURI ||
+            Array.from(sections.code.childNodes).some(node =>
+                node.nodeType !== Node.ELEMENT_NODE && !whitespace(node) &&
+                node.nodeType !== Node.COMMENT_NODE))
+            fail("Code section requires exactly one <name> and one <code>");
+        if (!textOnly(name))
+            fail("Code name must contain only text");
+        for (const node of code.childNodes) {
+            if (whitespace(node) || node.nodeType === Node.CDATA_SECTION_NODE)
+                continue;
+            if (node.nodeType !== Node.ELEMENT_NODE || !node.tagName.startsWith("lp5-"))
+                fail("Code must contain CDATA or lp5-* elements");
+        }
+        for (const ref of code.getElementsByTagName("lp5-")) {
+            if (!ref.hasAttribute("ref") || ref.attributes.length !== 1 || ref.childNodes.length)
+                fail('Code references require an empty <lp5- ref="bundle"/> element');
+        }
+    }
+    return article;
+}
+]]></code>
+    </section>
+</template>

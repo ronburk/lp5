@@ -1,0 +1,204 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>LP5 model loader tests</title>
+<pre id="results">Running model loader tests…</pre>
+<script type="module">
+const report = document.getElementById("results");
+let checks = 0;
+function check(condition, message) {
+    if (!condition) throw new Error(message);
+    checks++;
+}
+function equal(actual, expected, message) {
+    check(JSON.stringify(actual) === JSON.stringify(expected),
+        message + ": " + JSON.stringify(actual));
+}
+const article = (children = [], name = null, code = "", extra = "") =>
+    "<template>" + (children.length
+        ? "<children>" + children.map(id => '<li id="' + id + '"/>').join("") + "</children>"
+        : "") + extra + (name === null ? "" :
+        '<section data-lp5-kind="code"><name>' + name + "</name><code>" + code + "</code></section>")
+    + "</template>";
+const literal = text => "<![CDATA[" + text + "]]>";
+const fixture = {
+    "fixture.lp5": article(["1.lp5", "2.lp5"], "", '<lp5- ref="Shared"/>'),
+    "1.lp5": article(["3.lp5"], "Shared", literal("one") + '<lp5- ref="Helper"/>'),
+    "2.lp5": article([], "Shared", literal("two")),
+    "3.lp5": article([], "Helper", literal("helper"),
+        "<heading>Heading</heading><keywords><li>test</li></keywords>" +
+        '<section data-lp5-kind="explanation"><p>Text &amp; markup.</p></section>'),
+    "unreachable.lp5": "not XML"
+};
+function directory(files, name = "fixture.lp5", pause = null) {
+    const reads = [];
+    return {name, reads, async getFileHandle(filename) {
+        reads.push(filename);
+        if (!(filename in files)) throw new Error("Missing file");
+        return {async getFile() {
+            if (pause) await pause(filename);
+            return new File([files[filename]], filename, {type: "application/xml"});
+        }};
+    }};
+}
+async function run() {
+    const response = await fetch("/lp5.lp5/lp5.out");
+    check(response.ok, "Generated output is served");
+    const html = new DOMParser().parseFromString(await response.text(), "text/html");
+    const namespace = [...html.querySelectorAll("script")]
+        .find(script => script.textContent.includes("window.LP5 ="));
+    check(Boolean(namespace), "Generated namespace script exists");
+    new Function(namespace.textContent)();
+    const {model, util} = window.LP5;
+    const persist = util.indexedDB.storeDirectoryHandle;
+    util.indexedDB.storeDirectoryHandle = async () => {};
+    check(model.directoryHandle === undefined, "Directory handle is private");
+    try { await model.loadProject(); throw new Error("Expected no-selection failure"); }
+    catch (error) { check(error.message.includes("No project"), "No-selection failure"); }
+    const selected = directory(fixture);
+    await model.selectProject(selected);
+    check(await model.loadProject() === undefined, "Loader returns no source handle");
+    equal(selected.reads, ["fixture.lp5", "1.lp5", "3.lp5", "2.lp5"], "Reachable DFS reads");
+    equal([...model.docOrder()].map(a => a.filename), selected.reads, "Document order");
+    check(model.rootFilename === "fixture.lp5", "Root filename");
+    check(model.getArticle("fixture.lp5").parentFilename === null, "Root has no parent");
+    check(model.getArticle("3.lp5").parentFilename === "1.lp5", "Nested parent filename");
+    check(model.getArticle("missing.lp5") === null, "Absent lookup");
+    equal(model.getBundle(" Shared ").map(a => a.filename), ["1.lp5", "2.lp5"], "Bundle order");
+    equal(model.getReferrers("Shared").map(a => a.filename), ["fixture.lp5"], "Reference index");
+    equal(model.getReferrers("Helper").map(a => a.filename), ["1.lp5"], "Nested reference index");
+    const source = model.getArticle("3.lp5").document;
+    check(source !== document && source.documentElement.tagName === "template", "Detached XML DOM");
+    const draft = source.cloneNode(true);
+    draft.querySelector("heading").textContent = "Revised";
+    check(source.querySelector("heading").textContent === "Heading", "Draft edit leaves source intact");
+    const saved = new XMLSerializer().serializeToString(draft);
+    const reparsed = new DOMParser().parseFromString(saved, "application/xml");
+    check(!reparsed.querySelector("parsererror") && reparsed.querySelector("heading").textContent === "Revised",
+        "Draft XML serialization round trip");
+    check(reparsed.querySelector("code").firstChild.nodeType === Node.CDATA_SECTION_NODE,
+        "Code CDATA survives serialization");
+    const ordinaryParsererror = directory({"fixture.lp5": article([], null, "",
+        '<section data-lp5-kind="explanation"><parsererror>Ordinary content</parsererror></section>')});
+    await model.selectProject(ordinaryParsererror);
+    await model.loadProject();
+    check(model.rootFilename === "fixture.lp5", "Ordinary parsererror markup is not a parse error");
+    const normalizedNames = directory({
+        "fixture.lp5": article(["1.lp5"], "", '<lp5- ref="  A&#10;B  "/>'),
+        "1.lp5": article([], " A&#9;B ", literal("code"))
+    });
+    await model.selectProject(normalizedNames);
+    await model.loadProject();
+    check(model.getBundle("A B").length === 1, "Bundle names normalize XML whitespace");
+    const noCode = directory({"fixture.lp5": "<template/>"});
+    await model.selectProject(noCode);
+    await model.loadProject();
+    check([...model.docOrder()].length === 1 && model.getBundle("").length === 0,
+        "An article-only project needs no code bundle");
+    const duplicateRefs = directory({
+        "fixture.lp5": article(["constructor.lp5"], "", '<lp5- ref="A"/><lp5- ref="A"/>'),
+        "constructor.lp5": article([], "A", literal("code"))
+    });
+    await model.selectProject(duplicateRefs);
+    await model.loadProject();
+    check(model.getArticle("constructor.lp5").filename === "constructor.lp5",
+        "Filename lookup handles object-property names");
+    check(model.getReferrers("A").length === 1, "Repeated code references do not duplicate referrers");
+
+    const cases = [
+        ["missing root", {}, "Cannot read"],
+        ["missing child", {"fixture.lp5": article(["absent.lp5"])}, "absent.lp5"],
+        ["malformed XML", {"fixture.lp5": "<template>"}, "Invalid XML"],
+        ["wrong root", {"fixture.lp5": "<article/>"}, "root must"],
+        ["namespaced root", {"fixture.lp5": '<template xmlns="other"/>'}, "root must"],
+        ["namespaced section", {"fixture.lp5": '<template><heading xmlns="other"/></template>'}, "Unexpected"],
+        ["unexpected root text", {"fixture.lp5": "<template>text</template>"}, "Unexpected"],
+        ["duplicate section", {"fixture.lp5": "<template><heading/><heading/></template>"}, "Duplicate"],
+        ["invalid section", {"fixture.lp5": '<template><section data-lp5-kind="bad"/></template>'}, "Unexpected"],
+        ["unsafe link", {"fixture.lp5": article(["../bad.lp5"])}, "Invalid filename"],
+        ["invalid link", {"fixture.lp5": '<template><children><li/></children></template>'}, "requires empty"],
+        ["keyword markup", {"fixture.lp5": "<template><keywords><li><b>x</b></li></keywords></template>"}, "text-only"],
+        ["explanation CDATA", {"fixture.lp5": '<template><section data-lp5-kind="explanation"><p><![CDATA[x]]></p></section></template>'}, "must not use CDATA"],
+        ["literal without CDATA", {"fixture.lp5": article([], "", "text")}, "Code must"],
+        ["invalid code shape", {"fixture.lp5": '<template><section data-lp5-kind="code"><name/><name/><code/></section></template>'}, "exactly one"],
+        ["duplicate link", {"fixture.lp5": article(["1.lp5", "1.lp5"]), "1.lp5": article()}, "more than one"],
+        ["multiple parents", {"fixture.lp5": article(["1.lp5", "2.lp5"]), "1.lp5": article(["3.lp5"]),
+            "2.lp5": article(["3.lp5"]), "3.lp5": article()}, "more than one"],
+        ["article cycle", {"fixture.lp5": article(["1.lp5"]), "1.lp5": article(["fixture.lp5"])}, "Article cycle"],
+        ["self link", {"fixture.lp5": article(["fixture.lp5"])}, "Article cycle"],
+        ["undefined bundle", {"fixture.lp5": article([], "", '<lp5- ref="Missing"/>')}, "Undefined code bundle"],
+        ["invalid reference", {"fixture.lp5": article([], "", "<lp5-/>")}, "Code references"],
+        ["bundle cycle", {"fixture.lp5": article(["1.lp5"], "A", '<lp5- ref="B"/>'),
+            "1.lp5": article([], "B", '<lp5- ref="A"/>')}, "Code bundle cycle"],
+        ["unsafe output", {"fixture.lp5": article([], "&lt;../output.js&gt;", literal("x"))}, "Invalid output"],
+        ["output collision", {"fixture.lp5": article([], "&lt;fixture.lp5&gt;", literal("x"))}, "Invalid output"],
+        ["DOCTYPE", {"fixture.lp5": "<!DOCTYPE template><template/>"}, "DOCTYPE"]
+    ];
+    for (const [name, files, expected] of cases) {
+        await model.selectProject(directory(files));
+        let failed = false;
+        try { await model.loadProject(); }
+        catch (error) {
+            failed = true;
+            check(error.message.includes(expected), name + ": " + error.message);
+        }
+        check(failed, name + " must fail");
+        check(model.rootFilename === null && [...model.docOrder()].length === 0,
+            name + " leaves no partial model");
+        check(model.getBundle("Shared").length === 0 && model.getReferrers("Shared").length === 0,
+            name + " clears indexes");
+    }
+    await model.selectProject(directory(fixture));
+    await model.loadProject();
+    let release, reached;
+    const blocked = new Promise(resolve => release = resolve);
+    const entered = new Promise(resolve => reached = resolve);
+    const slow = directory(fixture, "fixture.lp5", async filename => {
+        if (filename === "2.lp5") { reached(); await blocked; }
+    });
+    await model.selectProject(slow);
+    const loading = model.loadProject();
+    check(model.rootFilename === null && model.getArticle("fixture.lp5") === null,
+        "Old model discarded synchronously at load entry");
+    await entered;
+    check([...model.docOrder()].length === 0, "Partial articles remain private during loading");
+    release();
+    await loading;
+    check([...model.docOrder()].length === 4, "Complete model published after loading");
+    await model.selectProject(directory({}, "invalid-name"));
+    try { await model.loadProject(); throw new Error("Expected invalid directory failure"); }
+    catch (error) { check(error.message.includes("Invalid filename"), "Directory naming convention"); }
+    check(model.rootFilename === null, "Bad directory also discards previous model");
+
+    util.indexedDB.storeDirectoryHandle = persist;
+    let nativeResult = "OPFS unavailable";
+    if (navigator.storage?.getDirectory) {
+        const storageRoot = await navigator.storage.getDirectory();
+        const name = "lp5-loader-test-" + crypto.randomUUID() + ".lp5";
+        const project = await storageRoot.getDirectoryHandle(name, {create: true});
+        try {
+            const file = await project.getFileHandle(name, {create: true});
+            const writable = await file.createWritable();
+            await writable.write(article([], "", literal("native file text")));
+            await writable.close();
+            await model.selectProject(project);
+            await model.loadProject();
+            check(model.rootFilename === name, "Native OPFS directory loading");
+            check(model.getArticle(name).document.querySelector("code").textContent === "native file text",
+                "Native file contents parsed");
+            const handles = await util.indexedDB.getDirectoryHandles();
+            let found = false;
+            for (const handle of handles) if (await handle.isSameEntry(project)) found = true;
+            check(found, "Native directory handle persisted in IndexedDB");
+            nativeResult = "OPFS and IndexedDB passed";
+        } finally {
+            await util.indexedDB.deleteDirectoryHandle(project);
+            await storageRoot.removeEntry(name, {recursive: true});
+        }
+    }
+    report.textContent = "PASS: " + checks + " checks; " + nativeResult;
+}
+run().catch(error => {
+    report.textContent = "FAIL: " + error.stack;
+    console.error(error);
+});
+</script>
