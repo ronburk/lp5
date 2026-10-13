@@ -14,15 +14,16 @@
         const section = articleSections(article).code;
         if (!section)
             continue;
+        const elements = Array.from(section.children);
         const name = normalizeBundleName(
-            Array.from(section.children).find(node => node.tagName === "name").textContent
+            elements.find(node => node.tagName === "name").textContent
         );
         if (!bundles.has(name)) {
             bundles.set(name, []);
             dependencies.set(name, new Set());
         }
         bundles.get(name).push(article);
-        const code = Array.from(section.children).find(node => node.tagName === "code");
+        const code = elements.find(node => node.tagName === "code");
         for (const ref of code.getElementsByTagName("lp5-")) {
             const target = normalizeBundleName(ref.getAttribute("ref"));
             dependencies.get(name).add(target);
@@ -40,7 +41,7 @@
     }
     for (const [name, articles] of referrers) {
         if (!bundles.has(name))
-            throw new Error(`${[...articles][0].filename}: Undefined code bundle '${name}'`);
+            throw new Error(`${articles.values().next().value.filename}: Undefined code bundle '${name}'`);
     }
     const visiting = new Set();
     const visited = new Set();

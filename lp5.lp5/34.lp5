@@ -75,7 +75,7 @@ function parseArticle(filename, parentFilename, text) {
         for (const link of childElements(sections.children, [Node.COMMENT_NODE], fail)) {
             if (link.tagName !== "li" ||
                 link.attributes.length !== 1 || !link.hasAttribute("id") ||
-                link.children.length || Array.from(link.childNodes).some(node => !whitespace(node)))
+                Array.from(link.childNodes).some(node => !whitespace(node)))
                 fail('<children> requires empty <li id="name.lp5"/> links');
             try { checkFilename(link.getAttribute("id")); }
             catch (error) { fail(error.message); }
