@@ -2,7 +2,7 @@
     <heading>Loading a project</heading>
     <keywords><li>model</li><li>project loading</li></keywords>
     <section data-lp5-kind="explanation">
-        <p><code>loadProject()</code> uses the model's privately selected directory and reads its identically named root article. It follows only ordered child links, rejecting missing files, duplicate links, multiple parents, and cycles. It does not enumerate or load unlinked files.</p><p>The previous article model is discarded immediately. New articles and indexes are constructed privately and published only after complete validation; failure leaves an empty article model and preserves the selected directory so the caller can retry. Loading writes no files and performs no rendering, events, or command dispatch. The caller decides when to notify the view.</p><p><code>rootFilename</code> is null while empty or loading. <code>getArticle(filename)</code> returns a record or null; each record contains <code>filename</code>, <code>document</code>, and <code>parentFilename</code> (null for the root). <code>docOrder()</code> traverses the loaded tree, while <code>getBundle(name)</code> and <code>getReferrers(name)</code> provide derived indexes. Returned records are source data; consumers should clone their documents for editing rather than changing them in place and leaving indexes stale. Loading and selection are expected to be serialized by the HSM.</p>
+        <p><code>loadProject()</code> uses the model's privately selected storage object and reads its identically named root article. It follows only ordered child links, rejecting missing files, duplicate links, multiple parents, and cycles. It does not enumerate or load unlinked files.</p><p>The previous article model is discarded immediately. New articles and indexes are constructed privately and published only after complete validation; failure leaves an empty article model and preserves the selected storage object so the caller can retry. Loading writes no files and performs no rendering, events, or command dispatch. The caller decides when to notify the view.</p><p><code>rootFilename</code> is null while empty or loading. <code>getArticle(filename)</code> returns a record or null; each record contains <code>filename</code>, <code>document</code>, and <code>parentFilename</code> (null for the root). <code>docOrder()</code> traverses the loaded tree, while <code>getBundle(name)</code> and <code>getReferrers(name)</code> provide derived indexes. Returned records are source data; consumers should clone their documents for editing rather than changing them in place and leaving indexes stale. Loading and selection are expected to be serialized by the HSM.</p>
     </section>
     <section data-lp5-kind="code">
         <name>Model project loading</name>
@@ -13,10 +13,10 @@
     bundles = new Map();
     referrers = new Map();
 
-    const directory = directoryHandle;
-    if (!directory)
+    const project = projectStorage;
+    if (!project)
         throw new Error("No project has been selected");
-    checkFilename(directory.name);
+    checkFilename(project.root_filename);
     const loadedArticles = new Map();
     const visiting = new Set();
 
@@ -28,9 +28,7 @@
         visiting.add(filename);
         let text;
         try {
-            const handle = await directory.getFileHandle(filename);
-            const file = await handle.getFile();
-            text = await file.text();
+            text = await project.load(filename);
         } catch (error) {
             throw new Error(`Cannot read '${filename}': ${error.message}`, { cause: error });
         }
@@ -41,12 +39,12 @@
         visiting.delete(filename);
     }
 
-    await load(directory.name, null);
-    const indexes = indexBundles(loadedArticles, directory.name);
+    await load(project.root_filename, null);
+    const indexes = indexBundles(loadedArticles, project.root_filename);
     articles = loadedArticles;
     bundles = indexes.bundles;
     referrers = indexes.referrers;
-    rootFilename = directory.name;
+    rootFilename = project.root_filename;
 }
 
 function getArticle(filename) {

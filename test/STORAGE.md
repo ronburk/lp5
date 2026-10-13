@@ -24,5 +24,8 @@ infrastructure; it is not a deployed remote-project service.
 
 `storage.local` and `storage.remote` provide `open(...)` and the shared methods.
 Use the object returned by open for operations; it inherits its backend's
-methods and privately binds one location. Model and dialog integration is
-separate work. See the Storage article for the interface and HTTP contract.
+methods and privately binds one location. The model loader uses these objects;
+the Select/Create dialog offers local directories or a remote directory URL.
+With no explicit remote root argument, open derives the root filename from
+the decoded directory name. The dialog exposes no root override. See the
+Storage article for the interface and HTTP contract.

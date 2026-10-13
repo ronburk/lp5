@@ -7,40 +7,69 @@
         <li>modal</li>
     </keywords>
     <section data-lp5-kind="explanation">
-        <p>This article defines the Select/Create Project dialog markup. Its code bundle name matches the dialog template's DOM <code>id</code>, so the parent dialog-template container can insert it with a code reference. The dialog-specific behavior belongs to the <code>SelectCreateProject</code> operation, selected by the logical <code>dialogName</code> on a <code>ModalDialog</code> command.</p>
-        <p>The dialog is mounted with <code>util.mountTemplate</code>, which compiles its script with an <code>elementByID</code> map. Each button has a unique id, allowing the script to bind directly to it. The Select button has a direct click handler that dispatches the <code>SelectProject</code> command using <code>dispatchImmediate</code>, so the directory picker is invoked during the click before control returns to the browser. The Create button is not wired yet. The script returns the dialog element so the operations helper can call <code>showModal()</code> after mounting.</p>
+        <p>The dialog defaults to Local directory. Remote URL reveals one project-directory URL field; there is no root-filename field. The final directory name is the root article filename, just as with local projects. Remote Create is disabled until server-side creation is defined; the local Create button remains unwired.</p>
+        <p>Select dispatches the location and URL snapshot using <code>dispatchImmediate</code>. The generator primes its async work immediately, preserving local picker user activation. Required URL validation runs before dispatch; storage validates directory URL shape and the model validates the project filename convention.</p>
     </section>
     <section data-lp5-kind="code">
         <name>SelectCreateProject</name>
         <code><![CDATA[
 <template id="SelectCreateProject">
     <style>
-        .SelectCreateProject {
-            text-align: center;
+        .SelectCreateProject h2 { margin: 0 0 1rem; font-size: 1.25rem; }
+        .SelectCreateProject fieldset { border: 0; padding: 0; margin: 0 0 1rem; }
+        .SelectCreateProject legend { margin-bottom: 0.5rem; }
+        .SelectCreateProject .locations { display: flex; gap: 1rem; flex-wrap: wrap; }
+        .SelectCreateProject .remote-url { display: block; margin-bottom: 1rem; }
+        .SelectCreateProject input[type="url"] {
+            display: block; box-sizing: border-box; width: 100%; margin-top: 0.5rem;
+            padding: 0.5rem; font: inherit;
         }
-
-        .SelectCreateProject h2 {
-            margin: 0 0 1rem;
-            font-size: 1.25rem;
-        }
-
         .SelectCreateProject .dialog-buttons {
-            display: flex;
-            justify-content: center;
-            gap: 1rem;
+            display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1rem;
         }
+        .SelectCreateProject [hidden] { display: none; }
     </style>
     <dialog id="SelectCreateProject-dialog" class="SelectCreateProject"
             aria-labelledby="SelectCreateProject-title">
         <h2 id="SelectCreateProject-title">Select or Create a Project</h2>
+        <fieldset>
+            <legend>Project location</legend>
+            <div class="locations">
+                <label><input id="SelectCreateProject-Local" type="radio"
+                    name="project-location" value="local" checked> Local directory</label>
+                <label><input id="SelectCreateProject-Remote" type="radio"
+                    name="project-location" value="remote"> Remote URL</label>
+            </div>
+        </fieldset>
+        <p id="SelectCreateProject-LocalInfo">Select an existing project directory or create a new one on this computer.</p>
+        <label id="SelectCreateProject-RemoteField" class="remote-url" hidden>
+            Project directory URL
+            <input id="SelectCreateProject-URL" type="url" required spellcheck="false"
+                placeholder="https://example.com/projects/demo.lp5/">
+        </label>
         <div class="dialog-buttons">
-            <button id="SelectCreateProject-Select" type="button" autofocus>Select</button>
-            <button id="SelectCreateProject-Create" type="button">Create</button>
+            <button id="SelectCreateProject-Create" type="button">Create…</button>
+            <button id="SelectCreateProject-Select" type="button" autofocus>Select…</button>
         </div>
-        <p data-name="selectionError" role="alert"></p>
         <script>
-            elementByID["SelectCreateProject-Select"].addEventListener("click", () => {
-                window.LP5.controller.dispatchImmediate({ name: "SelectProject" });
+            const local = elementByID["SelectCreateProject-Local"];
+            const remote = elementByID["SelectCreateProject-Remote"];
+            const url = elementByID["SelectCreateProject-URL"];
+            const select = elementByID["SelectCreateProject-Select"];
+            function updateLocation() {
+                elementByID["SelectCreateProject-LocalInfo"].hidden = remote.checked;
+                elementByID["SelectCreateProject-RemoteField"].hidden = !remote.checked;
+                elementByID["SelectCreateProject-Create"].disabled = remote.checked;
+                select.textContent = remote.checked ? "Select" : "Select…";
+            }
+            local.addEventListener("change", updateLocation);
+            remote.addEventListener("change", updateLocation);
+            select.addEventListener("click", () => {
+                if (remote.checked && !url.reportValidity()) return;
+                window.LP5.controller.dispatchImmediate({
+                    name: "SelectProject", location: remote.checked ? "remote" : "local",
+                    url: remote.checked ? url.value.trim() : undefined
+                });
             });
             return elementByID["SelectCreateProject-dialog"];
         </script>
