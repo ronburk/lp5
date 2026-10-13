@@ -6,11 +6,12 @@
     </keywords>
     <section data-lp5-kind="explanation">
         <p><code>window.LP5.view</code> owns presentation helpers. <code>view.showModalDialog(dialogName)</code> locates the named child template inside <code>LP5-Dialog-Templates</code> and uses <code>util.mountTemplate</code> to clone and append it while compiling its script with the element-ID map. The script returns the mounted dialog.</p>
-        <p>The helper inserts a clone of the shared modal style before the dialog's own style and calls <code>showModal()</code>. It returns immediately; command legality and operation state remain with the operations unit.</p>
+        <p>The helper inserts a clone of the shared modal style before the dialog's own style and calls <code>showModal()</code>. <code>closeModalDialog(dialogName)</code> closes the mounted dialog and removes it and both cloned styles. The helpers return immediately; command legality and operation state remain with the operations unit.</p>
     </section>
     <section data-lp5-kind="code">
         <name>JavaScript units</name>
         <code><![CDATA[let view = (() => {
+    const dialogs = new Map();
     function showModalDialog(dialogName) {
         const templates = document.getElementById("LP5-Dialog-Templates");
         if (!(templates instanceof HTMLTemplateElement))
@@ -32,11 +33,24 @@
         if (!(dialogStyle instanceof HTMLStyleElement))
             throw new Error(`Dialog template has no dialog styles: ${dialogName}`);
 
-        dialogStyle.before(sharedStyle.cloneNode(true));
+        const mountedSharedStyle = sharedStyle.cloneNode(true);
+        dialogStyle.before(mountedSharedStyle);
         dialog.showModal();
+        dialogs.set(dialogName, { dialog, dialogStyle, mountedSharedStyle });
     }
 
-    return { showModalDialog };
+    function closeModalDialog(dialogName) {
+        const mounted = dialogs.get(dialogName);
+        if (!mounted)
+            throw new Error(`Dialog is not mounted: ${dialogName}`);
+        mounted.dialog.close();
+        mounted.dialog.remove();
+        mounted.dialogStyle.remove();
+        mounted.mountedSharedStyle.remove();
+        dialogs.delete(dialogName);
+    }
+
+    return { showModalDialog, closeModalDialog };
 })();
 ]]></code>
     </section>
