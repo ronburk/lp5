@@ -103,6 +103,14 @@ async function run() {
     check(model.getArticle("constructor.lp5").filename === "constructor.lp5",
         "Filename lookup handles object-property names");
     check(model.getReferrers("A").length === 1, "Repeated code references do not duplicate referrers");
+    const directive = directory({
+        "fixture.lp5": article(["1.lp5"], "", '<lp5-wrapper><lp5- ref="A"/></lp5-wrapper>'),
+        "1.lp5": article([], "A", literal("code"))
+    });
+    await model.selectProject(directive);
+    await model.loadProject();
+    check(model.getReferrers("A").length === 1,
+        "Other lp5-* elements and nested bundle references remain supported");
 
     const cases = [
         ["missing root", {}, "Cannot read"],
@@ -114,6 +122,14 @@ async function run() {
         ["unexpected root text", {"fixture.lp5": "<template>text</template>"}, "Unexpected"],
         ["duplicate section", {"fixture.lp5": "<template><heading/><heading/></template>"}, "Duplicate"],
         ["invalid section", {"fixture.lp5": '<template><section data-lp5-kind="bad"/></template>'}, "Unexpected"],
+        ["children section", {"fixture.lp5": '<template><section data-lp5-kind="children"/></template>'}, "Unexpected"],
+        ["heading section", {"fixture.lp5": '<template><section data-lp5-kind="heading"/></template>'}, "Unexpected"],
+        ["keywords section", {"fixture.lp5": '<template><section data-lp5-kind="keywords"/></template>'}, "Unexpected"],
+        ["bare explanation", {"fixture.lp5": "<template><explanation/></template>"}, "Unexpected"],
+        ["bare code", {"fixture.lp5": "<template><code/></template>"}, "Unexpected"],
+        ["duplicate code sections", {"fixture.lp5": '<template><section data-lp5-kind="code"><name/><code/></section><section data-lp5-kind="code"><name/><code/></section></template>'}, "Duplicate"],
+        ["undefined nested reference", {"fixture.lp5": article([], "", '<lp5-wrapper><lp5- ref="Missing"/></lp5-wrapper>')}, "Undefined code bundle"],
+        ["malformed nested reference", {"fixture.lp5": article([], "", '<lp5-wrapper><lp5-/></lp5-wrapper>')}, "Code references"],
         ["unsafe link", {"fixture.lp5": article(["../bad.lp5"])}, "Invalid filename"],
         ["invalid link", {"fixture.lp5": '<template><children><li/></children></template>'}, "requires empty"],
         ["keyword markup", {"fixture.lp5": "<template><keywords><li><b>x</b></li></keywords></template>"}, "text-only"],
