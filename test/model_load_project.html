@@ -113,6 +113,31 @@ async function run() {
     check(model.getReferrers("A").length === 1,
         "Other lp5-* elements and nested bundle references remain supported");
 
+    const unfinishedCode = '<lp5- ref="Future"/><lp5-wrapper><lp5- ref="Future"/></lp5-wrapper><lp5- ref="Defined"/>';
+    const unfinishedFiles = {
+        "fixture.lp5": article(["1.lp5", "2.lp5"], "", unfinishedCode),
+        "1.lp5": article([], "Defined", '<lp5- ref="Future"/>'),
+        "2.lp5": article([], "Unused", '<lp5- ref="Other future"/>')
+    };
+    await selectDirectory(directory(unfinishedFiles));
+    await model.loadProject();
+    check(model.rootFilename === "fixture.lp5", "Unfinished project loads");
+    equal(model.getBundle("Future"), [], "Undefined bundle lookup is empty");
+    equal(model.getReferrers("Future").map(a => a.filename), ["fixture.lp5", "1.lp5"],
+        "Direct and nested undefined references retain deduplicated referrers");
+    equal(model.getReferrers("Other future").map(a => a.filename), ["2.lp5"],
+        "Undefined references in unused bundles also load");
+    check(model.getBundle("Defined").length === 1, "Defined bundle indexes remain available");
+    check([...model.docOrder()].length === 3, "Undefined names do not create article records");
+    unfinishedFiles["fixture.lp5"] = article(["1.lp5", "2.lp5", "3.lp5"], "", unfinishedCode);
+    unfinishedFiles["3.lp5"] = article([], "Future", literal("Now defined"));
+    await selectDirectory(directory(unfinishedFiles));
+    await model.loadProject();
+    equal(model.getBundle("Future").map(a => a.filename), ["3.lp5"],
+        "Adding a future definition resolves it on reload");
+    equal(model.getReferrers("Future").map(a => a.filename), ["fixture.lp5", "1.lp5"],
+        "Resolved reference retains its referrers");
+
     const cases = [
         ["missing root", {}, "Cannot read"],
         ["missing child", {"fixture.lp5": article(["absent.lp5"])}, "absent.lp5"],
@@ -129,7 +154,6 @@ async function run() {
         ["bare explanation", {"fixture.lp5": "<template><explanation/></template>"}, "Unexpected"],
         ["bare code", {"fixture.lp5": "<template><code/></template>"}, "Unexpected"],
         ["duplicate code sections", {"fixture.lp5": '<template><section data-lp5-kind="code"><name/><code/></section><section data-lp5-kind="code"><name/><code/></section></template>'}, "Duplicate"],
-        ["undefined nested reference", {"fixture.lp5": article([], "", '<lp5-wrapper><lp5- ref="Missing"/></lp5-wrapper>')}, "Undefined code bundle"],
         ["malformed nested reference", {"fixture.lp5": article([], "", '<lp5-wrapper><lp5-/></lp5-wrapper>')}, "Code references"],
         ["unsafe link", {"fixture.lp5": article(["../bad.lp5"])}, "Invalid filename"],
         ["invalid link", {"fixture.lp5": '<template><children><li/></children></template>'}, "requires empty"],
@@ -142,7 +166,6 @@ async function run() {
             "2.lp5": article(["3.lp5"]), "3.lp5": article()}, "more than one"],
         ["article cycle", {"fixture.lp5": article(["1.lp5"]), "1.lp5": article(["fixture.lp5"])}, "Article cycle"],
         ["self link", {"fixture.lp5": article(["fixture.lp5"])}, "Article cycle"],
-        ["undefined bundle", {"fixture.lp5": article([], "", '<lp5- ref="Missing"/>')}, "Undefined code bundle"],
         ["invalid reference", {"fixture.lp5": article([], "", "<lp5-/>")}, "Code references"],
         ["bundle cycle", {"fixture.lp5": article(["1.lp5"], "A", '<lp5- ref="B"/>'),
             "1.lp5": article([], "B", '<lp5- ref="A"/>')}, "Code bundle cycle"],

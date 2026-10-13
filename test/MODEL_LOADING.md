@@ -12,8 +12,10 @@ longer persists handles; the selecting operation owns persistence.
 
 Checks cover ordered reachable-only reads, filename lookup, parent links,
 bundles/referrers, detached XML and draft serialization, invalid XML/schema,
-unsafe links, missing files, duplicate parents, article/bundle cycles, undefined
-references, and output-name errors. They also verify immediate old-state
+unsafe links, missing files, duplicate parents, article/bundle cycles, and
+output-name errors. Undefined direct/nested references (including unused
+bundles) are allowed, retain deduplicated referrers, and resolve when their
+definitions are added and the project reloaded. They also verify immediate old-state
 discard, no partial publication, empty state after failure, and successful retry.
 
 If OPFS is available, the page additionally creates a uniquely named temporary
