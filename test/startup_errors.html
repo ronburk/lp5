@@ -1,0 +1,63 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>LP5 startup error tests</title>
+<p>Tests run the complete generated application in the frame below.</p>
+<button id="error">Test uncaught error</button>
+<button id="rejection">Test Error rejection</button>
+<button id="string">Test string rejection</button>
+<pre id="results">Choose a test.</pre>
+<iframe id="app" title="Generated LP5 application" style="width:100%;height:420px;border:1px solid #aaa"></iframe>
+<script type="module">
+const frame = document.getElementById("app");
+const report = document.getElementById("results");
+const buttons = [...document.querySelectorAll("button")];
+async function run(kind) {
+    buttons.forEach(button => button.disabled = true);
+    report.textContent = "Running " + kind + " test…";
+    let checks = 0;
+    const check = (condition, message) => {
+        if (!condition) throw new Error(message);
+        checks++;
+    };
+    try {
+        const loaded = new Promise(resolve => frame.addEventListener("load", resolve, {once: true}));
+        frame.src = "/lp5.lp5/lp5.out";
+        await loaded;
+        const win = frame.contentWindow;
+        const doc = frame.contentDocument;
+        check(Boolean(doc.querySelector("#SelectCreateProject-dialog:modal")), "Startup dialog opens normally");
+        const expected = kind === "string" ? "<b>Controlled string rejection.</b>"
+            : kind === "error" ? "Controlled uncaught error." : "Controlled Error rejection.";
+        const eventName = kind === "error" ? "error" : "unhandledrejection";
+        let captured;
+        const signaled = new Promise(resolve => win.addEventListener(eventName, event => {
+            captured = event;
+            resolve();
+        }, {once: true}));
+        const body = kind === "error" ? "throw new Error(" + JSON.stringify(expected) + ")"
+            : "Promise.reject(" + (kind === "string" ? JSON.stringify(expected)
+                : "new Error(" + JSON.stringify(expected) + ")") + ")";
+        win.setTimeout(new win.Function(body), 0);
+        await signaled;
+        const dialog = doc.querySelector('dialog[role="alertdialog"]');
+        check(Boolean(dialog), "Fatal dialog exists");
+        check(dialog.matches(":modal"), "Fatal dialog is modal");
+        check(dialog.querySelector("p").textContent === expected, "Explanatory message preserved");
+        check(!dialog.querySelector("b"), "Message rendered as text, not markup");
+        check(dialog.textContent.includes("Reload the entire page using your browser"), "Browser reload instruction");
+        check(dialog.querySelectorAll("button, a, input, form").length === 0, "No application recovery controls");
+        check(!captured.defaultPrevented, "Default diagnostic report remains enabled");
+        const canceled = dialog.dispatchEvent(new win.Event("cancel", {cancelable: true}));
+        check(!canceled && dialog.matches(":modal"), "Cancellation blocked");
+        win.dispatchEvent(new win.ErrorEvent("error", {message: "Later failure"}));
+        check(doc.querySelectorAll('dialog[role="alertdialog"]').length === 1, "Only one fatal dialog");
+        check(dialog.querySelector("p").textContent === expected, "First failure remains visible");
+        report.textContent = `PASS: ${kind} scenario; ${checks} assertions. Try Escape in the frame: the dialog must remain.`;
+    } catch (error) {
+        report.textContent = "FAIL: " + error.stack;
+    } finally {
+        buttons.forEach(button => button.disabled = false);
+    }
+}
+for (const button of buttons) button.addEventListener("click", () => run(button.id));
+</script>

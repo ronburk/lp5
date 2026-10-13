@@ -107,7 +107,7 @@ class PreviewHandler(BaseHTTPRequestHandler):
             target = REPO_ROOT / "new.html"
         elif path == "/lp5.lp5/lp5.out":
             target = REPO_ROOT / "lp5.lp5" / "lp5.out"
-        elif path in {"/test/model_load_project.html", "/test/storage.html"}:
+        elif path in {"/test/model_load_project.html", "/test/storage.html", "/test/startup_errors.html"}:
             target = REPO_ROOT / "test" / relative.name
         elif path in {"/test/project_io_controls.js", "/test/move_article.js", "/test/output_selection.js"}:
             target = REPO_ROOT / "test" / relative.name
