@@ -7,25 +7,31 @@
         <li>completion command</li>
     </keywords>
     <section data-lp5-kind="explanation">
-        <p><code>asyncSelectProject</code> is nested inside the <code>SelectProject</code> generator by a bundle reference. The generator starts it during priming, before yielding, so <code>showDirectoryPicker()</code> runs during the Select button's user activation.</p>
-        <p>Only the picker call is inside the error handler. <code>AbortError</code> dispatches <code>ProjectPickerAborted</code>; it can mean dismissal, a restricted directory, or permission refusal. Every other picker exception is rethrown unchanged.</p>
-        <p>After selection, the async function awaits <code>model.selectProject(directoryHandle)</code> to persist and install the handle, then awaits <code>model.loadProject()</code>. Only a fully loaded model produces <code>ProjectLoaded</code>. Neither the handle nor article data is carried by that command. Persistence and loading errors escape to global fatal-error handling, including errors named <code>AbortError</code>.</p>
-        <p>Completion dispatch is queued, allowing the generator to suspend and be installed before it receives a command. The generator waits throughout selection and loading; it contains no <code>await</code> calls.</p>
+        <p><code>asyncSelectProject(selection)</code> runs beside the <code>SelectProject</code> generator. The generator starts it during priming so a local picker is invoked in the Select click's user activation. The command's <code>location</code> selects local directory storage or remote HTTP storage; remote selection uses its <code>url</code> without invoking a picker.</p>
+        <p>Only the local picker call is caught. <code>AbortError</code> dispatches <code>ProjectPickerAborted</code>, permitting retry; every other exception is fatal. The local branch constructs its storage object and persists the directory handle before installing the model selection. Remote root filenames are derived from the project directory name, with no user override.</p>
+        <p>Both branches await <code>model.selectProject(project)</code> and <code>model.loadProject()</code>, then dispatch <code>ProjectLoaded</code>. Persistence, URL, and loading errors escape to global fatal-error handling. Completion dispatch is queued so the generator is installed before receiving the result.</p>
     </section>
     <section data-lp5-kind="code">
         <name>SelectProject async work</name>
         <code><![CDATA[
-async function asyncSelectProject() {
-    let directoryHandle;
-    try {
-        directoryHandle = await window.showDirectoryPicker();
-    } catch (error) {
-        if (error.name !== "AbortError") throw error;
-        controller.dispatch({ name: "ProjectPickerAborted", error });
-        return;
+async function asyncSelectProject(selection) {
+    let project;
+    if (selection.location === "remote") {
+        project = storage.remote.open(selection.url);
+    } else {
+        let directoryHandle;
+        try {
+            directoryHandle = await window.showDirectoryPicker();
+        } catch (error) {
+            if (error.name !== "AbortError") throw error;
+            controller.dispatch({ name: "ProjectPickerAborted", error });
+            return;
+        }
+        project = storage.local.open(directoryHandle);
+        await util.indexedDB.storeDirectoryHandle(directoryHandle);
     }
 
-    await model.selectProject(directoryHandle);
+    await model.selectProject(project);
     await model.loadProject();
     controller.dispatch({ name: "ProjectLoaded" });
 }

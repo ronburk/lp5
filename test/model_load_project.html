@@ -31,7 +31,7 @@ const fixture = {
 };
 function directory(files, name = "fixture.lp5", pause = null) {
     const reads = [];
-    return {name, reads, async getFileHandle(filename) {
+    return {kind: "directory", name, reads, async getFileHandle(filename) {
         reads.push(filename);
         if (!(filename in files)) throw new Error("Missing file");
         return {async getFile() {
@@ -48,14 +48,15 @@ async function run() {
         .find(script => script.textContent.includes("window.LP5 ="));
     check(Boolean(namespace), "Generated namespace script exists");
     new Function(namespace.textContent)();
-    const {model, util} = window.LP5;
+    const {model, util, storage} = window.LP5;
+    const selectDirectory = handle => model.selectProject(storage.local.open(handle));
     const persist = util.indexedDB.storeDirectoryHandle;
     util.indexedDB.storeDirectoryHandle = async () => {};
     check(model.directoryHandle === undefined, "Directory handle is private");
     try { await model.loadProject(); throw new Error("Expected no-selection failure"); }
     catch (error) { check(error.message.includes("No project"), "No-selection failure"); }
     const selected = directory(fixture);
-    await model.selectProject(selected);
+    await selectDirectory(selected);
     check(await model.loadProject() === undefined, "Loader returns no source handle");
     equal(selected.reads, ["fixture.lp5", "1.lp5", "3.lp5", "2.lp5"], "Reachable DFS reads");
     equal([...model.docOrder()].map(a => a.filename), selected.reads, "Document order");
@@ -79,18 +80,18 @@ async function run() {
         "Code CDATA survives serialization");
     const ordinaryParsererror = directory({"fixture.lp5": article([], null, "",
         '<section data-lp5-kind="explanation"><parsererror>Ordinary content</parsererror></section>')});
-    await model.selectProject(ordinaryParsererror);
+    await selectDirectory(ordinaryParsererror);
     await model.loadProject();
     check(model.rootFilename === "fixture.lp5", "Ordinary parsererror markup is not a parse error");
     const normalizedNames = directory({
         "fixture.lp5": article(["1.lp5"], "", '<lp5- ref="  A&#10;B  "/>'),
         "1.lp5": article([], " A&#9;B ", literal("code"))
     });
-    await model.selectProject(normalizedNames);
+    await selectDirectory(normalizedNames);
     await model.loadProject();
     check(model.getBundle("A B").length === 1, "Bundle names normalize XML whitespace");
     const noCode = directory({"fixture.lp5": "<template/>"});
-    await model.selectProject(noCode);
+    await selectDirectory(noCode);
     await model.loadProject();
     check([...model.docOrder()].length === 1 && model.getBundle("").length === 0,
         "An article-only project needs no code bundle");
@@ -98,7 +99,7 @@ async function run() {
         "fixture.lp5": article(["constructor.lp5"], "", '<lp5- ref="A"/><lp5- ref="A"/>'),
         "constructor.lp5": article([], "A", literal("code"))
     });
-    await model.selectProject(duplicateRefs);
+    await selectDirectory(duplicateRefs);
     await model.loadProject();
     check(model.getArticle("constructor.lp5").filename === "constructor.lp5",
         "Filename lookup handles object-property names");
@@ -107,7 +108,7 @@ async function run() {
         "fixture.lp5": article(["1.lp5"], "", '<lp5-wrapper><lp5- ref="A"/></lp5-wrapper>'),
         "1.lp5": article([], "A", literal("code"))
     });
-    await model.selectProject(directive);
+    await selectDirectory(directive);
     await model.loadProject();
     check(model.getReferrers("A").length === 1,
         "Other lp5-* elements and nested bundle references remain supported");
@@ -163,7 +164,7 @@ async function run() {
         ]) {
             const text = "<template>" + before + content + after + "</template>";
             if (allowed) {
-                await model.selectProject(directory({"fixture.lp5": text}));
+                await selectDirectory(directory({"fixture.lp5": text}));
                 await model.loadProject();
                 check(model.rootFilename === "fixture.lp5", name + " accepts " + content);
             } else {
@@ -178,7 +179,7 @@ async function run() {
                 ': Code name must contain only text; found:\n<name>CSS <i>declarations</i></name>']);
     }
     for (const [name, files, expected] of cases) {
-        await model.selectProject(directory(files));
+        await selectDirectory(directory(files));
         let failed = false;
         try { await model.loadProject(); }
         catch (error) {
@@ -191,7 +192,7 @@ async function run() {
         check(model.getBundle("Shared").length === 0 && model.getReferrers("Shared").length === 0,
             name + " clears indexes");
     }
-    await model.selectProject(directory(fixture));
+    await selectDirectory(directory(fixture));
     await model.loadProject();
     let release, reached;
     const blocked = new Promise(resolve => release = resolve);
@@ -199,7 +200,7 @@ async function run() {
     const slow = directory(fixture, "fixture.lp5", async filename => {
         if (filename === "2.lp5") { reached(); await blocked; }
     });
-    await model.selectProject(slow);
+    await selectDirectory(slow);
     const loading = model.loadProject();
     check(model.rootFilename === null && model.getArticle("fixture.lp5") === null,
         "Old model discarded synchronously at load entry");
@@ -208,7 +209,7 @@ async function run() {
     release();
     await loading;
     check([...model.docOrder()].length === 4, "Complete model published after loading");
-    await model.selectProject(directory({}, "invalid-name"));
+    await selectDirectory(directory({}, "invalid-name"));
     try { await model.loadProject(); throw new Error("Expected invalid directory failure"); }
     catch (error) { check(error.message.includes("Invalid filename"), "Directory naming convention"); }
     check(model.rootFilename === null, "Bad directory also discards previous model");
@@ -224,7 +225,8 @@ async function run() {
             const writable = await file.createWritable();
             await writable.write(article([], "", literal("native file text")));
             await writable.close();
-            await model.selectProject(project);
+            await util.indexedDB.storeDirectoryHandle(project);
+            await selectDirectory(project);
             await model.loadProject();
             check(model.rootFilename === name, "Native OPFS directory loading");
             check(model.getArticle(name).document.querySelector("code").textContent === "native file text",

@@ -2,11 +2,11 @@
     <heading>Storage</heading>
     <keywords><li>storage</li><li>HTTP</li><li>filesystem</li><li>cancellation</li></keywords>
     <section data-lp5-kind="explanation">
-        <p><code>storage.local</code> and <code>storage.remote</code> implement whole-file project storage independently of the model. Open a project with <code>storage.local.open(directoryHandle, root_filename = directoryHandle.name)</code> or <code>storage.remote.open(directoryURL, root_filename)</code>. Each returns an independent object with <code>root_filename</code>, <code>load(filename, signal?)</code>, <code>store(filename, text)</code>, <code>remove(filename)</code>, and <code>list_files(signal?)</code>. The handle or URL remains private. Filenames are single relative names; subdirectories are outside this interface.</p>
+        <p><code>storage.local</code> and <code>storage.remote</code> implement whole-file project storage independently of the model. Open a project with <code>storage.local.open(directoryHandle, root_filename = directoryHandle.name)</code> or <code>storage.remote.open(directoryURL, root_filename?)</code>. For remote selection, the omitted root filename is the decoded final directory name, preserving the project naming convention. Each returns an independent object with <code>root_filename</code>, <code>load(filename, signal?)</code>, <code>store(filename, text)</code>, <code>remove(filename)</code>, and <code>list_files(signal?)</code>. The handle or URL remains private. Filenames are single relative names; subdirectories are outside this interface.</p>
         <p>All operations return Promises and reject on failure. <code>load</code> returns complete text; <code>store</code> creates or replaces a complete text file; <code>list_files</code> returns sorted immediate file names, excluding directories. Missing-file removal rejects. Listing is not a reservation: creating an unused article filename concurrently needs a later exclusive-create contract.</p>
         <p>The HTTP protocol uses GET on a file URL for loading, PUT with UTF-8 text for storing, DELETE for removal, and GET on the directory URL for a JSON array of filenames. Directory URLs must be absolute HTTP(S) URLs ending in a slash, without a query or fragment. File names are URL-encoded. Non-success HTTP status codes reject; reads bypass the browser cache. The server must implement this protocol, acknowledge a store only after accepting all contents, and permit cross-origin requests if used from another origin.</p>
         <p>Loads and listings accept an AbortSignal. HTTP cancellation stops fetching, including body consumption; local cancellation is checked before and after the operation but cannot interrupt native reads. Stores and removals accept no cancellation signal: stopping the caller's wait cannot establish that a modification did not commit. Local stores await writable-stream close and attempt abort on failure; a newly created empty file may remain if storing fails. An HTTP failure or lost response can leave the commit outcome unknown. Neither backend promises transactions or rollback across files.</p>
-        <p>This unit does not select directories, persist selections, or change the current model. Connecting project selection and loading to storage is separate work.</p>
+        <p>This unit does not select directories, persist selections, or change the current model. The selecting operation supplies an opened storage object to the model; the model does not inspect its location.</p>
     </section>
     <section data-lp5-kind="code"><name>JavaScript units</name><code><![CDATA[
 let storage = (() => {
@@ -94,7 +94,7 @@ let storage = (() => {
             if (!["http:", "https:"].includes(base.protocol) ||
                 !base.pathname.endsWith("/") || base.search || base.hash)
                 throw new Error("Expected an HTTP(S) project directory URL ending in /");
-            return project(remote, base, root_filename);
+            return project(remote, base, root_filename ?? decodeURIComponent(base.pathname.split("/").at(-2)));
         },
         async load(name, signal) {
             const response = await request(location(this), name, {method: "GET", signal});

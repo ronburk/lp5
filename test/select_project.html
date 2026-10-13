@@ -42,7 +42,7 @@ button.addEventListener("click", async () => {
     checks = 0;
     try {
         let pickCount = 0, release;
-        const directory = {name: "fixture.lp5", async getFileHandle(filename) {
+        const directory = {kind: "directory", name: "fixture.lp5", async getFileHandle(filename) {
             check(filename === "fixture.lp5", "Root filename used");
             await new Promise(resolve => release = resolve);
             return {async getFile() { return new File(["<template><heading>Loaded</heading></template>"], filename); }};
@@ -74,7 +74,7 @@ button.addEventListener("click", async () => {
         select(); await tick();
         check(pickCount === 2, "Select can retry after abort");
 
-        await start(() => Promise.resolve({name: "broken.lp5", async getFileHandle() {
+        await start(() => Promise.resolve({kind: "directory", name: "broken.lp5", async getFileHandle() {
             throw new DOMException("Cannot read fixture", "AbortError");
         }}));
         select();
@@ -83,7 +83,35 @@ button.addEventListener("click", async () => {
         check(fatal?.matches(":modal"), "Loading error produces fatal modal");
         check(fatal.textContent.includes("Cannot read 'broken.lp5'"), "Loading error has filename context");
         check(frame.contentWindow.LP5.model.rootFilename === null, "Failed load leaves model empty");
-        report.textContent = `PASS: ${checks} assertions; selection, loading, abort/retry, and fatal loading error.`;
+        await start(() => { throw new Error("Remote selection must not invoke picker"); });
+        const remoteDoc = frame.contentDocument;
+        const remoteWindow = frame.contentWindow;
+        const projectURL = new URL("/test/storage-project.lp5/", location.href).href;
+        const http = remoteWindow.LP5.storage.remote.open(projectURL);
+        check(http.root_filename === "storage-project.lp5", "Remote root follows directory-name convention");
+        await http.store("storage-project.lp5", '<template><children><li id="1.lp5"/></children><heading>Remote root</heading></template>');
+        await http.store("1.lp5", '<template><heading>Remote child</heading></template>');
+        const remoteRadio = remoteDoc.getElementById("SelectCreateProject-Remote");
+        remoteRadio.click();
+        check(!remoteDoc.getElementById("SelectCreateProject-RemoteField").hidden, "Remote URL field appears");
+        check(remoteDoc.getElementById("SelectCreateProject-Create").disabled, "Remote creation disabled");
+        check(!remoteDoc.querySelector('input[id*="Root"]'), "No root-filename override");
+        select();
+        check(remoteDoc.getElementById("SelectCreateProject-dialog"), "Empty URL cannot start selection");
+        remoteDoc.getElementById("SelectCreateProject-Local").click();
+        check(remoteDoc.getElementById("SelectCreateProject-RemoteField").hidden, "Local hides URL field");
+        check(!remoteDoc.getElementById("SelectCreateProject-Create").disabled, "Local restores Create");
+        remoteRadio.click();
+        remoteDoc.getElementById("SelectCreateProject-URL").value = projectURL;
+        select();
+        await until(() => remoteWindow.LP5.model.rootFilename !== null || remoteDoc.querySelector('dialog[role="alertdialog"]'));
+        check(remoteWindow.LP5.model.rootFilename === "storage-project.lp5", "Remote root loaded via HTTP");
+        check([...remoteWindow.LP5.model.docOrder()].length === 2, "Remote child links loaded");
+        check(remoteWindow.LP5.model.getArticle("1.lp5").document.querySelector("heading").textContent === "Remote child", "Remote child content parsed");
+        check(!remoteDoc.getElementById("SelectCreateProject-dialog"), "Remote success removes dialog");
+        await http.remove("1.lp5");
+        await http.remove("storage-project.lp5");
+        report.textContent = `PASS: ${checks} assertions; local selection/loading, abort/retry, fatal errors, and remote HTTP selection/loading.`;
     } catch (error) {
         report.textContent = "FAIL: " + error.stack;
     } finally {

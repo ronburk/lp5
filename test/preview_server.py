@@ -21,8 +21,9 @@ FIXTURE_ROOT = REPO_ROOT / "test-fixtures" / "lp5-test-project.lp5"
 class PreviewHandler(BaseHTTPRequestHandler):
     def _storage_path(self):
         path = unquote(urlsplit(self.path).path)
-        prefix = "/test/storage-project/"
-        if not path.startswith(prefix):
+        prefix = next((prefix for prefix in ("/test/storage-project/", "/test/storage-project.lp5/")
+                       if path.startswith(prefix)), None)
+        if prefix is None:
             return None
         name = path[len(prefix):]
         if not name:
