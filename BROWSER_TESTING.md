@@ -23,6 +23,9 @@ For native file I/O, select an explicit test adapter before startup (for
 example, with a query parameter). The page evaluator is read-only and cannot
 install a shim after the application starts.
 
+`test/SELECT_PROJECT.md` covers selection through model loading in the rewrite,
+using a controlled picker installed before startup in a test-only iframe.
+
 Do not assume a test adapter from the older `new.html` application works in the
 LP5 rewrite. When testing the rewrite, serve the generated output and inspect
 that output's startup path for an adapter before choosing a test URL. A check of
