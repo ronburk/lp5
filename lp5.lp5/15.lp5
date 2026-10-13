@@ -2,7 +2,7 @@
     <section data-lp5-kind="explanation">some text
 </section>
     <section data-lp5-kind="code">
-        <name>CSS <i>declarations</i></name>
+        <name>CSS declarations</name>
         <code><![CDATA[stuff;
 ]]></code>
     </section>
