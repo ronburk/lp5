@@ -112,6 +112,20 @@ export async function run_output_selection_tests(model, views) {
         check(text_runs('2.lp5').every(node => !highlighted(node)), 'Nested expansion is not highlighted with its caller');
         check(text_runs('1.lp5').every(node => !highlighted(node)), 'Other sections in the same bundle are not highlighted');
         check_output(expected);
+        const source_reference = [...source.children]
+            .find(node => node.id === '0.lp5')?.querySelector('.LP5-CodeRef');
+        const referenced_output = occurrence('2.lp5');
+        let scroll_target = null;
+        referenced_output.scrollIntoView = options => { scroll_target = options; };
+        source_reference.click();
+        await settle_selection();
+        check(model.selected_article_url === '2.lp5'
+            && source.querySelector('article.lp5-selected')?.id === '2.lp5',
+            'Clicking a source code reference selects its target article');
+        check(selected().length === 2 && selected().every(node => node.dataset.ref === '2.lp5'),
+            'Clicking a source code reference highlights the target code in Output');
+        check(scroll_target?.block === 'center' && scroll_target?.inline === 'nearest',
+            'Clicking a source code reference scrolls its target code into view');
         await select_source('2.lp5');
         check(selected().length === 2 && selected().every(node => node.dataset.ref === '2.lp5'), 'Selection replaces previous highlights');
         check(text_runs('2.lp5').every(highlighted), 'Every nested occurrence is highlighted');
