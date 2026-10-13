@@ -114,19 +114,27 @@ export async function run_output_selection_tests(model, views) {
         check_output(expected);
         const source_reference = [...source.children]
             .find(node => node.id === '0.lp5')?.querySelector('.LP5-CodeRef');
+        const referenced_source = [...source.children]
+            .find(node => node.id === '2.lp5');
         const referenced_output = occurrence('2.lp5');
         let scroll_target = null;
+        let source_focus_attempted = false;
+        referenced_source.focus = () => { source_focus_attempted = true; };
         referenced_output.scrollIntoView = options => { scroll_target = options; };
         source_reference.click();
         await settle_selection();
-        check(model.selected_article_url === '2.lp5'
-            && source.querySelector('article.lp5-selected')?.id === '2.lp5',
-            'Clicking a source code reference selects its target article');
-        check(selected().length === 2 && selected().every(node => node.dataset.ref === '2.lp5'),
-            'Clicking a source code reference highlights the target code in Output');
+        check(model.selected_article_url === '0.lp5'
+            && source.querySelector('article.lp5-selected')?.id === '0.lp5'
+            && !source_focus_attempted,
+            'Clicking a source code reference leaves Source selection and focus unchanged');
+        check(output.querySelectorAll('.lp5-output-reference-target').length === 2
+            && !referenced_output.classList.contains('lp5-output-selected'),
+            'Clicking a source code reference highlights its expansion without changing selection');
         check(scroll_target?.block === 'center' && scroll_target?.inline === 'nearest',
             'Clicking a source code reference scrolls its target code into view');
         await select_source('2.lp5');
+        check(output.querySelectorAll('.lp5-output-reference-target').length === 0,
+            'Ordinary article selection clears the reference preview highlight');
         check(selected().length === 2 && selected().every(node => node.dataset.ref === '2.lp5'), 'Selection replaces previous highlights');
         check(text_runs('2.lp5').every(highlighted), 'Every nested occurrence is highlighted');
         await select_source('3.lp5');
