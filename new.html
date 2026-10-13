@@ -2962,15 +2962,11 @@ state awaitArticleDelete
                                  node instanceof Element
                                  && node.matches('.LP5-CodeRef[data-ref]'));
                              if(referenceNode){
-                                 const targets = Articles.byName[referenceNode.dataset.ref];
-                                 const target = targets?.[0];
-                                 const targetNode = target && outerDiv.querySelector(
-                                     `article#${CSS.escape(target.URL)}`);
-                                 if(targetNode){
+                                 const target = Articles.byName[referenceNode.dataset.ref]?.[0];
+                                 if(target){
                                      event.preventDefault();
                                      event.stopPropagation();
-                                     selectArticle(targetNode);
-                                     publish('lp5ScrollOutputToArticle', target.URL);
+                                     publish('lp5ShowCodeReferenceExpansion', target.URL);
                                      return;
                                  }
                              }
@@ -3285,6 +3281,9 @@ state awaitArticleDelete
                          .lp5-output-selected > .lp5-output-text {
                              background-color: #d9eaff;
                          }
+                         .lp5-output-reference-target > .lp5-output-text {
+                             background-color: #d9eaff;
+                         }
                          .lp5-output-hidden {
                              display: inline-block;
                              border: 1px solid #8a6d1d;
@@ -3349,19 +3348,24 @@ state awaitArticleDelete
                              }
                          }
                          function highlightSelection(){
-                             for(const span of outputDiv.querySelectorAll('span[data-ref]'))
+                             for(const span of outputDiv.querySelectorAll('span[data-ref]')){
                                  span.classList.toggle('lp5-output-selected',
                                      span.dataset.ref === model.selected_article_url);
+                                 span.classList.remove('lp5-output-reference-target');
+                             }
                          }
-                         function scrollToArticle(event){
-                             const match = [...outputDiv.querySelectorAll('span[data-ref]')]
-                                 .find(span => span.dataset.ref === event.detail);
+                         function showReferenceExpansion(event){
+                             const matches = [...outputDiv.querySelectorAll('span[data-ref]')]
+                                 .filter(span => span.dataset.ref === event.detail);
+                             for(const span of matches)
+                                 span.classList.add('lp5-output-reference-target');
+                             const match = matches[0];
                              match?.scrollIntoView({block: 'center', inline: 'nearest',
                                                    behavior: 'smooth'});
                          }
                          function init(iView){
                              subscribe('lp5SelectArticle', highlightSelection);
-                             subscribe('lp5ScrollOutputToArticle', scrollToArticle);
+                             subscribe('lp5ShowCodeReferenceExpansion', showReferenceExpansion);
                              let id    = "[_a-zA-Z]\w*";
                              let dval  = '"[^"\n\r]*"';
                              let sval  = "'[^'\n\r]*'";
