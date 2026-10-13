@@ -1,0 +1,116 @@
+<template>
+    <heading>Persistent directory handles</heading>
+    <keywords>
+        <li>IndexedDB</li>
+        <li>directory handle</li>
+        <li>persistence</li>
+    </keywords>
+    <section data-lp5-kind="explanation">
+        <p><code>util.indexedDB</code> exposes three Promise-returning functions: <code>storeDirectoryHandle(handle)</code> remembers a directory unless it is already stored, <code>getDirectoryHandles()</code> returns all remembered handles (or an empty array), and <code>deleteDirectoryHandle(handle)</code> removes that directory if present. Store and delete return no value. Names are not identifiers: <code>isSameEntry()</code> compares directory identity, allowing different directories with the same name.</p>
+        <p>The <code>LP5</code> database, version 2, stores handles in the <code>directoryHandles</code> object store with internal auto-generated keys. During upgrade, the previously saved version-1 <code>project.directoryHandle</code> is copied into the new store. Handles are returned in key order.</p>
+        <p>Read transactions complete before asynchronous identity comparisons begin; writes use a new transaction and resolve only after it commits. Calls through this utility are serialized within this app instance, including after a failed call, to prevent duplicate inserts from overlapping calls. This does not serialize separate tabs. Storage and comparison failures reject; the database connection closes after each operation. The utility does not request permissions or perform UI work.</p>
+    </section>
+    <section data-lp5-kind="code">
+        <name>Directory handle persistence</name>
+        <code><![CDATA[const indexedDB = (() => {
+    let pending = Promise.resolve();
+
+    function serialize(operation) {
+        const result = pending.then(operation);
+        pending = result.catch(() => {});
+        return result;
+    }
+
+    async function withDatabase(operation) {
+        const database = await new Promise((resolve, reject) => {
+            const request = window.indexedDB.open("LP5", 2);
+            request.onupgradeneeded = () => {
+                const store = request.result.createObjectStore(
+                    "directoryHandles", { autoIncrement: true }
+                );
+                if (request.result.objectStoreNames.contains("project")) {
+                    const previous = request.transaction.objectStore("project")
+                        .get("directoryHandle");
+                    previous.onsuccess = () => {
+                        if (previous.result)
+                            store.add(previous.result);
+                    };
+                }
+            };
+            request.onsuccess = () => {
+                request.result.onversionchange = () => request.result.close();
+                resolve(request.result);
+            };
+            request.onerror = () => reject(request.error);
+        });
+
+        try {
+            return await operation(database);
+        } finally {
+            database.close();
+        }
+    }
+
+    function readEntries(database) {
+        return new Promise((resolve, reject) => {
+            const transaction = database.transaction("directoryHandles", "readonly");
+            const store = transaction.objectStore("directoryHandles");
+            const handles = store.getAll();
+            const keys = store.getAllKeys();
+            transaction.oncomplete = () => resolve(
+                handles.result.map((handle, i) => ({ handle, key: keys.result[i] }))
+            );
+            transaction.onabort = () => reject(
+                transaction.error || new Error("Directory handle read aborted")
+            );
+        });
+    }
+
+    function write(database, operation) {
+        return new Promise((resolve, reject) => {
+            const transaction = database.transaction("directoryHandles", "readwrite");
+            transaction.oncomplete = () => resolve();
+            transaction.onabort = () => reject(
+                transaction.error || new Error("Directory handle write aborted")
+            );
+            operation(transaction.objectStore("directoryHandles"));
+        });
+    }
+
+    function storeDirectoryHandle(handle) {
+        return serialize(() => withDatabase(async database => {
+            const entries = await readEntries(database);
+            // isSameEntry is asynchronous; compare after the read transaction closes.
+            for (const entry of entries) {
+                if (await entry.handle.isSameEntry(handle))
+                    return;
+            }
+            await write(database, store => store.add(handle));
+        }));
+    }
+
+    function getDirectoryHandles() {
+        return serialize(() => withDatabase(async database => {
+            const entries = await readEntries(database);
+            return entries.map(entry => entry.handle);
+        }));
+    }
+
+    function deleteDirectoryHandle(handle) {
+        return serialize(() => withDatabase(async database => {
+            const entries = await readEntries(database);
+            const keys = [];
+            for (const entry of entries) {
+                if (await entry.handle.isSameEntry(handle))
+                    keys.push(entry.key);
+            }
+            if (keys.length)
+                await write(database, store => keys.forEach(key => store.delete(key)));
+        }));
+    }
+
+    return { storeDirectoryHandle, getDirectoryHandles, deleteDirectoryHandle };
+})();
+]]></code>
+    </section>
+</template>
