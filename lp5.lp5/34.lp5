@@ -20,8 +20,13 @@ function checkFilename(filename, suffix = ".lp5") {
 function articleSections(article) {
     const sections = {};
     for (const element of article.document.documentElement.children) {
-        const kind = element.tagName === "section"
-            ? element.getAttribute("data-lp5-kind") : element.tagName;
+        const section = element.tagName === "section";
+        const kind = section ? element.getAttribute("data-lp5-kind") : element.tagName;
+        const allowed = section ? ["explanation", "code"] : ["children", "heading", "keywords"];
+        if (!allowed.includes(kind))
+            throw new Error(`${article.filename}: Unexpected <${element.tagName}> or section kind '${kind}'`);
+        if (Object.hasOwn(sections, kind))
+            throw new Error(`${article.filename}: Duplicate ${kind}`);
         sections[kind] = element;
     }
     return sections;
@@ -52,21 +57,12 @@ function parseArticle(filename, parentFilename, text) {
         node.nodeType === Node.TEXT_NODE || node.nodeType === Node.CDATA_SECTION_NODE
     );
     const article = { filename, document, parentFilename };
-    const seen = new Set();
     for (const node of document.documentElement.childNodes) {
         if (node.nodeType === Node.COMMENT_NODE || node.nodeType === Node.PROCESSING_INSTRUCTION_NODE ||
             whitespace(node))
             continue;
         if (node.nodeType !== Node.ELEMENT_NODE || node.namespaceURI)
             fail("Unexpected text or CDATA inside <template>");
-        const kind = node.tagName === "section"
-            ? node.getAttribute("data-lp5-kind") : node.tagName;
-        if (!["children", "heading", "keywords", "explanation", "code"].includes(kind) ||
-            (node.tagName !== "section" && !["children", "heading", "keywords"].includes(node.tagName)))
-            fail(`Unexpected <${node.tagName}> or section kind '${kind}'`);
-        if (seen.has(kind))
-            fail(`Duplicate ${kind}`);
-        seen.add(kind);
     }
     const sections = articleSections(article);
     if (sections.children) {
