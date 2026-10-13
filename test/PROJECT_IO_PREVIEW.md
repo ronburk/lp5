@@ -172,7 +172,7 @@ in that dialog. The filesystem API cannot make the two writes crash-atomic.
    which has no code, should clear the Output highlight. Ordinary selection
    changes must not scroll Output; clicking a code reference in Source scrolls
    to and highlights its expanded target code.
-4. Click **Test output selection**. Expect **54 output selection checks passed**.
+4. Click **Test output selection**. Expect **51 output selection checks passed**.
    The browser runs `test/output_selection.js` with the actual XML loader,
    Source/TOC/Output views, and isolated in-memory projects. It checks repeated
    and nested expansions, other sections in the same bundle, all three selection
