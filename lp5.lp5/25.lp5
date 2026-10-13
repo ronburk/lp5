@@ -9,11 +9,42 @@
     <section data-lp5-kind="explanation">
         <p>This module script runs after the browser has parsed the document, so the dialog templates are available. The earlier classic script has already initialized <code>window.LP5.controller</code>.</p>
         <p>Startup dispatches a <code>ModalDialog</code> command with the logical operation key <code>SelectCreateProject</code>. The base handler uses that key to call the dialog-specific operation. The dialog template's DOM id is also <code>SelectCreateProject</code>.</p>
+        <p>Before dispatching startup, install handlers for uncaught errors and unhandled Promise rejections. The first failure displays its message as plain text in a permanent modal; later failures leave that first report intact. Escape cannot dismiss it, and there are no application controls for recovery. The user must reload the entire page through the browser. Console reports remain enabled. This first cut blocks ordinary UI interaction but does not cancel queued commands or ongoing async work, and cannot catch failures before this module installs the handlers.</p>
     </section>
     <section data-lp5-kind="code">
         <name>Startup code</name>
         <code><![CDATA[
 <script type="module">
+    let errorDialog;
+
+    function showMessage(message) {
+        if (errorDialog) return;
+        errorDialog = document.createElement("dialog");
+        errorDialog.setAttribute("role", "alertdialog");
+        errorDialog.setAttribute("aria-labelledby", "LP5-FatalError-title");
+        errorDialog.style.cssText = "max-width: 32rem; padding: 1.25rem; overflow-wrap: anywhere";
+
+        const title = document.createElement("h2");
+        title.id = "LP5-FatalError-title";
+        title.textContent = "Execution failed";
+        const detail = document.createElement("p");
+        detail.textContent = message;
+        detail.style.whiteSpace = "pre-wrap";
+        const instruction = document.createElement("p");
+        instruction.textContent = "Reload the entire page using your browser before continuing.";
+        errorDialog.append(title, detail, instruction);
+        errorDialog.addEventListener("cancel", event => event.preventDefault());
+        document.body.append(errorDialog);
+        errorDialog.showModal();
+    }
+
+    window.addEventListener("error", event => {
+        showMessage(event.error?.message ?? event.message);
+    });
+    window.addEventListener("unhandledrejection", event => {
+        showMessage(event.reason?.message ?? String(event.reason));
+    });
+
     window.LP5.controller.dispatch({
         name: "ModalDialog",
         dialogName: "SelectCreateProject"

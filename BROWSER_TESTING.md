@@ -38,6 +38,9 @@ rewrite; test the actual generated output and its own adapter and behavior.
 `/test/storage-project/`; they do not use the legacy in-memory adapter. This
 tests the storage unit separately from model and project-dialog integration.
 
+`test/STARTUP_ERRORS.md` covers uncaught errors and unhandled rejections in
+the complete generated application, including the permanent fatal-error modal.
+
 If preview setup fails, check `command -v sites-preview`, the checkout path,
 the startup configuration, and the exact runner error. Failure of a separate
 static preview (including a `bwrap` `/proc` mount error) does not establish that
