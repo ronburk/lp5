@@ -1,4 +1,7 @@
 <template>
+    <children>
+        <li id="30.lp5"/>
+    </children>
     <heading>Template utilities</heading>
     <keywords>
         <li>script</li>
@@ -66,7 +69,9 @@
         return fn ? fn(elementByID, ctx) : null;
     }
 
-    return { scriptToFunction, mountTemplate };
+    ]]><lp5- ref="Directory handle persistence"/><![CDATA[
+
+    return { scriptToFunction, mountTemplate, indexedDB };
 })();
 ]]></code>
     </section>
