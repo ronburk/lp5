@@ -149,6 +149,28 @@ async function run() {
         ["output collision", {"fixture.lp5": article([], "&lt;fixture.lp5&gt;", literal("x"))}, "Invalid output"],
         ["DOCTYPE", {"fixture.lp5": "<!DOCTYPE template><template/>"}, "DOCTYPE"]
     ];
+    // Preserve each container's existing comment/PI policy when sharing traversal.
+    const containers = [
+        ["template", "", "<heading/>", true, true],
+        ["children", "<children>", "</children>", true, false],
+        ["keywords", "<keywords>", "</keywords>", false, false],
+        ["code section", '<section data-lp5-kind="code">', "<name/><code/></section>", true, false]
+    ];
+    for (const [name, before, after, comments, instructions] of containers) {
+        for (const [content, allowed] of [
+            [" \t\r\n", true], ["<!-- comment -->", comments], ["<?test value?>", instructions],
+            ["text", false], ["<![CDATA[ ]]>", false], ['<li xmlns="other"/>', false]
+        ]) {
+            const text = "<template>" + before + content + after + "</template>";
+            if (allowed) {
+                await model.selectProject(directory({"fixture.lp5": text}));
+                await model.loadProject();
+                check(model.rootFilename === "fixture.lp5", name + " accepts " + content);
+            } else {
+                cases.push([name + " rejects " + content, {"fixture.lp5": text}, "Unexpected"]);
+            }
+        }
+    }
     for (const [name, files, expected] of cases) {
         await model.selectProject(directory(files));
         let failed = false;
