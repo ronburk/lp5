@@ -1,0 +1,125 @@
+<template>
+    <heading>Storage</heading>
+    <keywords><li>storage</li><li>HTTP</li><li>filesystem</li><li>cancellation</li></keywords>
+    <section data-lp5-kind="explanation">
+        <p><code>storage.local</code> and <code>storage.remote</code> implement whole-file project storage independently of the model. Open a project with <code>storage.local.open(directoryHandle, root_filename = directoryHandle.name)</code> or <code>storage.remote.open(directoryURL, root_filename)</code>. Each returns an independent object with <code>root_filename</code>, <code>load(filename, signal?)</code>, <code>store(filename, text)</code>, <code>remove(filename)</code>, and <code>list_files(signal?)</code>. The handle or URL remains private. Filenames are single relative names; subdirectories are outside this interface.</p>
+        <p>All operations return Promises and reject on failure. <code>load</code> returns complete text; <code>store</code> creates or replaces a complete text file; <code>list_files</code> returns sorted immediate file names, excluding directories. Missing-file removal rejects. Listing is not a reservation: creating an unused article filename concurrently needs a later exclusive-create contract.</p>
+        <p>The HTTP protocol uses GET on a file URL for loading, PUT with UTF-8 text for storing, DELETE for removal, and GET on the directory URL for a JSON array of filenames. Directory URLs must be absolute HTTP(S) URLs ending in a slash, without a query or fragment. File names are URL-encoded. Non-success HTTP status codes reject; reads bypass the browser cache. The server must implement this protocol, acknowledge a store only after accepting all contents, and permit cross-origin requests if used from another origin.</p>
+        <p>Loads and listings accept an AbortSignal. HTTP cancellation stops fetching, including body consumption; local cancellation is checked before and after the operation but cannot interrupt native reads. Stores and removals accept no cancellation signal: stopping the caller's wait cannot establish that a modification did not commit. Local stores await writable-stream close and attempt abort on failure; a newly created empty file may remain if storing fails. An HTTP failure or lost response can leave the commit outcome unknown. Neither backend promises transactions or rollback across files.</p>
+        <p>This unit does not select directories, persist selections, or change the current model. Connecting project selection and loading to storage is separate work.</p>
+    </section>
+    <section data-lp5-kind="code"><name>JavaScript units</name><code><![CDATA[
+let storage = (() => {
+    const locations = new WeakMap();
+
+    function filename(name) {
+        if (typeof name !== "string" || !name || name === "." || name === ".." ||
+            /[\x00-\x1f\x7f/\\<>:"|?*]/.test(name) || /[. ]$/.test(name))
+            throw new Error(`Invalid storage filename: ${name}`);
+        return name;
+    }
+
+    function project(backend, location, root_filename) {
+        const result = Object.create(backend);
+        Object.defineProperty(result, "root_filename", {
+            value: filename(root_filename), enumerable: true
+        });
+        locations.set(result, location);
+        return result;
+    }
+
+    function location(object) {
+        if (!locations.has(object)) throw new Error("Open a storage project first");
+        return locations.get(object);
+    }
+
+    const local = {
+        open(handle, root_filename = handle?.name) {
+            if (handle?.kind !== "directory") throw new Error("Expected a directory handle");
+            return project(local, handle, root_filename);
+        },
+        async load(name, signal) {
+            const directory = location(this);
+            filename(name);
+            signal?.throwIfAborted();
+            const handle = await directory.getFileHandle(name);
+            const file = await handle.getFile();
+            const text = await file.text();
+            signal?.throwIfAborted();
+            return text;
+        },
+        async store(name, text) {
+            const directory = location(this);
+            filename(name);
+            if (typeof text !== "string") throw new Error("Expected file text");
+            const handle = await directory.getFileHandle(name, {create: true});
+            const stream = await handle.createWritable();
+            try {
+                await stream.write(text);
+                await stream.close();
+            } catch (error) {
+                try { await stream.abort(); } catch {}
+                throw error;
+            }
+        },
+        async remove(name) {
+            const directory = location(this);
+            filename(name);
+            await directory.getFileHandle(name);
+            await directory.removeEntry(name);
+        },
+        async list_files(signal) {
+            const directory = location(this);
+            signal?.throwIfAborted();
+            const names = [];
+            for await (const [name, handle] of directory.entries()) {
+                signal?.throwIfAborted();
+                if (handle.kind === "file") names.push(name);
+            }
+            signal?.throwIfAborted();
+            return names.sort();
+        }
+    };
+
+    async function request(base, name, options) {
+        const url = name === null ? base : new URL(encodeURIComponent(filename(name)), base);
+        const response = await fetch(url, {cache: "no-store", ...options});
+        if (!response.ok) throw new Error(`Storage ${options.method} ${url}: HTTP ${response.status}`);
+        return response;
+    }
+
+    const remote = {
+        open(url, root_filename) {
+            const base = new URL(url);
+            if (!["http:", "https:"].includes(base.protocol) ||
+                !base.pathname.endsWith("/") || base.search || base.hash)
+                throw new Error("Expected an HTTP(S) project directory URL ending in /");
+            return project(remote, base, root_filename);
+        },
+        async load(name, signal) {
+            const response = await request(location(this), name, {method: "GET", signal});
+            return await response.text();
+        },
+        async store(name, text) {
+            if (typeof text !== "string") throw new Error("Expected file text");
+            await request(location(this), name, {
+                method: "PUT", headers: {"Content-Type": "text/plain; charset=utf-8"}, body: text
+            });
+        },
+        async remove(name) {
+            await request(location(this), name, {method: "DELETE"});
+        },
+        async list_files(signal) {
+            const response = await request(location(this), null, {method: "GET", signal});
+            const names = await response.json();
+            if (!Array.isArray(names)) throw new Error("Expected a JSON filename array");
+            names.forEach(filename);
+            if (new Set(names).size !== names.length) throw new Error("Duplicate storage filename");
+            return names.sort();
+        }
+    };
+
+    return { local, remote };
+})();
+]]></code></section>
+</template>

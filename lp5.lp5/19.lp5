@@ -5,6 +5,7 @@
 controller: controller, // window.LP5.controller
 operations: operations, // window.LP5.operations
 view: view, // window.LP5.view
-util: util, // window.LP5.util]]></code>
+util: util, // window.LP5.util
+storage: storage, // window.LP5.storage]]></code>
     </section>
 </template>
