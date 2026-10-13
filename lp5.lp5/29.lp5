@@ -48,7 +48,7 @@
           <path fill="none" stroke="currentColor" stroke-width="1.5" d="M706,102 V135 H540 V147" marker-end="url(#model-lookup-ref)"/>
         </svg>
 
-        
+
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 736 250" role="img" aria-label="Bundle and referrer indexes sharing article records" style="display:block;width:100%;height:auto;margin:0.75rem 0;color:#17283a">
           <defs>
             <marker id="model-index-ref" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
