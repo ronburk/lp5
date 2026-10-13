@@ -2,7 +2,7 @@
     <heading>Code bundle indexes</heading>
     <keywords><li>model</li><li>project loading</li></keywords>
     <section data-lp5-kind="explanation">
-        <p>Bundles collect defining articles in depth-first document order. Referrer indexes identify the articles using each bundle, without repeating an article for multiple references. These are derived from the source XML after the entire reachable tree is loaded.</p><p>This first loader treats undefined bundle references and recursive bundle expansion as fatal, even in unused bundles. It also rejects unsafe output declarations and collisions with loaded article files or reserved generated filenames. These checks do not read unlinked articles.</p>
+        <p>Bundles collect defining articles in depth-first document order. Referrer indexes identify the articles using each bundle, without repeating an article for multiple references. These are derived from the source XML after the entire reachable tree is loaded.</p><p>Undefined bundle references are retained in the referrer index so unfinished projects can load. A lookup of an undefined bundle returns an empty array; cycle checking follows only defined bundles. Recursive expansion remains fatal, even in unused bundles. It also rejects unsafe output declarations and collisions with loaded article files or reserved generated filenames. These checks do not read unlinked articles.</p>
     </section>
     <section data-lp5-kind="code">
         <name>Model bundle indexes</name>
@@ -39,10 +39,6 @@
                 throw new Error(`${article.filename}: Invalid output filename '${output}'`);
         }
     }
-    for (const [name, articles] of referrers) {
-        if (!bundles.has(name))
-            throw new Error(`${articles.values().next().value.filename}: Undefined code bundle '${name}'`);
-    }
     const visiting = new Set();
     const visited = new Set();
     function visit(name, path) {
@@ -51,8 +47,10 @@
         if (visited.has(name))
             return;
         visiting.add(name);
-        for (const target of dependencies.get(name))
-            visit(target, [...path, name]);
+        for (const target of dependencies.get(name)) {
+            if (bundles.has(target))
+                visit(target, [...path, name]);
+        }
         visiting.delete(name);
         visited.add(name);
     }
