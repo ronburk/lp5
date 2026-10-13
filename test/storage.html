@@ -1,0 +1,166 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>LP5 storage tests</title>
+<pre id="results">Running storage tests…</pre>
+<script type="module">
+const report = document.getElementById("results");
+let checks = 0;
+function check(condition, message) {
+    if (!condition) throw new Error(message);
+    checks++;
+}
+async function rejects(operation, message) {
+    let failed = false;
+    try { await operation(); } catch { failed = true; }
+    check(failed, message);
+}
+function directory(name) {
+    const files = new Map();
+    let failure = null;
+    let aborts = 0;
+    const handle = {
+        kind: "directory", name,
+        async getFileHandle(name, options) {
+            if (!files.has(name)) {
+                if (!options?.create) throw new Error("Missing file");
+                files.set(name, "");
+            }
+            return {
+                async getFile() { return new File([files.get(name)], name); },
+                async createWritable() {
+                    let pending;
+                    return {
+                        async write(text) {
+                            pending = text;
+                            if (failure === "write") throw new Error("Write failed");
+                        },
+                        async close() {
+                            if (failure === "close") throw new Error("Close failed");
+                            files.set(name, pending);
+                        },
+                        async abort() { aborts++; }
+                    };
+                }
+            };
+        },
+        async removeEntry(name) {
+            if (!files.delete(name)) throw new Error("Missing file");
+        },
+        async *entries() {
+            yield ["subdirectory", {kind: "directory"}];
+            for (const name of files.keys()) yield [name, {kind: "file"}];
+        }
+    };
+    return {handle, files, fail(value) { failure = value; }, get aborts() { return aborts; }};
+}
+async function contract(project) {
+    const name = "article #雪%.lp5";
+    const text = "<template>\nUnicode 雪 & literal text\n</template>\n";
+    check(typeof project.root_filename === "string", "Root filename");
+    await project.store(name, text);
+    check(await project.load(name) === text, "Whole-file UTF-8 round trip");
+    check((await project.list_files()).includes(name), "List created file");
+    await project.store(name, "short");
+    check(await project.load(name) === "short", "Replace and truncate");
+    await project.store(name, "");
+    check(await project.load(name) === "", "Empty file");
+    const controller = new AbortController();
+    controller.abort();
+    await rejects(() => project.load(name, controller.signal), "Canceled load");
+    await rejects(() => project.list_files(controller.signal), "Canceled listing");
+    for (const bad of ["../x", "/x", "a/b", "a\\b", "", ".", "..", "x\0", "x?y"]) {
+        await rejects(() => project.load(bad), "Invalid load filename");
+        await rejects(() => project.store(bad, "x"), "Invalid store filename");
+        await rejects(() => project.remove(bad), "Invalid remove filename");
+    }
+    await rejects(() => project.store(name, {}), "Reject non-text store");
+    await project.remove(name);
+    check(!(await project.list_files()).includes(name), "Deleted file absent");
+    await rejects(() => project.load(name), "Missing load rejects");
+    await rejects(() => project.remove(name), "Missing removal rejects");
+}
+async function run() {
+    const response = await fetch("/lp5.lp5/lp5.out");
+    check(response.ok, "Generated program served");
+    const html = new DOMParser().parseFromString(await response.text(), "text/html");
+    const namespace = [...html.querySelectorAll("script")].find(s => s.textContent.includes("window.LP5 ="));
+    check(Boolean(namespace), "Generated namespace found");
+    new Function(namespace.textContent)();
+    const {local, remote} = window.LP5.storage;
+    const fixture = directory("fixture.lp5");
+    const project = local.open(fixture.handle);
+    await contract(project);
+    check((await project.list_files()).length === 0, "Exclude directories");
+    await project.store("1.lp5", "original");
+    for (const failure of ["write", "close"]) {
+        fixture.fail(failure);
+        await rejects(() => project.store("1.lp5", "changed"), "Writable failure rejects");
+        check(await project.load("1.lp5") === "original", "Failed writable preserves old text");
+    }
+    check(fixture.aborts === 2, "Both writable failures abort");
+    fixture.fail(null);
+    let release;
+    const reading = new Promise(resolve => release = resolve);
+    const controller = new AbortController();
+    const slow = local.open({kind: "directory", name: "slow.lp5",
+        async getFileHandle() {
+            return {async getFile() {
+                await reading;
+                return new File(["late text"], "1.lp5");
+            }};
+        }
+    });
+    const pending = slow.load("1.lp5", controller.signal);
+    controller.abort();
+    release();
+    await rejects(() => pending, "Local cancellation discards a late read");
+    const directoryOnly = local.open({kind: "directory", name: "empty.lp5",
+        async getFileHandle() { throw new Error("Is a directory"); },
+        async removeEntry() { throw new Error("Must not remove directories"); }
+    });
+    await rejects(() => directoryOnly.remove("subdirectory"), "Removal refuses directories");
+    const other = local.open(directory("other.lp5").handle);
+    await rejects(() => other.load("1.lp5"), "Local projects independent");
+    const explicit = local.open(fixture.handle, "root.lp5");
+    check(explicit.root_filename === "root.lp5", "Explicit local root");
+    await rejects(() => local.open({kind: "file"}, "root.lp5"), "Reject non-directory handle");
+    await rejects(() => local.load("1.lp5"), "Unopened backend rejects");
+    for (const url of ["file:///tmp/", "https://example.com/project", "https://example.com/project/?x=1", "https://example.com/project/#x"]) {
+        await rejects(() => remote.open(url, "root.lp5"), "Invalid remote project URL");
+    }
+    await rejects(() => remote.open("https://example.com/", "../root"), "Invalid root filename");
+    const http = remote.open(new URL("/test/storage-project/", location.href), "root.lp5");
+    await contract(http);
+    await http.store("persist.lp5", "persistent HTTP text");
+    const reopened = remote.open(new URL("/test/storage-project/", location.href), "root.lp5");
+    check(await reopened.load("persist.lp5") === "persistent HTTP text", "HTTP reopen sees stored file");
+    await reopened.remove("persist.lp5");
+    const originalFetch = window.fetch;
+    try {
+        for (const body of ["{}", '["../bad"]', '["x.lp5","x.lp5"]']) {
+            window.fetch = async () => new Response(body);
+            await rejects(() => http.list_files(), "Reject invalid server listing");
+        }
+        window.fetch = async () => new Response("", {status: 500});
+        await rejects(() => http.store("1.lp5", "text"), "HTTP store error rejects");
+        const controller = new AbortController();
+        window.fetch = async (url, options) => {
+            check(options.signal === controller.signal, "Remote load forwards cancellation signal");
+            controller.abort();
+            options.signal.throwIfAborted();
+        };
+        await rejects(() => http.load("1.lp5", controller.signal), "Remote cancellation during request");
+    } finally { window.fetch = originalFetch; }
+    let native = "OPFS unavailable";
+    if (navigator.storage?.getDirectory) {
+        const root = await navigator.storage.getDirectory();
+        const name = "lp5-storage-test-" + crypto.randomUUID() + ".lp5";
+        try {
+            await contract(local.open(await root.getDirectoryHandle(name, {create: true})));
+            native = "OPFS passed";
+        } finally { await root.removeEntry(name, {recursive: true}); }
+    }
+    report.textContent = `PASS: ${checks} checks; local controlled handles and HTTP disk storage; ${native}`;
+}
+run().catch(error => { report.textContent = "FAIL: " + error.stack; console.error(error); });
+</script>

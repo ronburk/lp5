@@ -33,6 +33,11 @@ describe the older `new.html?test=1` application. Use those scenarios only when
 testing that application. They do not establish coverage for the generated LP5
 rewrite; test the actual generated output and its own adapter and behavior.
 
+`test/STORAGE.md` covers the rewrite's local and HTTP storage backends through
+`/test/storage.html`. HTTP stores use real disposable server-side files at
+`/test/storage-project/`; they do not use the legacy in-memory adapter. This
+tests the storage unit separately from model and project-dialog integration.
+
 If preview setup fails, check `command -v sites-preview`, the checkout path,
 the startup configuration, and the exact runner error. Failure of a separate
 static preview (including a `bwrap` `/proc` mount error) does not establish that
