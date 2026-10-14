@@ -26,6 +26,9 @@ install a shim after the application starts.
 `test/SELECT_PROJECT.md` covers selection through model loading in the rewrite,
 using a controlled picker installed before startup in a test-only iframe.
 
+`test/STATE_MACHINE_COMPILER.md` covers the experimental compiler and a separate
+test driver; the production handler loop does not support tagged transitions yet.
+
 Do not assume a test adapter from the older `new.html` application works in the
 LP5 rewrite. When testing the rewrite, serve the generated output and inspect
 that output's startup path for an adapter before choosing a test URL. A check of

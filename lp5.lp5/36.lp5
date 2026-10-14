@@ -1,0 +1,121 @@
+<template>
+<heading>State Machine Compiler</heading>
+<keywords><li>state machine</li><li>compiler</li><li>generator</li><li>continuation</li></keywords>
+<section data-lp5-kind="explanation">
+<p><code>operations.compileStateMachine(source)</code> ports the line-oriented compiler from <code>new.html</code>. It returns a JavaScript function body without executing the actions. Define it with <code>util.scriptToFunction(code, name, ...argumentNames)</code> and invoke that function to obtain <code>{ initialState, states }</code>. Each <code>states[name]()</code> creates a fresh, primed generator. No generated machine is installed by this article; the existing controller loop and handwritten operations are unchanged.</p>
+<p>The first declared state is initial. JavaScript before it runs once when the generated function is invoked, sharing its bindings across that machine's states and calls. Each state has its own <code>event</code> variable and constant <code>state</code> name. Generator-local values survive suspension and child calls; a transition abandons that state's local continuation.</p>
+<table><thead><tr><th>Syntax</th><th>Meaning</th></tr></thead><tbody>
+<tr><td><code>state name</code></td><td>Begin a state, compiled as a generator factory.</td></tr>
+<tr><td><code>on name</code></td><td>Match <code>event.name</code>, adapting the old compiler's <code>event.type</code> to controller commands.</td></tr>
+<tr><td><code>on *</code></td><td>Match any command. Handlers are tried in declaration order; only the first match runs.</td></tr>
+<tr><td><code>-&gt; name</code></td><td>Yield <code>{ transition: target }</code>, where target is primed. Replace this stack frame, preserving its caller; the target waits for the next command.</td></tr>
+<tr><td><code>-&gt;() name</code></td><td>Yield a primed child generator. It receives the initiating command. When it finishes, assign its completion command to <code>event</code> and continue after the call with local variables intact.</td></tr>
+<tr><td><code>-&gt; *</code></td><td>Wait for another command, then continue within the current handler without rematching its <code>on</code> condition.</td></tr>
+<tr><td><code>return</code></td><td>Ordinary JavaScript generator completion: pop this frame and resume its caller with the same completion command. Return values are ignored by the controller protocol.</td></tr>
+</tbody></table>
+<p>A state waits for its first command before executing its body. JavaScript before its first <code>on</code> executes for every command processed at the outer wait, not just upon entry. After handling or ignoring a command without a transfer, the same generator waits again. Statements following an <code>on</code> belong to that handler until another <code>on</code> or <code>state</code>. JavaScript braces control nested conditions and loops; indentation is cosmetic.</p>
+<p>Directives occupy physical lines, optionally followed by a <code>//</code> comment. Names use ASCII JavaScript identifier spelling; forward references are allowed. Duplicate states, missing targets, malformed directives, and directives before a state produce source-line errors. Other lines pass through as JavaScript, whose syntax is checked when the generated function is defined. The compiler does not lex multiline JavaScript strings or comments: their interior lines must not look like directives. Names starting <code>__lp5_</code> are reserved for generated bindings.</p>
+<p>The future driver must recognize transition requests separately from child generators, close the replaced generator, install the primed target, and stop dispatch until the next command. This protocol is exercised by a separate test driver while we explore the compiler; the production controller does not yet support it. Calls, ordinary waits, and returns retain the current stack semantics.</p>
+</section>
+<section data-lp5-kind="code"><name>State Machine Compiler</name><code><![CDATA[
+function compileStateMachine(source) {
+    if (typeof source !== "string")
+        throw new TypeError("State machine source must be a string");
+
+    // Like the original compiler, recognize directives by physical line;
+    // all other lines remain JavaScript rather than being parsed here.
+    const identifier = "[A-Za-z_$][A-Za-z0-9_$]*";
+    const end = "\\s*(?://.*)?$";
+    const statePattern = new RegExp("^\\s*state\\s+(" + identifier + ")" + end);
+    const onPattern = new RegExp("^\\s*on\\s+(\\*|" + identifier + ")" + end);
+    const arrowPattern = new RegExp("^\\s*->(\\(\\))?\\s*(\\*|" + identifier + ")" + end);
+    const states = new Map();
+    const references = [];
+    let current = null;
+    const fail = (line, message) => {
+        throw new SyntaxError(`State machine line ${line}: ${message}`);
+    };
+    const lines = source.split(/\r?\n/).map((text, index) => {
+        const line = index + 1;
+        let match;
+        if ((match = statePattern.exec(text))) {
+            const name = match[1];
+            if (states.has(name)) fail(line, `Duplicate state '${name}'`);
+            states.set(name, line);
+            current = name;
+            return { kind: "state", name, line };
+        }
+        if ((match = onPattern.exec(text))) {
+            if (current === null) fail(line, "on requires a preceding state");
+            return { kind: "on", name: match[1], line };
+        }
+        if ((match = arrowPattern.exec(text))) {
+            if (current === null) fail(line, "An arrow requires a preceding state");
+            const call = Boolean(match[1]);
+            const name = match[2];
+            if (call && name === "*") fail(line, "A call requires a named state");
+            if (name !== "*") references.push({ name, line });
+            return { kind: call ? "call" : "arrow", name, line };
+        }
+        if (/^\s*(?:state\b|on\b|->)/.test(text))
+            fail(line, "Malformed directive");
+        return { kind: "js", text, line };
+    });
+    if (!states.size) fail(1, "No states declared");
+    for (const { name, line } of references)
+        if (!states.has(name)) fail(line, `Undefined state '${name}'`);
+
+    const output = [];
+    let inState = false;
+    let inEvent = false;
+    function closeState() {
+        if (!inState) return;
+        if (inEvent) output.push("            }");
+        output.push("        }", "    });");
+    }
+    for (const item of lines) {
+        const { kind, name, line } = item;
+        if (kind === "state") {
+            closeState();
+            if (!inState) {
+                output.push("const __lp5_states = Object.create(null);",
+                    "function __lp5_make(generator) {",
+                    "    const handler = generator(() => handler);",
+                    "    handler.next();",
+                    "    return handler;",
+                    "}");
+            }
+            inState = true;
+            inEvent = false;
+            output.push(`// State ${name}, source line ${line}.`,
+                `__lp5_states[${JSON.stringify(name)}] = () => __lp5_make(function* (__lp5_self) {`,
+                `    const state = ${JSON.stringify(name)};`,
+                "    let event;",
+                "    while (true) {",
+                "        event = yield __lp5_self();");
+        } else if (kind === "on") {
+            if (inEvent) output.push("            }");
+            const condition = name === "*" ? "true" : `event.name === ${JSON.stringify(name)}`;
+            output.push(`            ${inEvent ? "else " : ""}if (${condition}) {`);
+            inEvent = true;
+        } else if (kind === "call") {
+            output.push(`                event = yield __lp5_states[${JSON.stringify(name)}]();`);
+        } else if (kind === "arrow") {
+            if (name === "*") {
+                output.push("                event = yield __lp5_self();");
+            } else {
+                // The driver replaces this frame and stops dispatch; it must
+                // not deliver the triggering command to the destination.
+                output.push(`                yield { transition: __lp5_states[${JSON.stringify(name)}]() };`,
+                    "                return;");
+            }
+        } else {
+            output.push(item.text);
+        }
+    }
+    closeState();
+    output.push(`return { initialState: ${JSON.stringify(states.keys().next().value)}, states: __lp5_states };`);
+    return output.join("\n") + "\n";
+}
+]]></code></section>
+</template>
