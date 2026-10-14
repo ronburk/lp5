@@ -110,7 +110,7 @@ class PreviewHandler(BaseHTTPRequestHandler):
             target = REPO_ROOT / "lp5.lp5" / "lp5.out"
         elif path in {"/test/model_load_project.html", "/test/storage.html", "/test/startup_errors.html", "/test/select_project.html", "/test/state_machine_compiler.html"}:
             target = REPO_ROOT / "test" / relative.name
-        elif path in {"/test/project_io_controls.js", "/test/move_article.js", "/test/output_selection.js"}:
+        elif path in {"/test/project_io_controls.js", "/test/move_article.js", "/test/output_selection.js", "/test/toc_expansion.js"}:
             target = REPO_ROOT / "test" / relative.name
         elif relative.parts[:1] == ("test-fixtures",):
             if len(relative.parts) != 3 or relative.parts[1] != "lp5-test-project.lp5":
