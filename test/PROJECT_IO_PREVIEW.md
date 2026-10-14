@@ -181,10 +181,25 @@ in that dialog. The filesystem API cannot make the two writes crash-atomic.
    and unchanged generated/displayed/exported text. It restores the original
    fixture project and selection after running.
 
+## Table of Contents expansion checks
+
+1. Click **Test ToC expansion**. Confirm all checks pass. The browser test uses
+   nested in-memory project hierarchies to verify that a parent expansion
+   survives a view redraw and a project reload, that another project starts
+   collapsed, and that saved URLs for removed or childless articles are pruned.
+2. In the live fixture, parent entries with children should start collapsed by
+   default unless they were previously expanded for that project. Leaf entries
+   have no disclosure control and do not retain expansion state.
+
+The browser adapter verifies the model and view behavior with per-project
+in-memory state. Production persistence uses IndexedDB directory-handle
+identity; cloud-browser testing does not exercise a real project handle across
+browser restarts.
+
 ## Validation boundaries
 
 These checks exercise application behavior through the test adapter. They do
 not test native directory selection, real filesystem permissions or disk
-writes, or IndexedDB handle persistence. A cloud-browser result should be
+writes or real IndexedDB handle persistence. A cloud-browser result should be
 reported only after opening the preview URL supplied by the environment and
 completing the visible checks above.
