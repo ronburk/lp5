@@ -25,6 +25,7 @@
                 <button type="button" data-action="export">Export output</button>
                 <button type="button" data-action="test-moves">Test article moves</button>
                 <button type="button" data-action="test-output-selection">Test output selection</button>
+                <button type="button" data-action="test-toc-expansion">Test ToC expansion</button>
                 <button type="button" data-action="inspect-storage">Inspect storage</button>
             </div>
             <output aria-live="polite" data-status>Ready</output>
@@ -103,6 +104,11 @@
                 void run("Output selection tests", async () => {
                     const {run_output_selection_tests} = await import('./output_selection.js');
                     return await run_output_selection_tests(model, views);
+                });
+            else if(action === "test-toc-expansion")
+                void run("Table of Contents expansion tests", async () => {
+                    const {run_toc_expansion_tests} = await import('./toc_expansion.js');
+                    return await run_toc_expansion_tests(model, views);
                 });
             else if(action === "inspect-storage"){
                 const storage = panel.querySelector('[data-storage]');
