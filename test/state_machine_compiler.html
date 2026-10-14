@@ -1,0 +1,75 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>LP5 state machine compiler tests</title>
+<pre id="results">Running compiler tests...</pre>
+<details><summary>Generated example</summary><pre id="generated"></pre></details>
+<script type="module">
+const report = document.getElementById("results");
+async function run() {
+    let checks = 0;
+    function check(condition, message) {
+        if (!condition) throw new Error(message);
+        checks++;
+    }
+    const response = await fetch("/lp5.lp5/lp5.out");
+    check(response.ok, "Generated application is served");
+    const html = new DOMParser().parseFromString(await response.text(), "text/html");
+    const namespace = [...html.querySelectorAll("script")]
+        .find(script => script.textContent.includes("window.LP5 ="));
+    new Function(namespace.textContent)();
+    const {operations, util} = window.LP5;
+    const log = [];
+    const source = `
+state parent
+    on Start
+        const saved = event.value;
+        ->() child
+        log.push([saved, event.name]);
+        -> ready
+state child
+    on Done
+        return;
+state ready
+    on Next
+        log.push(state);
+        -> *
+        log.push(event.name);
+`;
+    const compiled = operations.compileStateMachine(source);
+    document.getElementById("generated").textContent = compiled;
+    const define = util.scriptToFunction(compiled, "compiler-browser-test", "log");
+    const machine = define(log);
+    check(machine.initialState === "parent", "Initial state is first declaration");
+    check(Object.keys(machine.states).length === 3, "Factory per state");
+    const stack = [machine.states.parent()];
+    // Experimental transition support is confined to this test driver.
+    function send(command) {
+        while (stack.length) {
+            const current = stack.at(-1);
+            const result = current.next(command);
+            if (result.done) stack.pop();
+            else if (result.value === current) return;
+            else if (result.value?.transition) {
+                current.return();
+                stack[stack.length - 1] = result.value.transition;
+                return;
+            } else stack.push(result.value);
+        }
+    }
+    send({name: "Start", value: 42});
+    check(stack.length === 2, "Call pushes child");
+    check(log.length === 0, "Parent suspended during call");
+    send({name: "Ignored"});
+    check(stack.length === 2 && log.length === 0, "Unmatched command ignored");
+    send({name: "Done"});
+    check(JSON.stringify(log) === '[[42,"Done"]]', "Caller preserves local value and receives completion command");
+    check(stack.length === 1, "Transition replaces caller frame");
+    send({name: "Next"});
+    check(log.at(-1) === "ready", "Destination waits for next command");
+    send({name: "Continue"});
+    check(log.at(-1) === "Continue", "Inline wait resumes without rematching");
+    check(machine.states.parent() !== machine.states.parent(), "Factories create independent generators");
+    report.textContent = `PASS: ${checks} assertions; generated state factories and experimental driver.`;
+}
+run().catch(error => { report.textContent = "FAIL: " + error.stack; console.error(error); });
+</script>
