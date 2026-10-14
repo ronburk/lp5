@@ -18,6 +18,10 @@ async function run() {
         .find(script => script.textContent.includes("window.LP5 ="));
     new Function(namespace.textContent)();
     const {operations, util} = window.LP5;
+    check(operations.compileStateMachine === undefined, "Compiler is private to Operations");
+    const compilerResponse = await fetch("/test/state_machine_compiler.js");
+    check(compilerResponse.ok, "Harness serves the compiler bundle for testing");
+    const compileStateMachine = new Function(await compilerResponse.text() + "; return compileStateMachine;")();
     const log = [];
     const source = `
 state parent
@@ -33,7 +37,7 @@ state ready
     on Next
         log.push(state);
 `;
-    const compiled = operations.compileStateMachine(source);
+    const compiled = compileStateMachine(source);
     document.getElementById("generated").textContent = compiled;
     const define = util.scriptToFunction(compiled, "compiler-browser-test", "log");
     const machine = define(log);

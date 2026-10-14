@@ -1,5 +1,6 @@
 <template>
     <children>
+        <li id="37.lp5"/>
         <li id="36.lp5"/>
         <li id="28.lp5"/>
     </children>
@@ -21,12 +22,9 @@
             <li><code>yield child</code>, where <code>child</code> is another primed generator object: call a child operation. The controller pushes <code>child</code> onto <code>handlerStack</code> and immediately dispatches the same command to it.</li>
             <li><code>return</code>, or reach the end of the generator: finish the operation. The generator result has <code>done === true</code>, so the controller pops it and resumes the parent with the same command. Any returned value is ignored. If no parent remains, dispatch ends.</li>
         </ol>
-        <p>A <code>ModalDialog</code> command carries a <code>dialogName</code> key identifying the dialog-specific operation. The base handler switches on that key and yields the selected primed operation. The controller then sends the same initial command to the child.</p>
-        <p><code>SelectCreateProject</code> is the operation for the startup project dialog. It receives the initial command and calls <code>view.showModalDialog</code> with the dialog template's DOM id. The view mounts and displays the dialog, then returns immediately. The operation remains the active handler and can receive later commands while the dialog is open.</p>
-        <p>The Select button dispatches <code>SelectProject</code> immediately. Its child handler starts the nested <code>asyncSelectProject</code> function before its priming yield, invoking the local picker during user activation, or opening the supplied remote URL without a picker. The generator then waits throughout selection, persistence, and loading, ignoring unrelated commands. <code>ProjectPickerAborted</code> finishes the child and leaves the dialog available; all fatal errors escape to global error handling.</p>
-        <p><code>ProjectLoaded</code> finishes the child. The controller resumes the parent at its child yield with that same command. The parent closes and removes the dialog, then finishes. Rendering the loaded model is the next unfinished step. The Create operation remains an unwritten bundle, and its button is not wired.</p>
-        <p>The child State Machine Compiler article exposes <code>compileStateMachine</code> for exploration without changing the handwritten handlers or dispatcher.</p>
-        <p><code>operations</code> installs the primed base handler with <code>controller.init(handler)</code> before any commands are dispatched.</p>
+        <p>The IIFE defines the unit without initializing the controller. Startup code invokes <code>operations.startup()</code> after installing fatal-error reporting. That synchronous hook privately compiles the Project State Machine source, defines the generated function with <code>util.scriptToFunction</code>, retains the machine in <code>stateMachine</code>, and installs its initial generator. The compiler and generated factories are not exposed outside Operations.</p>
+        <p>The compiled source owns base/dialog command routing. It delegates selection to the handwritten <code>SelectProject</code> worker, which starts its nested async function before priming and ignores unrelated commands while picking, persisting, and loading. Success and picker abort return through the compiled caller continuations. The parent closes the dialog only on success; rendering and project creation remain unfinished.</p>
+        <p>The production controller loop is unchanged. The startup source uses calls and returns, not tagged transitions, while that extension remains under exploration.</p>
     </section>
     <section data-lp5-kind="code">
         <name>JavaScript units</name>
@@ -58,44 +56,17 @@ let operations = (() => {
         }
     }
 
-    function* SelectCreateProject(self) {
-        let command = yield self();
-        view.showModalDialog("SelectCreateProject");
-        while (true) {
-            command = yield self();
-            switch (command.name) {
-            case "SelectProject":
-                command = yield to_handler(SelectProject, command);
-                if (command.name === "ProjectLoaded") {
-                    view.closeModalDialog("SelectCreateProject");
-                    // TODO: Ask the view to render the loaded model.
-                    return;
-                }
-                break;
-            case "Create":
-                yield ]]><lp5- ref="CreateProjectOperation"/><![CDATA[;
-                break;
-            }
-        }
+    ]]><lp5- ref="Project state machine"/><![CDATA[
+
+    let stateMachine;
+    function startup() {
+        const code = compileStateMachine(stateMachineSource);
+        const define = util.scriptToFunction(code, "project-state-machine", "view", "selectProjectHandler");
+        stateMachine = define(view, selection => to_handler(SelectProject, selection));
+        controller.init(stateMachine.states[stateMachine.initialState]());
     }
 
-    function* baseOperationsHandler(self) {
-        while (true) {
-            let command = yield self();
-            if (command.name === "ModalDialog") {
-                switch (command.dialogName) {
-                case "SelectCreateProject":
-                    yield to_handler(SelectCreateProject);
-                    break;
-                }
-            }
-        }
-    }
-
-    const handler = to_handler(baseOperationsHandler);
-    controller.init(handler);
-
-    return { compileStateMachine };
+    return { startup };
 })();
 ]]></code>
     </section>

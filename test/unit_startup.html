@@ -1,0 +1,78 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>LP5 unit startup tests</title>
+<button id="run">Test unit startup</button>
+<pre id="results">Choose the test.</pre>
+<iframe id="app" title="Generated application" style="width:100%;height:420px"></iframe>
+<script type="module">
+const frame = document.getElementById("app");
+const report = document.getElementById("results");
+const button = document.getElementById("run");
+let checks = 0;
+function check(condition, message) {
+    if (!condition) throw new Error(message);
+    checks++;
+}
+async function until(predicate) {
+    for (let i = 0; i < 100; i++) {
+        if (predicate()) return;
+        await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    throw new Error("Timed out waiting for startup result");
+}
+button.addEventListener("click", async () => {
+    button.disabled = true;
+    checks = 0;
+    try {
+        const response = await fetch("/lp5.lp5/lp5.out");
+        check(response.ok, "Generated application served");
+        const original = await response.text();
+        for (const scenario of ["normal", "directive error", "JavaScript error"]) {
+            window.startupLog = [];
+            let source = original;
+            if (scenario === "directive error")
+                source = source.replace("state baseOperationsHandler\n", "state baseOperationsHandler garbage\n");
+            if (scenario === "JavaScript error")
+                source = source.replace('view.showModalDialog("SelectCreateProject");', "const = 1;");
+            const bootstrap = `<script>
+                const operations = window.LP5.operations;
+                const start = operations.startup;
+                operations.startup = function() { parent.startupLog.push("operations"); return start.call(this); };
+                window.LP5.testOne = { startup() { parent.startupLog.push(this === window.LP5.testOne ? "one" : "wrong this"); } };
+                window.LP5.testTwo = { startup() { parent.startupLog.push("two"); } };
+                window.LP5.testNull = null;
+                window.LP5.testNoHook = {};
+                window.LP5.testFunction = function() {};
+                window.LP5.testFunction.startup = () => parent.startupLog.push("function called");
+            <\/script>`;
+            const loaded = new Promise(resolve => frame.addEventListener("load", resolve, {once: true}));
+            frame.srcdoc = source.replace('<script type="module">', bootstrap + '<script type="module">');
+            await loaded;
+            const doc = frame.contentDocument, win = frame.contentWindow;
+            await until(() => doc.querySelector("dialog:modal"));
+            check(win.LP5.operations.compileStateMachine === undefined, "Compiler stays private");
+            if (scenario === "normal") {
+                check(JSON.stringify(window.startupLog) === '["operations","one","two"]', "Hooks enumerate in order with method binding");
+                check(doc.querySelector("#SelectCreateProject-dialog:modal"), "Initial command runs after hooks");
+                check(!doc.querySelector('dialog[role="alertdialog"]'), "Successful compilation has no fatal report");
+            } else {
+                const fatal = doc.querySelector('dialog[role="alertdialog"]');
+                check(fatal?.matches(":modal"), "Compilation error is reported as fatal");
+                check(JSON.stringify(window.startupLog) === '["operations"]', "Failure stops later hooks");
+                check(!doc.getElementById("SelectCreateProject-dialog"), "Failure prevents initial command");
+                check(fatal.textContent.includes(scenario === "directive error" ? "State machine line 2: Malformed directive" : "Unexpected token"), "Syntax diagnostic displayed");
+                let uninitialized = false;
+                try { win.LP5.controller.dispatchImmediate({name: "Test"}); }
+                catch (error) { uninitialized = error.message.includes("not been initialized"); }
+                check(uninitialized, "Failed setup does not install a partial machine");
+            }
+        }
+        report.textContent = `PASS: ${checks} assertions; unit hooks, private compiler, and startup syntax errors.`;
+    } catch (error) {
+        report.textContent = "FAIL: " + error.stack;
+    } finally {
+        button.disabled = false;
+        delete window.startupLog;
+    }
+});
+</script>
