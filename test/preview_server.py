@@ -9,7 +9,9 @@ import mimetypes
 import os
 import re
 import signal
+import subprocess
 import tempfile
+import xml.etree.ElementTree as ET
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path, PurePosixPath
 from urllib.parse import unquote, urlsplit
@@ -106,9 +108,22 @@ class PreviewHandler(BaseHTTPRequestHandler):
 
         if path == "/new.html":
             target = REPO_ROOT / "new.html"
+        elif path == "/test/state_machine_compiler.js":
+            compiled = subprocess.run(
+                [str(REPO_ROOT / "lp5"), "lp5", "show-bundle", "State Machine Compiler"],
+                cwd=REPO_ROOT, capture_output=True, check=True)
+            body = ET.fromstring(compiled.stdout).find("section/code").text.encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/javascript; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            if not head_only:
+                self.wfile.write(body)
+            return
         elif path == "/lp5.lp5/lp5.out":
             target = REPO_ROOT / "lp5.lp5" / "lp5.out"
-        elif path in {"/test/model_load_project.html", "/test/storage.html", "/test/startup_errors.html", "/test/select_project.html", "/test/state_machine_compiler.html"}:
+        elif path in {"/test/model_load_project.html", "/test/storage.html", "/test/startup_errors.html", "/test/select_project.html", "/test/state_machine_compiler.html", "/test/unit_startup.html"}:
             target = REPO_ROOT / "test" / relative.name
         elif path in {"/test/project_io_controls.js", "/test/move_article.js", "/test/output_selection.js", "/test/toc_expansion.js"}:
             target = REPO_ROOT / "test" / relative.name
