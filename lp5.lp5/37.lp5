@@ -2,7 +2,7 @@
     <heading>Project State Machine</heading>
     <keywords><li>startup</li><li>state machine</li><li>project selection</li></keywords>
     <section data-lp5-kind="explanation">
-        <p>This little-language source defines the startup command flow. The base state calls the Select/Create dialog state. Its Select command calls the selection state, which delegates the existing picker/loading generator. Calls preserve the completion command, so success closes the dialog while picker abort permits retry.</p>
+        <p>This little-language source defines the startup command flow. The base state calls the Select/Create dialog state. Displaying the dialog is one-time state entry code, not a repeatable ModalDialog handler. Its Select command calls the selection state, which delegates the existing picker/loading generator. Calls preserve the completion command, so success closes the dialog while picker abort permits retry.</p>
         <p>The selection worker remains handwritten while the compiler is explored. Its construction invokes the picker synchronously during the Select click. These compiled states use only calls, ordinary waits, and returns, which the unchanged controller already supports. Rendering and project creation remain unfinished.</p>
     </section>
     <section data-lp5-kind="code">
@@ -16,8 +16,7 @@ state baseOperationsHandler
         }
 
 state SelectCreateProject
-    on ModalDialog
-        view.showModalDialog("SelectCreateProject");
+    view.showModalDialog("SelectCreateProject");
     on SelectProject
         ->() SelectProject
         if (event.name === "ProjectLoaded") {

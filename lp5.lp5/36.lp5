@@ -13,7 +13,7 @@
 <tr><td style="white-space: nowrap; vertical-align: top; padding-right: 1.25rem"><code>return</code></td><td style="vertical-align: top">Ordinary JavaScript generator completion: pop this frame and resume its caller with the same completion command. Return values are ignored by the controller protocol.</td></tr>
 </tbody></table>
 <p>Within a state, <code>on</code> clauses are tested in declaration order; only the first matching clause runs. Place <code>on *</code> last to use it as a fallback. If it appears first, later clauses never run.</p>
-<p>A state waits for its first command before executing its body. JavaScript before its first <code>on</code> executes for every command processed at the outer wait, not just upon entry. After handling or ignoring a command without a transfer, the same generator waits again. Statements following an <code>on</code> belong to that handler until another <code>on</code> or <code>state</code>. JavaScript braces control nested conditions and loops; indentation is cosmetic.</p>
+<p>After priming, the first resume supplies the initiating command as <code>event</code>. JavaScript between <code>state</code> and its first <code>on</code> then runs once, before entering the event loop. Its local declarations remain available to all handlers in that generator. The initiating command is also matched against the <code>on</code> clauses; later commands do not repeat entry code. A fresh call to the state runs its entry code again. Transition targets likewise run entry code when they receive their next command, not while merely being constructed. After handling or ignoring a command without a transfer, the same generator waits again. Statements following an <code>on</code> belong to that handler until another <code>on</code> or <code>state</code>. JavaScript braces control nested conditions and loops; indentation is cosmetic.</p>
 <p>Directives occupy physical lines, optionally followed by a <code>//</code> comment. Names use ASCII JavaScript identifier spelling; forward references are allowed. Duplicate states, missing targets, malformed directives, and directives before a state produce source-line errors. Other lines pass through as JavaScript, whose syntax is checked when the generated function is defined. The compiler does not lex multiline JavaScript strings or comments: their interior lines must not look like directives. Names starting <code>__lp5_</code> are reserved for generated bindings.</p>
 <p>The future driver must recognize transition requests separately from child generators, close the replaced generator, install the primed target, and stop dispatch until the next command. This protocol is exercised by a separate test driver while we explore the compiler; the production controller does not yet support it. The application's compiled source therefore uses only calls and returns. Calls, ordinary waits, and returns retain the current stack semantics.</p>
 </section>
@@ -70,7 +70,8 @@ function compileStateMachine(source) {
     function closeState() {
         if (!inState) return;
         if (inEvent) output.push("            }");
-        output.push("        }", "    });");
+        else output.push("    while (true) {");
+        output.push("        event = yield __lp5_self();", "    }", "});");
     }
     for (const item of lines) {
         const { kind, name, line } = item;
@@ -89,11 +90,10 @@ function compileStateMachine(source) {
             output.push(`// State ${name}, source line ${line}.`,
                 `__lp5_states[${JSON.stringify(name)}] = () => __lp5_make(function* (__lp5_self) {`,
                 `    const state = ${JSON.stringify(name)};`,
-                "    let event;",
-                "    while (true) {",
-                "        event = yield __lp5_self();");
+                "    let event = yield __lp5_self();");
         } else if (kind === "on") {
             if (inEvent) output.push("            }");
+            else output.push("    while (true) {");
             const condition = name === "*" ? "true" : `event.name === ${JSON.stringify(name)}`;
             output.push(`            ${inEvent ? "else " : ""}if (${condition}) {`);
             inEvent = true;
