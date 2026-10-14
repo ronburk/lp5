@@ -376,7 +376,8 @@ state awaitArticleDelete
          window.LP5.modIndexedDB = (function(){
              const DB_NAME = "lp5-001";
              const STORE_NAME = "handles";
-             const VERSION = 2;
+             const VIEW_STATE_STORE = "project-view-state";
+             const VERSION = 3;
 
              let dbPromise = null;
 
@@ -387,10 +388,10 @@ state awaitArticleDelete
 
                      request.onupgradeneeded = (event) => {
                          const db = event.target.result;
-                         if (db.objectStoreNames.contains(STORE_NAME)) {
-                             db.deleteObjectStore(STORE_NAME);
-                         }
-                         db.createObjectStore(STORE_NAME);
+                         if (!db.objectStoreNames.contains(STORE_NAME))
+                             db.createObjectStore(STORE_NAME);
+                         if (!db.objectStoreNames.contains(VIEW_STATE_STORE))
+                             db.createObjectStore(VIEW_STATE_STORE);
                      };
 
                      request.onsuccess = () => resolve(request.result);
@@ -434,7 +435,41 @@ state awaitArticleDelete
                  }
              }
 
-             return { get, put };
+             async function getProjectViewStates(){
+                 try {
+                     const db = await openDB();
+                     return await new Promise((resolve, reject) => {
+                         const store = db.transaction([VIEW_STATE_STORE], "readonly")
+                             .objectStore(VIEW_STATE_STORE);
+                         const req = store.getAll();
+                         req.onsuccess = () => resolve(req.result);
+                         req.onerror = e => reject(wrapError("getAll", null,
+                             "Project view-state read failed", e.target.error));
+                     });
+                 } catch(e) {
+                     if(e.op) throw e;
+                     throw wrapError("getAll", null, "Unexpected failure", e);
+                 }
+             }
+
+             async function putProjectViewState(value){
+                 try {
+                     const db = await openDB();
+                     return await new Promise((resolve, reject) => {
+                         const store = db.transaction([VIEW_STATE_STORE], "readwrite")
+                             .objectStore(VIEW_STATE_STORE);
+                         const req = store.put(value, value.id);
+                         req.onsuccess = () => resolve();
+                         req.onerror = e => reject(wrapError("put", value.id,
+                             "Project view-state write failed", e.target.error));
+                     });
+                 } catch(e) {
+                     if(e.op) throw e;
+                     throw wrapError("put", value?.id, "Unexpected failure", e);
+                 }
+             }
+
+             return { get, put, getProjectViewStates, putProjectViewState };
          })();
 
         </script>
@@ -894,6 +929,10 @@ state awaitArticleDelete
                      if (nestedList) {
                          nestedList.classList.toggle('active');
                          li.classList.toggle('expanded');
+                         deferShadowEvent(this, 'lp5-treeview:toggle', {
+                             articleURL: li.id,
+                             expanded: li.classList.contains('expanded')
+                         });
                      }
                  }
                  #contextMenuHandler(event){
@@ -1019,6 +1058,16 @@ state awaitArticleDelete
                      }
                  }
                  setContent(nodes){
+                 }
+                 setExpandedURLs(urls){
+                     const expanded = new Set(urls || []);
+                     for(const li of this.#treeview.querySelectorAll('li')){
+                         const nestedList = li.querySelector(':scope > ul');
+                         if(!nestedList) continue;
+                         const isExpanded = expanded.has(li.id);
+                         nestedList.classList.toggle('active', isExpanded);
+                         li.classList.toggle('expanded', isExpanded);
+                     }
                  }
                  render(){
                      if(this.#dirty){
@@ -2681,6 +2730,15 @@ state awaitArticleDelete
                              const {pane} = require('dataID');
 //                             subscribe('lp5-treeview:select', selectHandler);
                              pane.addEventListener('lp5-treeview:select', selectHandler, true);
+                             pane.addEventListener('lp5-treeview:toggle', event => {
+                                 const {articleURL, expanded} = event.detail;
+                                 if(!articleURL) return;
+                                 if(expanded) model.tocExpandedURLs.add(articleURL);
+                                 else model.tocExpandedURLs.delete(articleURL);
+                                 Promise.resolve(model.project?.save_toc_expansion?.(
+                                     [...model.tocExpandedURLs])).catch(error =>
+                                         console.warn('Could not save Table of Contents state', error));
+                             }, true);
                          };
                          function getTitle(li){
                              let ID = li.getAttribute('id');
@@ -2723,6 +2781,7 @@ state awaitArticleDelete
                                  let tocRootNode = iView.rootNode.shadowRoot.querySelector('#LP5-Nav');
                                  console.assert(tocRootNode && tocRootNode.id == "LP5-Nav");
                                  tocRootNode.replaceChildren(tv);
+                                 tv.setExpandedURLs(model.tocExpandedURLs);
                              }
                              return;
                          };
@@ -3677,7 +3736,7 @@ state awaitArticleDelete
                  *[Symbol.iterator](){ yield* this.#ranges; }
              }
              function createProductionProjectIO(){
-                 const {get, put} = window.LP5.modIndexedDB;
+                 const {get, put, getProjectViewStates, putProjectViewState} = window.LP5.modIndexedDB;
                  const PARENT_KEY = "handle";
                  const PREVIOUS_PROJECT_KEY = "lp5PreviousHandle";
                  const projects = new Map();
@@ -3689,6 +3748,7 @@ state awaitArticleDelete
 
                  class NativeProjectStore {
                      #directoryHandle;
+                     #viewStateID = null;
                      constructor(directoryHandle){
                          this.#directoryHandle = directoryHandle;
                      }
@@ -3717,6 +3777,45 @@ state awaitArticleDelete
                                  throw error;
                          }
                          return true;
+                     }
+                     async load_toc_expansion(){
+                         const rows = await getProjectViewStates();
+                         for(const row of rows){
+                             if(!row?.directoryHandle?.isSameEntry) continue;
+                             try {
+                                 if(await row.directoryHandle.isSameEntry(this.#directoryHandle)){
+                                     this.#viewStateID = row.id;
+                                     return Array.isArray(row.expandedArticleURLs)
+                                         ? row.expandedArticleURLs : [];
+                                 }
+                             } catch(error) {
+                                 console.warn('Could not compare saved project directory handles', error);
+                             }
+                         }
+                         this.#viewStateID = null;
+                         return [];
+                     }
+                     async save_toc_expansion(urls){
+                         if(!this.#viewStateID){
+                             const rows = await getProjectViewStates();
+                             for(const row of rows){
+                                 if(!row?.directoryHandle?.isSameEntry) continue;
+                                 try {
+                                     if(await row.directoryHandle.isSameEntry(this.#directoryHandle)){
+                                         this.#viewStateID = row.id;
+                                         break;
+                                     }
+                                 } catch(error) {
+                                     console.warn('Could not compare saved project directory handles', error);
+                                 }
+                             }
+                         }
+                         this.#viewStateID ||= crypto.randomUUID();
+                         await putProjectViewState({
+                             id: this.#viewStateID,
+                             directoryHandle: this.#directoryHandle,
+                             expandedArticleURLs: [...new Set(urls)]
+                         });
                      }
                      async create_unique_article(pattern, startingNumber){
                          const MAX_TRIES = 99;
@@ -3882,6 +3981,12 @@ state awaitArticleDelete
                          if(name === "lp5.html")
                              state.lastGeneratedOutput = String(text);
                          return true;
+                     }
+                     async load_toc_expansion(){
+                         return [...(state.expandedArticleURLs || [])];
+                     }
+                     async save_toc_expansion(urls){
+                         state.expandedArticleURLs = [...new Set(urls)];
                      }
                      async remove(name){
                          if(name === failedRemove)
@@ -5935,6 +6040,24 @@ state awaitArticleDelete
                      this.selected_article_url = null;
                  this.projectName = name;
                  this.rootTOC = await this.loadTOC(name);
+                 let savedExpandedURLs = [];
+                 try {
+                     savedExpandedURLs = await this.project.load_toc_expansion?.() || [];
+                 } catch(error) {
+                     console.warn('Could not load Table of Contents state', error);
+                 }
+                 const validParentURLs = new Set([...Articles]
+                     .filter(article => article.childCount > 0)
+                     .map(article => article.URL));
+                 this.tocExpandedURLs = new Set(savedExpandedURLs
+                     .filter(url => validParentURLs.has(url)));
+                 if(this.tocExpandedURLs.size !== savedExpandedURLs.length){
+                     try {
+                         await this.project.save_toc_expansion?.([...this.tocExpandedURLs]);
+                     } catch(error) {
+                         console.warn('Could not clean stale Table of Contents state', error);
+                     }
+                 }
                  if(!this.articleFromURL(this.selected_article_url))
                      this.selected_article_url = null;
                  console.log("openProject got rootTOC of ", this.rootTOC);
