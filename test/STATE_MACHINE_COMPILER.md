@@ -22,7 +22,8 @@ to inspect the returned JavaScript.
 
 Neither test modifies the production command dispatcher. The compiler is
 private to Operations; its startup hook installs the application's compiled
-base/dialog states, which delegate the existing selection worker. Tagged
+base, dialog, and selection states. Selection entry starts the private async
+function, then waits only for loading success or picker abort. Tagged
 transitions are only supported by the separate test drivers until the runtime
 protocol is approved. `test/unit_startup.html` verifies hook enumeration,
 initialization order, and fatal reporting for compiler errors.

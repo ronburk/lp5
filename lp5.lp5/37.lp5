@@ -2,23 +2,25 @@
     <heading>Project State Machine</heading>
     <keywords><li>startup</li><li>state machine</li><li>project selection</li></keywords>
     <section data-lp5-kind="explanation">
-        <p>This little-language source defines the startup command flow. The base state calls the Select/Create dialog state. Displaying the dialog is one-time state entry code, not a repeatable ModalDialog handler. Its Select command calls the selection state, which delegates the existing picker/loading generator. Calls preserve the completion command, so success closes the dialog while picker abort permits retry.</p>
-        <p>The selection worker remains handwritten while the compiler is explored. Its construction invokes the picker synchronously during the Select click. These compiled states use only calls, ordinary waits, and returns, which the unchanged controller already supports. Rendering and project creation remain unfinished.</p>
+        <p>This little-language source defines the startup command flow. The base state calls the Select/Create dialog state. Displaying the dialog is one-time state entry code, not a repeatable ModalDialog handler. Its Select command calls the selection state, whose entry code starts the private async picker/loading function. Calls preserve the completion command, so success closes the dialog while picker abort permits retry.</p>
+        <p>Selection entry code starts async work during the Select click. Only <code>ProjectLoaded</code> and <code>ProjectPickerAborted</code> are accepted while that work is pending; all other commands are ignored. These compiled states use only calls, ordinary waits, and returns, which the unchanged controller already supports. Rendering and project creation remain unfinished.</p>
+        <p>Indentation rule for humans and agents: every directive's first token is right-justified at column 5. Thus <code>state</code> starts at column 1, <code>on</code> and <code>-&gt;</code> at column 4, and <code>-&gt;()</code> at column 2; their right-hand sides all start at column 7. Keep directives in that left-hand column even inside JavaScript conditions, so the state and transition structure can be read vertically. Indent ordinary JavaScript separately; directive indentation has no semantic effect.</p>
     </section>
     <section data-lp5-kind="code">
         <name>Project state machine</name>
         <code><![CDATA[
 const stateMachineSource = `
 state baseOperationsHandler
-    on ModalDialog
+   on ModalDialog
         if (event.dialogName === "SelectCreateProject") {
-            ->() SelectCreateProject
+ ->() SelectCreateProject
         }
 
 state SelectCreateProject
-    view.showModalDialog("SelectCreateProject");
-    on SelectProject
-        ->() SelectProject
+        view.showModalDialog("SelectCreateProject");
+
+   on SelectProject
+ ->() SelectProject
         if (event.name === "ProjectLoaded") {
             view.closeModalDialog("SelectCreateProject");
             // TODO: Ask the view to render the loaded model.
@@ -26,8 +28,12 @@ state SelectCreateProject
         }
 
 state SelectProject
-    on SelectProject
-        event = yield selectProjectHandler(event);
+        asyncSelectProject(event);
+
+   on ProjectLoaded
+        return;
+
+   on ProjectPickerAborted
         return;
 `;
 ]]></code>

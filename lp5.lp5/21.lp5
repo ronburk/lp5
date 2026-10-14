@@ -11,11 +11,10 @@
         <li>coroutine</li>
         <li>command handler</li>
         <li>initialization</li>
-        <li>to_handler</li>
         <li>modal dialog</li>
     </keywords>
     <section data-lp5-kind="explanation">
-        <p><code>operations</code> holds the application's multi-step command handlers. Each handler is a generator object, created and primed by <code>to_handler</code>. The generator receives <code>self</code>, a function that returns its own object; calling <code>self()</code> after construction avoids accessing the object before it exists.</p>
+        <p><code>operations</code> holds the application's multi-step command handlers. The compiler creates and primes one generator object per state. Generated waits yield that same object; generated calls yield a fresh child generator.</p>
         <p>Each operation can produce one of three outcomes when <code>controller</code> resumes it with <code>handler.next(command)</code>:</p>
         <ol>
             <li><code>yield self()</code>: remain the current handler. The controller stops dispatching this command; the next command resumes the same operation.</li>
@@ -23,46 +22,24 @@
             <li><code>return</code>, or reach the end of the generator: finish the operation. The generator result has <code>done === true</code>, so the controller pops it and resumes the parent with the same command. Any returned value is ignored. If no parent remains, dispatch ends.</li>
         </ol>
         <p>The IIFE defines the unit without initializing the controller. Startup code invokes <code>operations.startup()</code> after installing fatal-error reporting. That synchronous hook privately compiles the Project State Machine source, defines the generated function with <code>util.scriptToFunction</code>, retains the machine in <code>stateMachine</code>, and installs its initial generator. The compiler and generated factories are not exposed outside Operations.</p>
-        <p>The compiled source owns base/dialog command routing. It delegates selection to the handwritten <code>SelectProject</code> worker, which starts its nested async function before priming and ignores unrelated commands while picking, persisting, and loading. Success and picker abort return through the compiled caller continuations. The parent closes the dialog only on success; rendering and project creation remain unfinished.</p>
+        <p>The compiled source owns base/dialog command routing. The compiled <code>SelectProject</code> state starts the private <code>asyncSelectProject</code> function in entry code and accepts only its completion commands while picking, persisting, and loading. Success and picker abort return through the compiled caller continuations. The parent closes the dialog only on success; rendering and project creation remain unfinished.</p>
         <p>The production controller loop is unchanged. The startup source uses calls and returns, not tagged transitions, while that extension remains under exploration.</p>
     </section>
     <section data-lp5-kind="code">
         <name>JavaScript units</name>
         <code><![CDATA[
 let operations = (() => {
-    function to_handler(generator, ...args) {
-        const handler = generator(() => handler, ...args);
-        handler.next();
-        return handler;
-    }
-
     ]]><lp5- ref="State Machine Compiler"/><![CDATA[
 
-    function* SelectProject(self, selection) {
-        ]]><lp5- ref="SelectProject async work"/><![CDATA[
-        asyncSelectProject(selection);
-
-        // Priming; the next resume receives the initiating SelectProject command.
-        yield;
-        while (true) {
-            const command = yield self();
-            switch (command.name) {
-            case "ProjectLoaded":
-                return;
-            case "ProjectPickerAborted":
-                // AbortError does not distinguish dismissal from denied access.
-                return;
-            }
-        }
-    }
+    ]]><lp5- ref="SelectProject async work"/><![CDATA[
 
     ]]><lp5- ref="Project state machine"/><![CDATA[
 
     let stateMachine;
     function startup() {
         const code = compileStateMachine(stateMachineSource);
-        const define = util.scriptToFunction(code, "project-state-machine", "view", "selectProjectHandler");
-        stateMachine = define(view, selection => to_handler(SelectProject, selection));
+        const define = util.scriptToFunction(code, "project-state-machine", "view", "asyncSelectProject");
+        stateMachine = define(view, asyncSelectProject);
         controller.init(stateMachine.states[stateMachine.initialState]());
     }
 
