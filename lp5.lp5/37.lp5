@@ -1,36 +1,27 @@
-<template>
-    <heading>Project State Machine</heading>
-    <keywords><li>startup</li><li>state machine</li><li>project selection</li></keywords>
-    <section data-lp5-kind="explanation">
-        <p>This little-language source defines the startup command flow. The base state calls the Select/Create dialog state. Its Select command calls the selection state, which delegates the existing picker/loading generator. Calls preserve the completion command, so success closes the dialog while picker abort permits retry.</p>
-        <p>The selection worker remains handwritten while the compiler is explored. Its construction invokes the picker synchronously during the Select click. These compiled states use only calls, ordinary waits, and returns, which the unchanged controller already supports. Rendering and project creation remain unfinished.</p>
-    </section>
-    <section data-lp5-kind="code">
-        <name>Project state machine</name>
-        <code><![CDATA[
+<template><heading>Project State Machine</heading><keywords><li>startup</li><li>state machine</li><li>project selection</li></keywords><section data-lp5-kind="explanation"><p>This little-language source defines the startup command flow. The base state calls the Select/Create dialog state. Its Select command calls the selection state, which delegates the existing picker/loading generator. Calls preserve the completion command, so success closes the dialog while picker abort permits retry.</p>
+<p>The selection worker remains handwritten while the compiler is explored. Its construction invokes the picker synchronously during the Select click. These compiled states use only calls, ordinary waits, and returns, which the unchanged controller already supports. Rendering and project creation remain unfinished.</p>
+</section><section data-lp5-kind="code"><name>Project state machine</name><code><![CDATA[
 const stateMachineSource = `
 state baseOperationsHandler
-    on ModalDialog
+   on ModalDialog
         if (event.dialogName === "SelectCreateProject") {
-            ->() SelectCreateProject
+ ->()       SelectCreateProject
         }
 
 state SelectCreateProject
-    on ModalDialog
+   on ModalDialog
         view.showModalDialog("SelectCreateProject");
-    on SelectProject
-        ->() SelectProject
-        if (event.name === "ProjectLoaded") {
-            view.closeModalDialog("SelectCreateProject");
-            // TODO: Ask the view to render the loaded model.
-            return;
-        }
+   on SelectProject
+ ->() SelectProject
+      if (event.name === "ProjectLoaded") {
+          view.closeModalDialog("SelectCreateProject");
+          // TODO: Ask the view to render the loaded model.
+          return;
+      }
 
 state SelectProject
-    on SelectProject
-        event = yield selectProjectHandler(event);
-        return;
+   on SelectProject
+      event = yield selectProjectHandler(event);
+      return;
 `;
-]]></code>
-    </section>
-</template>
+]]></code></section></template>
