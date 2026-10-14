@@ -158,6 +158,30 @@ state child
     assert.deepEqual(log, [0, 1], "Immediate child returns preserve loop continuation");
     assert.equal(d.stack.length, 0);
 }
+for (const loop of ["for (let i = 0; i < 2; i++)", "while (true)"]) {
+    const log = [];
+    const d = driver(machine(`
+state original
+    on Go
+        ${loop} {
+            log.push("before transition");
+            -> destination
+            log.push("incorrectly continued inside loop");
+        }
+        log.push("incorrectly continued after loop");
+state destination
+    on Next
+        log.push("destination");
+`, log));
+    const old = d.stack[0];
+    d.send({name: "Go"});
+    assert.deepEqual(log, ["before transition"], "Transition exits the entire state inside " + loop);
+    assert.equal(d.stack.length, 1);
+    assert.notEqual(d.stack[0], old, "Transition replaces the old frame");
+    assert.equal(old.next().done, true, "Old generator is closed");
+    d.send({name: "Next"});
+    assert.deepEqual(log, ["before transition", "destination"], "Destination waits for next command");
+}
 for (const [source, expected] of [
     ["", /line 1: No states/],
     ["on Go", /line 1: on requires/],
