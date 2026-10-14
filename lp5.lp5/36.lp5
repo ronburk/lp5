@@ -10,7 +10,6 @@
 <tr><td style="white-space: nowrap; vertical-align: top; padding-right: 1.25rem"><code>on *</code></td><td style="vertical-align: top">Match any event.</td></tr>
 <tr><td style="white-space: nowrap; vertical-align: top; padding-right: 1.25rem"><code>-&gt; name</code></td><td style="vertical-align: top">Yield <code>{ transition: target }</code>, where target is primed. Replace this stack frame, preserving its caller; the target waits for the next command.</td></tr>
 <tr><td style="white-space: nowrap; vertical-align: top; padding-right: 1.25rem"><code>-&gt;() name</code></td><td style="vertical-align: top">Yield a primed child generator. It receives the initiating command. When it finishes, assign its completion command to <code>event</code> and continue after the call with local variables intact.</td></tr>
-<tr><td style="white-space: nowrap; vertical-align: top; padding-right: 1.25rem"><code>-&gt; *</code></td><td style="vertical-align: top">Wait for another command, then continue within the current handler without rematching its <code>on</code> condition.</td></tr>
 <tr><td style="white-space: nowrap; vertical-align: top; padding-right: 1.25rem"><code>return</code></td><td style="vertical-align: top">Ordinary JavaScript generator completion: pop this frame and resume its caller with the same completion command. Return values are ignored by the controller protocol.</td></tr>
 </tbody></table>
 <p>Within a state, <code>on</code> clauses are tested in declaration order; only the first matching clause runs. Place <code>on *</code> last to use it as a fallback. If it appears first, later clauses never run.</p>
@@ -29,7 +28,7 @@ function compileStateMachine(source) {
     const end = "\\s*(?://.*)?$";
     const statePattern = new RegExp("^\\s*state\\s+(" + identifier + ")" + end);
     const onPattern = new RegExp("^\\s*on\\s+(\\*|" + identifier + ")" + end);
-    const arrowPattern = new RegExp("^\\s*->(\\(\\))?\\s*(\\*|" + identifier + ")" + end);
+    const arrowPattern = new RegExp("^\\s*->(\\(\\))?\\s*(" + identifier + ")" + end);
     const states = new Map();
     const references = [];
     let current = null;
@@ -54,8 +53,7 @@ function compileStateMachine(source) {
             if (current === null) fail(line, "An arrow requires a preceding state");
             const call = Boolean(match[1]);
             const name = match[2];
-            if (call && name === "*") fail(line, "A call requires a named state");
-            if (name !== "*") references.push({ name, line });
+            references.push({ name, line });
             return { kind: call ? "call" : "arrow", name, line };
         }
         if (/^\s*(?:state\b|on\b|->)/.test(text))
@@ -102,14 +100,10 @@ function compileStateMachine(source) {
         } else if (kind === "call") {
             output.push(`                event = yield __lp5_states[${JSON.stringify(name)}]();`);
         } else if (kind === "arrow") {
-            if (name === "*") {
-                output.push("                event = yield __lp5_self();");
-            } else {
-                // The driver replaces this frame and stops dispatch; it must
-                // not deliver the triggering command to the destination.
-                output.push(`                yield { transition: __lp5_states[${JSON.stringify(name)}]() };`,
-                    "                return;");
-            }
+            // The driver replaces this frame and stops dispatch; it must
+            // not deliver the triggering command to the destination.
+            output.push(`                yield { transition: __lp5_states[${JSON.stringify(name)}]() };`,
+                "                return;");
         } else {
             output.push(item.text);
         }
