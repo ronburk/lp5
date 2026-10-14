@@ -5,13 +5,13 @@ bundle through the harness, compiles examples, and executes them with an
 experimental stack driver. It covers nested and immediately returning calls,
 locals across calls, replacing transitions, caller preservation, generator
 cleanup, repeated transitions without stack growth, ordered handlers,
-wildcards, inline waits, forward targets, CRLF, repeated compilations, and
+wildcards, forward targets, CRLF, repeated compilations, and
 source-line diagnostics. Transitions inside both `for` and `while` loops must
 exit the entire state without executing actions inside or after the loop;
 the destination waits for the next command.
 
 Build with `./lp5 lp5 tangle`, start `sites-preview start "$PWD"`, and open
-`/test/state_machine_compiler.html` at the supplied host. Expect PASS with 11
+`/test/state_machine_compiler.html` at the supplied host. Expect PASS with 10
 assertions. It extracts the actual generated namespace and defines a compiled
 example through `util.scriptToFunction` in Chrome. Expand **Generated example**
 to inspect the returned JavaScript.

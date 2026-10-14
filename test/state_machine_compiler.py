@@ -104,27 +104,6 @@ state second
 {
     const log = [];
     const d = driver(machine(`
-state wait
-    on Start
-        const first = event.name;
-        -> *
-        log.push([first, event.name]);
-    on Finish
-        log.push("rematched");
-    on *
-        log.push("wildcard");
-`, log));
-    d.send({name: "Start"});
-    assert.deepEqual(log, []);
-    d.send({name: "Finish"});
-    assert.deepEqual(log, [["Start", "Finish"]], "Inline wait resumes without rematching");
-    d.send({name: "Finish"});
-    d.send({name: "Other"});
-    assert.deepEqual(log, [["Start", "Finish"], "rematched", "wildcard"]);
-}
-{
-    const log = [];
-    const d = driver(machine(`
 state a
     on Switch
         if (event.go) {
@@ -182,6 +161,19 @@ state destination
     d.send({name: "Next"});
     assert.deepEqual(log, ["before transition", "destination"], "Destination waits for next command");
 }
+{
+    const log = [];
+    const d = driver(machine(`
+state ready
+    on Finish
+        log.push("named");
+    on *
+        log.push("wildcard");
+`, log));
+    d.send({name: "Finish"});
+    d.send({name: "Other"});
+    assert.deepEqual(log, ["named", "wildcard"]);
+}
 for (const [source, expected] of [
     ["", /line 1: No states/],
     ["on Go", /line 1: on requires/],
@@ -189,7 +181,8 @@ for (const [source, expected] of [
     ["state a\nstate a", /line 2: Duplicate/],
     ["state a\n-> missing", /line 2: Undefined/],
     ["state a\n->() missing", /line 2: Undefined/],
-    ["state a\n->() *", /line 2: A call requires/],
+    ["state a\n->() *", /line 2: Malformed/],
+    ["state a\n-> *", /line 2: Malformed/],
     ["state a trailing", /line 1: Malformed/],
     ["state a\non Go trailing", /line 2: Malformed/],
     ["state a\n->()", /line 2: Malformed/]
@@ -199,7 +192,7 @@ assert.throws(() => machine("state a\non Go\nconst = 1;"), SyntaxError);
 assert.equal(machine("state fresh\r\non *\r\nreturn;").initialState, "fresh",
     "Compilations have independent parser state and support CRLF");
 assert.equal(driver(machine("state __proto__\non *\nreturn;")).stack.length, 1);
-console.log("PASS: per-state generators, calls/returns, transitions, waits, and diagnostics");
+console.log("PASS: per-state generators, calls/returns, transitions, wildcard handling, and diagnostics");
 '''
 subprocess.run(["node"], input="const CODE = " + json.dumps(code) + ";\n" + tests,
                text=True, cwd=repo, check=True)

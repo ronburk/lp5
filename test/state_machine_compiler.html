@@ -32,8 +32,6 @@ state child
 state ready
     on Next
         log.push(state);
-        -> *
-        log.push(event.name);
 `;
     const compiled = operations.compileStateMachine(source);
     document.getElementById("generated").textContent = compiled;
@@ -66,8 +64,6 @@ state ready
     check(stack.length === 1, "Transition replaces caller frame");
     send({name: "Next"});
     check(log.at(-1) === "ready", "Destination waits for next command");
-    send({name: "Continue"});
-    check(log.at(-1) === "Continue", "Inline wait resumes without rematching");
     check(machine.states.parent() !== machine.states.parent(), "Factories create independent generators");
     report.textContent = `PASS: ${checks} assertions; generated state factories and experimental driver.`;
 }
