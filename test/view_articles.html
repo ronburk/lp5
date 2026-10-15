@@ -119,8 +119,8 @@ button.addEventListener("click", async () => {
         await model.loadProject();
         check(pane.children.length === 1 && pane.firstElementChild.dataset.lp5Filename === "other.lp5", "Different project replaces prior display");
         check(!pane.querySelector("h2"), "Empty article has no generated heading");
-        check(doc.querySelectorAll("#LP5-Toc .LP5-TocEntry").length === 0 && !doc.getElementById("LP5-Output").children.length,
-            "TOC tracks the new project while expanded output remains empty");
+        check(doc.querySelectorAll("#LP5-Toc .LP5-TocEntry").length === 0 && doc.querySelector("#LP5-Output code")?.textContent === "No unnamed code defines the default output.",
+            "TOC tracks the new project while the default output explains that no code is defined");
         files["fixture.lp5"] = originalRoot;
         await model.selectProject(storage.local.open(window.displayFixture));
         await model.loadProject();

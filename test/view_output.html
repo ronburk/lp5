@@ -1,0 +1,120 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>LP5 output display tests</title>
+<button id="run">Test expanded output</button>
+<pre id="results">Choose the test.</pre>
+<iframe id="app" title="Generated LP5 application" style="width:100%;height:560px"></iframe>
+<script type="module">
+const frame = document.getElementById("app"), report = document.getElementById("results"), run = document.getElementById("run");
+let checks;
+function check(condition, message) { if (!condition) throw new Error(message); checks++; }
+async function until(predicate) {
+    for (let i = 0; i < 100; i++) {
+        if (predicate()) return;
+        await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    throw new Error("Timed out waiting for output");
+}
+run.addEventListener("click", async () => {
+    checks = 0; run.disabled = true;
+    try {
+        const fixtureResponse = await fetch("/test/output_fixture.json");
+        check(fixtureResponse.ok, "Harness fixture served");
+        const {files, expected} = await fixtureResponse.json();
+        const originalFiles = {...files};
+        window.outputFixture = {kind: "directory", name: "fixture.lp5", async getFileHandle(filename) {
+            if (!(filename in files)) throw new Error("Missing " + filename);
+            return {async getFile() { return new File([files[filename]], filename); }};
+        }};
+        const html = await (await fetch("/lp5.lp5/lp5.out")).text();
+        const bootstrap = '<script>window.showDirectoryPicker = async () => parent.outputFixture;' +
+            'window.LP5.util.indexedDB.storeDirectoryHandle = async () => {};<\/script>';
+        const loaded = new Promise(resolve => frame.addEventListener("load", resolve, {once:true}));
+        frame.srcdoc = html.replace('<script type="module">', bootstrap + '<script type="module">');
+        await loaded;
+        const doc = frame.contentDocument, win = frame.contentWindow;
+        const {model, storage} = win.LP5;
+        doc.getElementById("SelectCreateProject-Select").click();
+        await until(() => !doc.getElementById("SelectCreateProject-dialog") || doc.querySelector('dialog[role="alertdialog"]'));
+        check(!doc.querySelector('dialog[role="alertdialog"]'), "Expansion succeeds");
+        const output = doc.getElementById("LP5-Output"), source = doc.getElementById("LP5-Source"), toc = doc.getElementById("LP5-Toc");
+        const code = () => output.querySelector("pre code");
+        const articleSpans = filename => [...output.querySelectorAll(".LP5-OutputArticle")].filter(el => el.dataset.lp5Filename === filename);
+        const sourceArticle = filename => [...source.children].find(el => el.dataset.lp5Filename === filename);
+        const choose = name => {
+            const select = output.querySelector("select"); select.value = name;
+            select.dispatchEvent(new win.Event("change", {bubbles:true}));
+        };
+        check(code().textContent === expected[""], "Default expansion exactly matches harness output, including whitespace and wrappers");
+        check(!code().querySelector("script, tag, lp5-wrapper"), "Expanded code is text, not live HTML");
+        check(win.outputExecuted === undefined, "Expanded scripts do not execute");
+        check(code().textContent.includes("&amp;"), "Literal entities are not decoded a second time");
+        check(articleSpans("1.lp5").length === 2 && articleSpans("2.lp5").length === 2, "Repeated references expand every bundle definition");
+        check(articleSpans("3.lp5").length === 3, "Nested and wrapped references expand");
+        const keys = [...output.querySelectorAll("[data-occurrence]")].map(el => el.dataset.occurrence);
+        check(new Set(keys).size === keys.length, "Each expansion occurrence has a distinct identity");
+        check(output.querySelectorAll("option").length === 2, "Default and named output are available");
+        const modelSource = new win.XMLSerializer().serializeToString(model.getArticle("fixture.lp5").document);
+        toc.scrollTop = 0;
+        output.scrollTop = 100;
+        const oldOutputScroll = output.scrollTop;
+        const sharedEntry = [...toc.querySelectorAll(".LP5-TocEntry")].find(el => el.title === "1.lp5");
+        sharedEntry.click();
+        check(output.scrollTop === oldOutputScroll, "Article selection does not scroll Output");
+        check(articleSpans("1.lp5").every(el => el.classList.contains("LP5-OutputSelected")), "Every occurrence of the selected article is highlighted");
+        check(articleSpans("3.lp5").every(el => !el.classList.contains("LP5-OutputSelected")), "Nested definitions keep their own ownership");
+        const leaf = articleSpans("3.lp5")[0];
+        leaf.querySelector(".LP5-OutputText").click();
+        check(sourceArticle("3.lp5").classList.contains("LP5-Selected"), "Output click selects innermost defining article");
+        check(Math.abs(sourceArticle("3.lp5").getBoundingClientRect().top - source.getBoundingClientRect().top - source.clientTop) < 1,
+            "Output click scrolls to the defining Source article");
+        check([...toc.querySelectorAll('[aria-current="true"]')].some(el => el.title === "3.lp5"), "Output click selects the corresponding TOC entry");
+        choose("<other.js>");
+        check(code().textContent === expected["<other.js>"], "Named output exactly matches harness output");
+        check(articleSpans("4.lp5").length === 1 && articleSpans("1.lp5").length === 1, "Named output has independent occurrence mapping");
+        const ref = sourceArticle("fixture.lp5").querySelector(".LP5-CodeReference");
+        const before = {source: source.scrollTop, toc: toc.scrollTop, page: win.scrollY, outer: window.scrollY};
+        const selectedBefore = source.querySelector(".LP5-Selected");
+        ref.click();
+        check(output.querySelector("select").value === "", "Reference navigation switches to the output containing that reference site");
+        check(output.querySelectorAll(".LP5-OutputReference.LP5-ReferenceTarget").length === 1, "Only the clicked reference site is highlighted");
+        check(source.scrollTop === before.source && toc.scrollTop === before.toc && win.scrollY === before.page && window.scrollY === before.outer,
+            "Source-reference navigation leaves Source, TOC, and ancestor scrolling unchanged");
+        check(source.querySelector(".LP5-Selected") === selectedBefore, "Reference click does not trigger normal Source article selection");
+        const nestedRef = sourceArticle("1.lp5").querySelector(".LP5-CodeReference");
+        nestedRef.click();
+        check(output.querySelectorAll(".LP5-ReferenceTarget").length === 2, "A repeated source reference site highlights all its expansions");
+        sharedEntry.click();
+        check(!output.querySelector(".LP5-ReferenceTarget"), "Article selection clears reference-specific highlighting");
+        sourceArticle("5.lp5").querySelector(".LP5-CodeReference").click();
+        check(output.querySelector("select").value === "Leaf" && code().textContent.startsWith("leaf"), "Unreferenced code can preview its target bundle");
+        check(output.querySelector(".LP5-ReferenceTarget"), "Standalone preview is highlighted");
+        check(new win.XMLSerializer().serializeToString(model.getArticle("fixture.lp5").document) === modelSource, "Expansion and navigation leave model XML unchanged");
+        choose("");
+        files["2.lp5"] = files["2.lp5"].replace("B\n", "REVISED\n");
+        await model.loadProject();
+        check(code().textContent.includes("REVISED") && !code().textContent.includes("B\n"), "Reload replaces cached expansions");
+        check(!output.querySelector(".LP5-ReferenceTarget"), "Reload removes reference highlighting");
+        files["fixture.lp5"] = '<template><children><li id="6.lp5"/></children><section data-lp5-kind="code"><name/><code><lp5- ref="Future"/></code></section></template>';
+        files["6.lp5"] = '<template><section data-lp5-kind="code"><name>Only named</name><code><![CDATA[named code]]></code></section></template>';
+        await model.loadProject();
+        check(code().querySelector(".LP5-OutputMissing")?.textContent.includes("Future"), "Undefined reference has a visible marker");
+        check(!doc.querySelector('dialog[role="alertdialog"]'), "Undefined reference does not prevent display");
+        files["fixture.lp5"] = '<template><section data-lp5-kind="code"><name>&lt;only.js&gt;</name><code><![CDATA[only named output]]></code></section></template>';
+        await model.loadProject();
+        check(code().textContent.includes("No unnamed code"), "Absent default output has an explanatory message");
+        choose("<only.js>");
+        check(code().textContent === "only named output\n", "Project with only a named output remains inspectable");
+        await model.selectProject(storage.local.open({kind:"directory",name:"empty.lp5",async getFileHandle() {
+            return {async getFile() {return new File(["<template/>"], "empty.lp5");}};
+        }}));
+        await model.loadProject();
+        check(output.querySelectorAll("option").length === 1 && code().textContent.includes("No unnamed code"), "New article-only project clears old output choices and content");
+        Object.assign(files, originalFiles);
+        await model.selectProject(storage.local.open(window.outputFixture));
+        await model.loadProject();
+        report.textContent = `PASS: ${checks} assertions; harness fidelity, ownership, references, output selection, missing bundles, and reloads.`;
+    } catch (error) { report.textContent = "FAIL: " + error.stack; }
+    finally { run.disabled = false; delete window.outputFixture; }
+});
+</script>

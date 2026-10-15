@@ -1,0 +1,92 @@
+<template>
+    <heading>Expanding code for display</heading>
+    <keywords><li>view</li><li>output</li><li>expansion</li><li>indentation</li></keywords>
+    <section data-lp5-kind="explanation">
+        <p>Output is a view of the model's bundle graph. Expansion retains article ownership, distinct occurrence paths, and reference offsets into each fragment's authored text. These boundaries matter when one definition is expanded several times or inside another definition.</p>
+        <p>Expansion, formatting, and DOM rendering are separate stages. The formatter currently emits literal whitespace. A later indentation pass can use each article's sourceText and each reference's sourceOffset to dedent fragments and indent insertion sites without changing reference lookup, occurrence identity, or navigation. Literal code is already decoded by the XML parser; decoding HTML entities again would corrupt it.</p>
+        <p>Undefined references remain visible as diagnostic placeholders, allowing unfinished projects to be read. They are presentation diagnostics, not valid generated code. Other XML wrapper elements retain their markup while references within them expand. This display does not write output files.</p>
+    </section>
+    <section data-lp5-kind="code">
+        <name>View output expansion</name>
+        <code><![CDATA[function normalizedCodeName(name) {
+    return name.replace(/^[ \t\r\n]+|[ \t\r\n]+$/g, "").replace(/[ \t\r\n]+/g, " ");
+}
+
+function codeParts(article) {
+    const section = Array.from(article.document.documentElement.children).find(element =>
+        element.tagName === "section" && element.getAttribute("data-lp5-kind") === "code");
+    if (!section) return null;
+    const code = section.querySelector("code");
+    const parts = [];
+    let offset = 0;
+    const serializer = new XMLSerializer();
+    function text(value, emit = true, showSource = true) {
+        parts.push({ kind: "text", text: value, sourceOffset: offset, emit, showSource });
+        offset += showSource ? value.length : 0;
+    }
+    function visit(node, top = false) {
+        if (node.nodeType === Node.CDATA_SECTION_NODE || node.nodeType === Node.TEXT_NODE) {
+            const whitespace = /^[ \t\r\n]*$/.test(node.data);
+            text(node.data, !(top && code.children.length && whitespace),
+                !top || node.nodeType === Node.CDATA_SECTION_NODE);
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+            const serialized = serializer.serializeToString(node);
+            if (node.tagName === "lp5-") {
+                parts.push({ kind: "reference", name: normalizedCodeName(node.getAttribute("ref")),
+                    sourceOffset: offset, sourceText: serialized });
+                offset += serialized.length;
+            } else {
+                const opening = serializer.serializeToString(node.cloneNode(false)).replace(/\/>$/, ">");
+                text(opening);
+                for (const child of node.childNodes) visit(child);
+                if (!["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"].includes(node.tagName))
+                    text(`</${node.tagName}>`);
+            }
+        }
+    }
+    for (const node of code.childNodes) visit(node, true);
+    return { name: normalizedCodeName(section.querySelector("name").textContent), parts,
+        sourceText: parts.map(part => part.kind === "reference" ? part.sourceText : part.showSource ? part.text : "").join("") };
+}
+
+function referenceKey(filename, offset) {
+    return JSON.stringify([filename, offset]);
+}
+
+function expandOutput(name, path = [name], active = new Set()) {
+    if (active.has(name)) throw new Error(`Code bundle cycle while displaying ${name}`);
+    active.add(name);
+    const articles = model.getBundle(name);
+    const children = articles.map((article, index) => {
+        const definition = codeParts(article);
+        const key = [...path, index];
+        return { kind: "article", filename: article.filename, name, key: JSON.stringify(key),
+            sourceText: definition.sourceText,
+            children: definition.parts.map((part, partIndex) => {
+                if (part.kind === "text") return part;
+                return { kind: "reference", name: part.name, sourceOffset: part.sourceOffset, sourceText: part.sourceText,
+                    sourceKey: referenceKey(article.filename, part.sourceOffset),
+                    children: expandOutput(part.name, [...key, partIndex], active) };
+            }) };
+    });
+    active.delete(name);
+    return articles.length ? children : [{ kind: "missing", name }];
+}
+
+function* formatOutput(nodes, outermost = true) {
+    for (const node of nodes) {
+        if (node.kind === "text") {
+            if (node.emit !== false) yield node;
+        } else if (node.kind === "missing") yield node;
+        else {
+            yield { kind: "open", node };
+            yield* formatOutput(node.children, false);
+            yield { kind: "close", node };
+        }
+    }
+    // The harness HTML serializer terminates each output with a newline.
+    if (outermost) yield { kind: "text", text: "\n" };
+}
+]]></code>
+    </section>
+</template>

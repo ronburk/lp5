@@ -1,0 +1,137 @@
+<template>
+    <heading>Output display and navigation</heading>
+    <keywords><li>view</li><li>output</li><li>navigation</li></keywords>
+    <section data-lp5-kind="explanation">
+        <p>The default view expands unnamed code. Named output declarations supply additional choices; an ordinary bundle can also be previewed when a Source reference has no occurrence in any output. This keeps unfinished or unreferenced code inspectable.</p>
+        <p>Source reference navigation identifies the reference site, not merely a target article: several fragments may define a bundle, and a reference site may itself occur several times. Its expansions are highlighted together and only Output scrolls. Output text navigates back to its innermost defining article; article selection highlights that article's own text in every displayed occurrence without scrolling Output. Occurrence paths distinguish repeated expansions even when they have the same filename.</p>
+        <p>Plain text, ownership spans, and diagnostic markers remain separate. The DOM never interprets expanded code as HTML. Only the formatter supplies displayed text, keeping future indentation work independent of UI construction.</p>
+    </section>
+    <section data-lp5-kind="code">
+        <name>View output display</name>
+        <code><![CDATA[let outputNames = [""];
+let displayedOutput = "";
+let outputTrees = new Map();
+let outputArticles = new Map();
+let outputReferences = new Map();
+
+function outputTree(name) {
+    if (!outputTrees.has(name)) outputTrees.set(name, expandOutput(name));
+    return outputTrees.get(name);
+}
+
+function highlightOutputArticle() {
+    for (const target of document.querySelectorAll("#LP5-Output .LP5-ReferenceTarget"))
+        target.classList.remove("LP5-ReferenceTarget");
+    for (const [filename, elements] of outputArticles)
+        for (const element of elements)
+            element.classList.toggle("LP5-OutputSelected", filename === selectedFilename);
+}
+
+function displayOutput(name) {
+    displayedOutput = name;
+    const pane = document.getElementById("LP5-Output");
+    const label = document.createElement("label");
+    label.className = "LP5-OutputChoice";
+    label.append("Output ");
+    const select = document.createElement("select");
+    const names = outputNames.includes(name) ? outputNames : [...outputNames, name];
+    for (const key of names) {
+        const option = document.createElement("option");
+        option.value = key;
+        option.textContent = key === "" ? "Default output" :
+            key.startsWith("<") && key.endsWith(">") ? key.slice(1, -1) : `Bundle: ${key}`;
+        select.append(option);
+    }
+    select.value = name;
+    select.addEventListener("change", () => displayOutput(select.value));
+    label.append(select);
+    const pre = document.createElement("pre");
+    pre.className = "LP5-ExpandedCode";
+    const code = document.createElement("code");
+    const stack = [code];
+    outputArticles = new Map();
+    outputReferences = new Map();
+    function index(map, key, element) {
+        if (!map.has(key)) map.set(key, []);
+        map.get(key).push(element);
+    }
+    const tree = outputTree(name);
+    if (name === "" && !model.getBundle("").length) {
+        code.textContent = "No unnamed code defines the default output.";
+    } else for (const token of formatOutput(tree)) {
+        if (token.kind === "open") {
+            const span = document.createElement("span");
+            const node = token.node;
+            if (node.kind === "article") {
+                span.className = "LP5-OutputArticle";
+                span.dataset.lp5Filename = node.filename;
+                span.dataset.occurrence = node.key;
+                span.title = `${node.filename}: ${node.name || "Unnamed code"}`;
+                span.tabIndex = 0;
+                span.setAttribute("role", "link");
+                index(outputArticles, node.filename, span);
+            } else {
+                span.className = "LP5-OutputReference";
+                span.dataset.bundle = node.name;
+                index(outputReferences, node.sourceKey, span);
+            }
+            stack.at(-1).append(span);
+            stack.push(span);
+        } else if (token.kind === "close") stack.pop();
+        else {
+            const text = document.createElement("span");
+            text.className = token.kind === "missing" ? "LP5-OutputMissing" : "LP5-OutputText";
+            text.textContent = token.kind === "missing" ? `[[Undefined bundle: ${token.name}]]` : token.text;
+            stack.at(-1).append(text);
+        }
+    }
+    function navigate(event) {
+        if (event.type === "keydown" && event.key !== "Enter") return;
+        const span = event.target.closest(".LP5-OutputArticle");
+        if (!span) return;
+        event.preventDefault();
+        selectArticle(span.dataset.lp5Filename);
+        scrollToArticle(span.dataset.lp5Filename);
+    }
+    code.addEventListener("click", navigate);
+    code.addEventListener("keydown", navigate);
+    pre.append(code);
+    pane.replaceChildren(label, pre);
+    pane.scrollTop = 0;
+    highlightOutputArticle();
+}
+
+function initializeOutput(articles, newSelection) {
+    outputNames = [""];
+    for (const article of articles) {
+        const definition = codeParts(article);
+        const name = definition?.name;
+        if (name?.startsWith("<") && name.endsWith(">") && !outputNames.includes(name))
+            outputNames.push(name);
+    }
+    outputTrees = new Map();
+    if (newSelection || (displayedOutput && !model.getBundle(displayedOutput).length)) displayedOutput = "";
+    displayOutput(displayedOutput);
+}
+
+function showCodeReference(filename, offset, name) {
+    const key = referenceKey(filename, offset);
+    function contains(nodes) {
+        return nodes.some(node => node.sourceKey === key || node.children && contains(node.children));
+    }
+    let preview = false;
+    if (!outputReferences.has(key)) {
+        const root = outputNames.find(rootName => contains(outputTree(rootName)));
+        preview = root === undefined;
+        displayOutput(preview ? name : root);
+    }
+    const pane = document.getElementById("LP5-Output");
+    for (const old of pane.querySelectorAll(".LP5-ReferenceTarget")) old.classList.remove("LP5-ReferenceTarget");
+    const targets = preview ? [pane.querySelector(".LP5-ExpandedCode code")] : outputReferences.get(key);
+    for (const target of targets || []) target.classList.add("LP5-ReferenceTarget");
+    const target = targets?.[0];
+    if (target) pane.scrollTop += target.getBoundingClientRect().top - pane.getBoundingClientRect().top - pane.clientTop;
+}
+]]></code>
+    </section>
+</template>

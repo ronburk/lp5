@@ -16,9 +16,10 @@ Reload and project replacement must replace the display and reset its scroll.
 Native picker permissions and persistence are bypassed before startup.
 The original three-article fixture is left visible for visual inspection.
 
-The Source Pane and TOC rebuild together; expanded output remains unfinished.
+The Source Pane, TOC, and Output rebuild together.
 `test/VIEW_TOC.md` covers hierarchy, navigation, and collapse state. Also run
-the selection/loading browser tests to check integration.
+the selection/loading browser tests to check integration. `test/VIEW_OUTPUT.md`
+covers expansion and cross-pane navigation.
 
 After the test passes, drag each divider in the displayed application. Verify
 that only its two neighboring panes exchange width and their combined width

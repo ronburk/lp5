@@ -22,6 +22,7 @@ function selectArticle(filename) {
     const article = articleElements.get(filename);
     article.classList.add("LP5-Selected");
     tocEntries.get(filename)?.setAttribute("aria-current", "true");
+    highlightOutputArticle();
 }
 
 function scrollToArticle(filename) {
