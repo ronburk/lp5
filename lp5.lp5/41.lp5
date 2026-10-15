@@ -3,7 +3,7 @@
     <keywords><li>view</li><li>output</li><li>expansion</li><li>indentation</li></keywords>
     <section data-lp5-kind="explanation">
         <p>Output is a view of the model's bundle graph. Expansion retains article ownership, distinct occurrence paths, and reference offsets into each fragment's authored text. These boundaries matter when one definition is expanded several times or inside another definition.</p>
-        <p>Expansion, formatting, and DOM rendering are separate stages. The formatter currently emits literal whitespace. A later indentation pass can use each article's sourceText and each reference's sourceOffset to dedent fragments and indent insertion sites without changing reference lookup, occurrence identity, or navigation. Literal code is already decoded by the XML parser; decoding HTML entities again would corrupt it.</p>
+        <p>Expansion, formatting, and DOM rendering are separate stages. The formatter removes each fragment's common leading spaces, then indents continuation lines to match the reference site. Reference indentation is measured after removing the fragment's common prefix. Literal code is already decoded by the XML parser; decoding HTML entities again would corrupt it.</p>
         <p>Undefined references remain visible as diagnostic placeholders, allowing unfinished projects to be read. They are presentation diagnostics, not valid generated code. Other XML wrapper elements retain their markup while references within them expand. This display does not write output files.</p>
     </section>
     <section data-lp5-kind="code">
@@ -45,8 +45,25 @@ function codeParts(article) {
         }
     }
     for (const node of code.childNodes) visit(node, true);
-    return { name: normalizedCodeName(section.querySelector("name").textContent), parts,
-        sourceText: parts.map(part => part.kind === "reference" ? part.sourceText : part.showSource ? part.text : "").join("") };
+    const sourceText = parts.map(part => part.kind === "reference" ? part.sourceText : part.showSource ? part.text : "").join("");
+    const baseIndent = minimumIndent(sourceText);
+    for (const part of parts) {
+        if (part.kind === "reference")
+            part.indent = referenceIndent(sourceText, part.sourceOffset, baseIndent);
+    }
+    return { name: normalizedCodeName(section.querySelector("name").textContent), parts, sourceText, baseIndent };
+}
+
+function minimumIndent(text) {
+    const indents = text.split(/\r?\n/).filter(line => /\S/.test(line))
+        .map(line => line.match(/^ */)[0].length);
+    return indents.length ? Math.min(...indents) : 0;
+}
+
+function referenceIndent(sourceText, offset, baseIndent) {
+    const lineStart = sourceText.lastIndexOf("\n", offset - 1) + 1;
+    const prefix = sourceText.slice(lineStart, offset);
+    return /^[ ]*$/.test(prefix) ? Math.max(0, prefix.length - baseIndent) : 0;
 }
 
 function referenceKey(filename, offset) {
@@ -61,10 +78,11 @@ function expandOutput(name, path = [name], active = new Set()) {
         const definition = codeParts(article);
         const key = [...path, index];
         return { kind: "article", filename: article.filename, name, key: JSON.stringify(key),
-            sourceText: definition.sourceText,
+            sourceText: definition.sourceText, baseIndent: definition.baseIndent,
             children: definition.parts.map((part, partIndex) => {
                 if (part.kind === "text") return part;
-                return { kind: "reference", name: part.name, sourceOffset: part.sourceOffset, sourceText: part.sourceText,
+                return { kind: "reference", name: part.name, indent: part.indent,
+                    sourceOffset: part.sourceOffset, sourceText: part.sourceText,
                     sourceKey: referenceKey(article.filename, part.sourceOffset),
                     children: expandOutput(part.name, [...key, partIndex], active) };
             }) };
@@ -74,18 +92,51 @@ function expandOutput(name, path = [name], active = new Set()) {
 }
 
 function* formatOutput(nodes, outermost = true) {
-    for (const node of nodes) {
-        if (node.kind === "text") {
-            if (node.emit !== false) yield node;
-        } else if (node.kind === "missing") yield node;
-        else {
-            yield { kind: "open", node };
-            yield* formatOutput(node.children, false);
-            yield { kind: "close", node };
+    let atLineStart = true;
+    function formatText(value, indent, baseIndent) {
+        let result = "";
+        for (const line of value.match(/[^\n]*\n|[^\n]+$/g) || []) {
+            const hasNewline = line.endsWith("\n");
+            let body = hasNewline ? line.slice(0, -1) : line;
+            if (atLineStart) {
+                if (baseIndent && body.startsWith(" ".repeat(baseIndent)))
+                    body = body.slice(baseIndent);
+                if (body.length) {
+                    result += " ".repeat(indent);
+                    atLineStart = false;
+                }
+            }
+            result += body;
+            if (hasNewline) {
+                result += "\n";
+                atLineStart = true;
+            }
+        }
+        return result;
+    }
+    function* walk(items, indent = 0, baseIndent = 0) {
+        for (const node of items) {
+            if (node.kind === "text" || node.kind === "missing") {
+                const text = formatText(node.kind === "missing" ? `[[Undefined bundle: ${node.name}]]` : node.text,
+                    indent, baseIndent);
+                if (text) yield { ...node, text };
+            } else if (node.kind === "article") {
+                yield { kind: "open", node };
+                yield* walk(node.children, indent, node.baseIndent);
+                yield { kind: "close", node };
+            } else {
+                yield { kind: "open", node };
+                yield* walk(node.children, indent + node.indent, baseIndent);
+                yield { kind: "close", node };
+            }
         }
     }
+    yield* walk(nodes);
     // The harness HTML serializer terminates each output with a newline.
-    if (outermost) yield { kind: "text", text: "\n" };
+    if (outermost) {
+        const text = formatText("\n", 0, 0);
+        if (text) yield { kind: "text", text };
+    }
 }
 ]]></code>
     </section>
