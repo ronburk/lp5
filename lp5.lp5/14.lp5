@@ -276,6 +276,16 @@ body {
 }
 
 .LP5-OutputArticle { cursor: pointer; }
+.LP5-OutputArticle.LP5-OutputFolded {
+    display: inline-block;
+    padding: 0 0.25rem;
+    border: 1px solid #8a6d1d;
+    border-radius: 3px;
+    background: #fff4c2;
+    color: #493900;
+}
+.LP5-OutputFolded > :not(.LP5-OutputFoldPlaceholder) { display: none; }
+.LP5-OutputFoldPlaceholder { font-style: italic; }
 .LP5-OutputArticle.LP5-OutputSelected > .LP5-OutputText,
 .LP5-ReferenceTarget .LP5-OutputArticle > .LP5-OutputText { background: #d9eaff; }
 .LP5-OutputMissing { background: #ffe5e5; color: #8b1111; }
