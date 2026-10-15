@@ -123,7 +123,28 @@ function displayOutput(name) {
     }
     function navigate(event) {
         if (event.type === "keydown" && event.key !== "Enter") return;
-        const span = event.target.closest(".LP5-OutputArticle");
+        let span = event.target.closest(".LP5-OutputArticle");
+        if (!span && event.type === "click") {
+            let nearestDistance = Infinity;
+            let nearestText = null;
+            const range = document.createRange();
+            for (const text of code.querySelectorAll(".LP5-OutputText, .LP5-OutputMissing")) {
+                for (const node of text.childNodes) {
+                    if (node.nodeType !== Node.TEXT_NODE) continue;
+                    range.selectNodeContents(node);
+                    for (const rect of range.getClientRects()) {
+                        if (!rect.width || event.clientY < rect.top || event.clientY > rect.bottom) continue;
+                        if (rect.right > event.clientX) continue;
+                        const distance = event.clientX - rect.right;
+                        if (distance < nearestDistance) {
+                            nearestDistance = distance;
+                            nearestText = text;
+                        }
+                    }
+                }
+            }
+            span = nearestText?.closest(".LP5-OutputArticle") || null;
+        }
         if (!span) return;
         if (event.type === "click" && event.ctrlKey) {
             event.preventDefault();
@@ -136,7 +157,7 @@ function displayOutput(name) {
         selectArticle(span.dataset.lp5Filename);
         scrollToArticle(span.dataset.lp5Filename);
     }
-    code.addEventListener("click", navigate);
+    pre.addEventListener("click", navigate);
     code.addEventListener("keydown", navigate);
     pre.append(code);
     pane.replaceChildren(label, pre);
