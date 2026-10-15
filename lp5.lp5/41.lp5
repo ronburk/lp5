@@ -121,7 +121,11 @@ function* formatOutput(nodes, outermost = true) {
                     indent, baseIndent);
                 if (text) yield { ...node, text };
             } else if (node.kind === "article") {
-                yield { kind: "open", node };
+                const sourceLine = node.sourceText.split(/\r?\n/).find(line => /\S/.test(line)) || "";
+                const sourceIndent = sourceLine.match(/^[ \t]*/)[0];
+                const outputIndent = atLineStart ?
+                    " ".repeat(indent) + sourceIndent.slice(node.baseIndent) : sourceIndent;
+                yield { kind: "open", node, indent: outputIndent };
                 yield* walk(node.children, indent, node.baseIndent);
                 yield { kind: "close", node };
             } else {
