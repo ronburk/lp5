@@ -8,10 +8,10 @@
         <li>state machine</li>
     </keywords>
     <section data-lp5-kind="explanation">
-        <p>Command dispatch is a kind of hierarchical state machine, implemented with a stack where push is a "call" and pop is a "return".</p>
-        <p>Each command is an object with at least a <code>name</code> field identifying the command. Additional fields carry its arguments. The controller passes the same object to each handler involved in dispatch.</p>
-        <p><code>dispatch(command)</code> queues command handling in a microtask, allowing the current handler to suspend before another command reaches it. Producers of async completion commands use this default method without scheduling their own microtasks. <code>dispatchImmediate(command)</code> handles a command synchronously; use it when an operation must call a browser API during the originating user activation, such as the Select button opening the directory picker. Parent/child handoffs remain synchronous within either form of dispatch.</p>
-        <p>Both dispatch methods throw an explicit error until initialization installs the command handler. Each handler is a generator object. Call <code>init(handler)</code> once to install the first handler. The stack is undefined until initialization creates it. An empty stack still records that initialization has occurred, so a second call throws an error even after dispatch removes the last handler.</p>
+        <p>Only the top handler decides what a command means in the current state. A child operation temporarily takes that authority; its suspended caller retains the work to perform after the child finishes. This makes a multi-step interaction a call with a continuation, rather than a collection of unrelated callbacks.</p>
+        <p>Commands carry a <code>name</code> and any arguments. The same command object crosses parent/child handoffs: a child receives the command that called it, and its caller resumes with the command that completed it. Generator return values do not carry operation results; completion commands do.</p>
+        <p><code>dispatch(command)</code> defers handling to a microtask so an async completion cannot re-enter a generator before it suspends. Use <code>dispatchImmediate(command)</code> when the originating user activation must reach a browser API, as with the directory picker. Handoffs within either dispatch remain synchronous.</p>
+        <p><code>init(handler)</code> installs one initial, primed generator and may be called only once. Dispatch before initialization is an error. Finishing the last handler does not make the controller available for reinitialization.</p>
     </section>
     <section data-lp5-kind="code">
         <name>JavaScript units</name>

@@ -3,9 +3,6 @@
 </keywords>
     <heading>lp5: The Program</heading>
     <section data-lp5-kind="explanation">
-        The bulk of the lp5 source can be divided
-        into two main pieces:
-        templates (modular HTML/CSS/JavaScript for UI)
-        and the main code (JavaScript).
+        <p>The program separates reusable UI templates from the JavaScript units that own data, presentation, and command handling. A template can keep its markup, styles, and event wiring together without deciding which commands are legal in the current operation.</p>
     </section>
 </template>

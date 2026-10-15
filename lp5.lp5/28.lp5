@@ -7,9 +7,9 @@
         <li>completion command</li>
     </keywords>
     <section data-lp5-kind="explanation">
-        <p><code>asyncSelectProject(selection)</code> is private to Operations. The compiled <code>SelectProject</code> state starts it once in entry code with the initiating command, so a local picker is invoked synchronously in the Select click's user activation. The command's <code>location</code> selects local directory storage or remote HTTP storage; remote selection uses its <code>url</code> without invoking a picker.</p>
-        <p>Only the local picker call is caught. <code>AbortError</code> dispatches <code>ProjectPickerAborted</code>, permitting retry; every other exception is fatal. The local branch constructs its storage object and persists the directory handle before installing the model selection. Remote root filenames are derived from the project directory name, with no user override.</p>
-        <p>Both branches await <code>model.selectProject(project)</code> and <code>model.loadProject()</code>, then dispatch <code>ProjectLoaded</code>. Persistence, URL, and loading errors escape to global fatal-error handling. Completion dispatch is queued so the generator is installed before receiving the result.</p>
+        <p>Selection involves asynchronous work, but command legality must remain with the HSM. This function reports completion rather than holding the state handler inside an <code>await</code>. A local picker must be invoked before the first suspension so the Select click's user activation reaches the browser API; remote selection needs no picker.</p>
+        <p>Dismissing the picker is an expected user decision, represented by <code>ProjectPickerAborted</code>. Only the picker call has that interpretation: an <code>AbortError</code> from persistence or loading is still a failure. Other errors escape to fatal reporting because recovery has not been defined.</p>
+        <p><code>ProjectLoaded</code> means the entire model is available, not merely that a directory was chosen. Local handle persistence precedes model selection and loading; remote projects use the directory-name convention for their root filename. Completion uses deferred dispatch so even a prompt picker dismissal cannot reach the state generator while its entry code is running.</p>
     </section>
     <section data-lp5-kind="code">
         <name>SelectProject async work</name>

@@ -136,31 +136,27 @@
         Simple parts, simply related:
         fundamental to lp5.
     </p>
-    <b>documentation fragments:</b>
+    <b>explanation and code:</b>
     <p>
-        The documentation portion of a section is
-        written in normal HTML.
-        The first headline element
-        (<code>&lt;h1&gt;</code>, <code>&lt;h2&gt;</code>, etc.),
-        if any,
-        in the documentation portion of the section
-        will be copied to the <q>table of contents</q>
-        pane on the left,
-        with appropriate indentation.
-        There, you can click on the headline text of a section to scroll
-        to that section of your code.
+        An article is an XML document rooted at <code>&lt;template&gt;</code>.
+        Its optional <code>&lt;heading&gt;</code> supplies the title;
+        ordered <code>&lt;children&gt;</code> links organize the reading hierarchy.
+        Explanation is HTML markup in a section marked
+        <code>data-lp5-kind="explanation"</code>. Code belongs in a separate
+        section marked <code>data-lp5-kind="code"</code>, with a
+        <code>&lt;name&gt;</code> and a <code>&lt;code&gt;</code> body.
     </p>
-    <b>code fragments:</b>
     <p>
-        The code fragment portion of a section is written
-        in a language nearly identical to HTML5,
-        except that the code fragment may have a <em>name</em>,
-        and the code fragment may contain references to other
-        named code fragments.
+        Literal code is protected by CDATA so its target language need not
+        obey XML syntax. References such as
+        <code>&lt;lp5- ref="bundle name"/&gt;</code> remain XML elements
+        between literal portions. This separates the article's explanatory
+        hierarchy from the graph that assembles its output, regardless of
+        whether that output is HTML, JavaScript, or another language.
     </p>
     <p>
         Unnamed code fragments form the root of a directed
-        graph that is traversed to produce the final output HTML.
+        graph that is traversed to produce the default output file.
         As each code fragment is copied to the output,
         any reference to another code fragment causes the
         copying to recurse.

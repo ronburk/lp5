@@ -14,16 +14,15 @@
         <li>modal dialog</li>
     </keywords>
     <section data-lp5-kind="explanation">
-        <p><code>operations</code> holds the application's multi-step command handlers. The compiler creates and primes one generator object per state. Generated waits yield that same object; generated calls yield a fresh child generator.</p>
-        <p>Each operation can produce one of three outcomes when <code>controller</code> resumes it with <code>handler.next(command)</code>:</p>
+        <p>Operations express command legality and the continuation of an interaction. The state-machine source keeps that control flow together; nested generators preserve local variables and the work following a child call. Async functions perform the waiting and report completion through commands, leaving the state handler available to interpret incoming commands.</p>
+        <p>The controller and generated states share this protocol:</p>
         <ol>
-            <li><code>yield self()</code>: remain the current handler. The controller stops dispatching this command; the next command resumes the same operation.</li>
-            <li><code>yield child</code>, where <code>child</code> is another primed generator object: call a child operation. The controller pushes <code>child</code> onto <code>handlerStack</code> and immediately dispatches the same command to it.</li>
-            <li><code>return</code>, or reach the end of the generator: finish the operation. The generator result has <code>done === true</code>, so the controller pops it and resumes the parent with the same command. Any returned value is ignored. If no parent remains, dispatch ends.</li>
+            <li><code>yield self()</code> consumes the command and waits for the next one in the same handler.</li>
+            <li><code>yield child</code> calls a fresh, primed child with the same command. The caller remains suspended until the child finishes.</li>
+            <li><code>return</code> resumes the caller with the child's completion command. The returned JavaScript value is ignored; without a caller, dispatch ends.</li>
         </ol>
-        <p>The IIFE defines the unit without initializing the controller. Startup code invokes <code>operations.startup()</code> after installing fatal-error reporting. That synchronous hook privately compiles the Project State Machine source, defines the generated function with <code>util.scriptToFunction</code>, retains the machine in <code>stateMachine</code>, and installs its initial generator. The compiler and generated factories are not exposed outside Operations.</p>
-        <p>The compiled source owns base/dialog command routing. The compiled <code>SelectProject</code> state starts the private <code>asyncSelectProject</code> function in entry code and accepts only its completion commands while picking, persisting, and loading. Success and picker abort return through the compiled caller continuations. The parent closes the dialog only on success; rendering and project creation remain unfinished.</p>
-        <p>The production controller loop is unchanged. The startup source uses calls and returns, not tagged transitions, while that extension remains under exploration.</p>
+        <p>Compilation belongs to <code>startup()</code> so syntax failures use the same fatal-error reporting as runtime failures. Defining the unit earlier must not start command handling. The compiler and machine stay private because callers need to send commands, not manipulate state factories.</p>
+        <p>The project state machine and async selection work are explained in their own articles. The production controller currently supports calls, waits, and returns; the compiler's replacing transitions remain experimental and are exercised only by separate test drivers.</p>
     </section>
     <section data-lp5-kind="code">
         <name>JavaScript units</name>
