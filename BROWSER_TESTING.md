@@ -26,6 +26,9 @@ install a shim after the application starts.
 `test/SELECT_PROJECT.md` covers selection through model loading in the rewrite,
 using a controlled picker installed before startup in a test-only iframe.
 
+`test/VIEW_ARTICLES.md` covers Source Pane rendering after model load/reload,
+literal code, explanation markup and SVG, and replacement of the prior display.
+
 `test/STATE_MACHINE_COMPILER.md` covers the experimental compiler and a separate
 test driver; the production handler loop does not support tagged transitions yet.
 

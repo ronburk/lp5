@@ -154,6 +154,45 @@ body {
     background: #dce8f5;
     border-top: 1px solid #7890aa;
 }
+
+#LP5-Source > .LP5-Article {
+    margin: 0.5rem;
+    border: 1px solid #c8c3af;
+}
+
+.LP5-Article > h2 {
+    margin: 0;
+    padding: 0.35rem 0.5rem;
+    font-size: 1.1rem;
+    background: #f7f4e8;
+}
+
+.LP5-Article > h2 > small {
+    font-size: 0.75rem;
+    font-weight: normal;
+    color: #526174;
+}
+
+.LP5-Article > .LP5-Explanation {
+    padding: 0.5rem;
+    background: #f7f4e8;
+    overflow-wrap: anywhere;
+}
+
+.LP5-Article > .LP5-CodeName {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.85rem;
+    background: #edf2f7;
+    overflow-wrap: anywhere;
+}
+
+.LP5-Article > pre {
+    margin: 0;
+    padding: 0.5rem;
+    background: white;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
 ]]></code>
     </section>
 </template>

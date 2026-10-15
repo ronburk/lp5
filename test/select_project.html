@@ -68,6 +68,7 @@ button.addEventListener("click", async () => {
         check(!doc.getElementById("SelectCreateProject-dialog"), "Dialog removed on success");
         check(doc.querySelectorAll("body > style").length === 0, "Mounted dialog styles removed");
         check(!doc.querySelector('dialog[role="alertdialog"]'), "Success produces no fatal error");
+        check(doc.querySelector("#LP5-Source .LP5-Article h2").textContent.includes("Loaded"), "Local selection displays the article");
 
         pickCount = 0;
         await start(() => {
@@ -114,6 +115,8 @@ button.addEventListener("click", async () => {
         check([...remoteWindow.LP5.model.docOrder()].length === 2, "Remote child links loaded");
         check(remoteWindow.LP5.model.getArticle("1.lp5").document.querySelector("heading").textContent === "Remote child", "Remote child content parsed");
         check(!remoteDoc.getElementById("SelectCreateProject-dialog"), "Remote success removes dialog");
+        check(remoteDoc.querySelectorAll("#LP5-Source .LP5-Article").length === 2,
+            "Remote selection displays root and child articles");
         await http.remove("1.lp5");
         await http.remove("storage-project.lp5");
         report.textContent = `PASS: ${checks} assertions; local selection/loading, abort/retry, fatal errors, and remote HTTP selection/loading.`;
