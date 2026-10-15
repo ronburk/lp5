@@ -22,13 +22,22 @@ function setOutputFolded(span, folded) {
     span.classList.toggle("LP5-OutputFolded", folded);
     span.setAttribute("aria-expanded", String(!folded));
     const placeholder = span.querySelector(":scope > .LP5-OutputFoldPlaceholder");
+    const lineBreak = span.nextElementSibling?.classList.contains("LP5-OutputFoldBreak") ?
+        span.nextElementSibling : null;
     if (folded && !placeholder) {
         const label = document.createElement("span");
         label.className = "LP5-OutputFoldPlaceholder";
         label.setAttribute("aria-hidden", "true");
-        label.textContent = `⟪ folded: ${span.title} ⟫${span.dataset.outputEndsWithNewline === "true" ? "\n" : ""}`;
+        label.textContent = `⟪ folded: ${span.title} ⟫`;
         span.prepend(label);
     } else if (!folded) placeholder?.remove();
+    if (folded && span.dataset.outputEndsWithNewline === "true" && !lineBreak) {
+        const separator = document.createElement("span");
+        separator.className = "LP5-OutputFoldBreak";
+        separator.setAttribute("aria-hidden", "true");
+        separator.textContent = "\n";
+        span.after(separator);
+    } else if ((!folded || span.dataset.outputEndsWithNewline !== "true") && lineBreak) lineBreak.remove();
 }
 
 function foldOutputChildren(span) {
