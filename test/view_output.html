@@ -144,11 +144,12 @@ run.addEventListener("click", async () => {
         check(code().textContent === "only named output\n", "Project with only a named output remains inspectable");
 
         const indentationFiles = {
-            "indent.lp5": '<template><children><li id="1.lp5"/><li id="2.lp5"/><li id="3.lp5"/><li id="4.lp5"/></children></template>',
+            "indent.lp5": '<template><children><li id="1.lp5"/><li id="2.lp5"/><li id="3.lp5"/><li id="4.lp5"/><li id="5.lp5"/></children></template>',
             "1.lp5": '<template><section data-lp5-kind="code"><name>&lt;indent.txt&gt;</name><code><![CDATA[root {\n    ]]><lp5- ref="Shared"/><![CDATA[\n}\n]]></code></section></template>',
             "2.lp5": '<template><section data-lp5-kind="code"><name>Shared</name><code><![CDATA[first {\n    ]]><lp5- ref="Leaf"/><![CDATA[}]]></code></section></template>',
             "3.lp5": '<template><section data-lp5-kind="code"><name>Leaf</name><code><![CDATA[leaf\nnext\n]]></code></section></template>',
-            "4.lp5": '<template><section data-lp5-kind="code"><name>&lt;dedent.txt&gt;</name><code><![CDATA[    one\n    two]]></code></section></template>'
+            "4.lp5": '<template><section data-lp5-kind="code"><name>&lt;dedent.txt&gt;</name><code><![CDATA[    one\n    two]]></code></section></template>',
+            "5.lp5": '<template><section data-lp5-kind="code"><name>&lt;marker.txt&gt;</name><code><![CDATA[    marked\nplain\n]]></code></section></template>'
         };
         const indentationDirectory = {kind:"directory", name:"indent.lp5", async getFileHandle(filename) {
             if (!(filename in indentationFiles)) throw new Error("Missing " + filename);
@@ -160,6 +161,12 @@ run.addEventListener("click", async () => {
         const actualIndented = code().textContent;
         check(actualIndented === "root {\n    first {\n        leaf\n        next\n    }\n}\n\n",
             `Nested reference output: ${JSON.stringify(actualIndented)}`);
+        choose("<marker.txt>");
+        const indentedMarker = articleSpans("5.lp5")[0];
+        modifiedClick(indentedMarker);
+        check(indentedMarker.querySelector(":scope > .LP5-OutputFoldPlaceholder").textContent.startsWith("    ⟪ folded: 5.lp5: <marker.txt> ⟫"),
+            "Fold marker preserves leading whitespace inside its section");
+        modifiedClick(indentedMarker);
         choose("<dedent.txt>");
         check(code().textContent === "one\ntwo\n", "Common fragment leading spaces are removed");
 
