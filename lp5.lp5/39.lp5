@@ -3,7 +3,7 @@
     <keywords><li>view</li><li>rendering</li><li>articles</li></keywords>
     <section data-lp5-kind="explanation">
         <p>The Source Pane is a presentation of model XML, not an editing copy of it. Explanation markup is parsed as HTML so paragraphs and SVG illustrations retain their browser presentation. Literal code and LP references are displayed as text, preventing source code from becoming live page elements. An article without a nonblank heading has no generated heading.</p>
-        <p>A model load replaces the entire article display in document order. Building the replacement offscreen keeps the old display intact until the new one is ready, and rendering never moves nodes out of the model. The view subscribes during startup, before the first project can be selected. The TOC is built from the same records and installed alongside the source, so both panes change together. Code expansion remains separate work.</p>
+        <p>A model load replaces the entire article display in document order. Building the replacement offscreen keeps the old display intact until the new one is ready, and rendering never moves nodes out of the model. The view subscribes during startup, before the first project can be selected. The TOC is built from the same records and installed alongside the source, so both panes change together. Output is rebuilt from the same records after Source and TOC are installed. Reference buttons preserve literal source text while providing navigation into expansions.</p>
     </section>
     <section data-lp5-kind="code">
         <name>View article rendering</name>
@@ -38,18 +38,24 @@
     }
     if (codeSection) {
         const name = codeSection.querySelector("name");
-        const code = codeSection.querySelector("code");
         const label = document.createElement("div");
         label.className = "LP5-CodeName";
         label.textContent = name.textContent.trim() || "Unnamed code";
         const pre = document.createElement("pre");
         const text = document.createElement("code");
-        const serializer = new XMLSerializer();
-        for (const node of code.childNodes) {
-            if (node.nodeType === Node.CDATA_SECTION_NODE)
-                text.append(document.createTextNode(node.data));
-            else if (node.nodeType === Node.ELEMENT_NODE)
-                text.append(document.createTextNode(serializer.serializeToString(node)));
+        for (const part of codeParts(article).parts) {
+            if (part.kind === "reference") {
+                const reference = document.createElement("button");
+                reference.type = "button";
+                reference.className = "LP5-CodeReference";
+                reference.textContent = part.sourceText;
+                reference.addEventListener("click", event => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    showCodeReference(article.filename, part.sourceOffset, part.name);
+                });
+                text.append(reference);
+            } else if (part.showSource) text.append(document.createTextNode(part.text));
         }
         pre.append(text);
         rendered.append(label, pre);
@@ -62,7 +68,8 @@ function renderProject(event) {
     const toc = document.getElementById("LP5-Toc");
     if (!pane || !toc) throw new Error("Missing LP5-Source or LP5-Toc pane");
     const selectionId = event.detail.selectionId;
-    if (selectionId !== displayedSelectionId) collapsedArticles.clear();
+    const newSelection = selectionId !== displayedSelectionId;
+    if (newSelection) collapsedArticles.clear();
     const articles = [...model.docOrder()];
     const content = document.createDocumentFragment();
     const elements = new Map();
@@ -79,6 +86,7 @@ function renderProject(event) {
     selectedFilename = null;
     displayedSelectionId = selectionId;
     pane.scrollTop = 0;
+    initializeOutput(articles, newSelection);
 }
 ]]></code>
     </section>

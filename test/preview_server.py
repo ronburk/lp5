@@ -10,6 +10,7 @@ import os
 import re
 import signal
 import subprocess
+import sys
 import tempfile
 import xml.etree.ElementTree as ET
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -108,6 +109,18 @@ class PreviewHandler(BaseHTTPRequestHandler):
 
         if path == "/new.html":
             target = REPO_ROOT / "new.html"
+        elif path == "/test/output_fixture.json":
+            generated = subprocess.run([sys.executable, str(REPO_ROOT / "test" / "output_fixture.py")],
+                                       cwd=REPO_ROOT, capture_output=True, check=True)
+            body = generated.stdout
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            if not head_only:
+                self.wfile.write(body)
+            return
         elif path == "/test/state_machine_compiler.js":
             compiled = subprocess.run(
                 [str(REPO_ROOT / "lp5"), "lp5", "show-bundle", "State Machine Compiler"],
@@ -123,7 +136,7 @@ class PreviewHandler(BaseHTTPRequestHandler):
             return
         elif path == "/lp5.lp5/lp5.out":
             target = REPO_ROOT / "lp5.lp5" / "lp5.out"
-        elif path in {"/test/browser_db.html", "/test/model_load_project.html", "/test/storage.html", "/test/startup_errors.html", "/test/select_project.html", "/test/state_machine_compiler.html", "/test/unit_startup.html", "/test/view_articles.html", "/test/view_toc.html"}:
+        elif path in {"/test/browser_db.html", "/test/model_load_project.html", "/test/storage.html", "/test/startup_errors.html", "/test/select_project.html", "/test/state_machine_compiler.html", "/test/unit_startup.html", "/test/view_articles.html", "/test/view_toc.html", "/test/view_output.html"}:
             target = REPO_ROOT / "test" / relative.name
         elif path in {"/test/project_io_controls.js", "/test/move_article.js", "/test/output_selection.js", "/test/toc_expansion.js"}:
             target = REPO_ROOT / "test" / relative.name

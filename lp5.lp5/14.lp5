@@ -251,6 +251,34 @@ body {
 #LP5-Source > .LP5-Article.LP5-Selected {
     border-left-color: #17283a;
 }
+
+.LP5-CodeReference {
+    border: 0;
+    padding: 0;
+    background: #edf2f7;
+    color: #174575;
+    font: inherit;
+    white-space: inherit;
+    cursor: pointer;
+}
+
+.LP5-OutputChoice {
+    display: block;
+    padding: 0.35rem 0.5rem;
+    background: #edf2f7;
+}
+
+.LP5-ExpandedCode {
+    margin: 0;
+    padding: 0.5rem;
+    white-space: pre;
+    min-width: max-content;
+}
+
+.LP5-OutputArticle { cursor: pointer; }
+.LP5-OutputArticle.LP5-OutputSelected > .LP5-OutputText,
+.LP5-ReferenceTarget .LP5-OutputArticle > .LP5-OutputText { background: #d9eaff; }
+.LP5-OutputMissing { background: #ffe5e5; color: #8b1111; }
 ]]></code>
     </section>
 </template>
