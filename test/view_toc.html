@@ -42,7 +42,8 @@ run.addEventListener("click", async () => {
             "fixture.lp5": article("Root", children),
             "1.lp5": article("Repeated", ["3.lp5"]),
             "3.lp5": article(""),
-            "2.lp5": article("Repeated"),
+            "2.lp5": article("Repeated").replace("</template>",
+                '<section data-lp5-kind="code"><name>Example</name><code><![CDATA[const example = 1;]]></code></section></template>'),
             [odd]: article("Special filename")
         };
         for (const [i, filename] of extra.entries()) files[filename] = article("Extra " + i);
@@ -103,6 +104,24 @@ run.addEventListener("click", async () => {
         check(shown("1.lp5").classList.contains("LP5-Selected"), "Duplicate title navigates by filename");
         entry(odd).click();
         check(shown(odd).classList.contains("LP5-Selected"), "Quotes and brackets in filenames do not become selectors");
+        for (const [filename, selector] of [["fixture.lp5", "h2"], ["2.lp5", ".LP5-Explanation p"], ["2.lp5", "pre code"]]) {
+            const target = shown(filename).querySelector(selector);
+            const beforeClick = [source.scrollTop, source.scrollLeft, toc.scrollTop, output.scrollTop, win.scrollY, window.scrollY];
+            const width = shown(filename).getBoundingClientRect().width;
+            target.click();
+            check(shown(filename).classList.contains("LP5-Selected") && entry(filename).getAttribute("aria-current") === "true", "Source click selects article and TOC: " + selector);
+            check(source.querySelectorAll(".LP5-Selected").length === 1 && toc.querySelectorAll('[aria-current="true"]').length === 1, "Exactly one selection after source click");
+            check(JSON.stringify(beforeClick) === JSON.stringify([source.scrollTop, source.scrollLeft, toc.scrollTop, output.scrollTop, win.scrollY, window.scrollY]), "Source selection preserves all scrolling");
+            check(shown(filename).getBoundingClientRect().width === width, "Selection marker does not change article width");
+        }
+        const text = shown("2.lp5").querySelector("pre code");
+        const range = doc.createRange();
+        range.selectNodeContents(text);
+        win.getSelection().removeAllRanges();
+        win.getSelection().addRange(range);
+        check(text.dispatchEvent(new win.MouseEvent("click", {bubbles: true, cancelable: true})), "Selection handler does not prevent normal click behavior");
+        check(win.getSelection().toString() === "const example = 1;", "Article selection preserves text selection");
+        win.getSelection().removeAllRanges();
         toggle("1.lp5").click();
         const oldRoot = item("fixture.lp5");
         await model.loadProject();

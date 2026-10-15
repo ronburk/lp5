@@ -3,7 +3,7 @@
     <keywords><li>view</li><li>navigation</li><li>table of contents</li></keywords>
     <section data-lp5-kind="explanation">
         <p>The TOC and Source Pane describe the same model records. Filenames connect their elements because titles may be absent or repeated; maps avoid turning filenames into CSS selectors. Model document order and parent filenames determine the nested lists without inventing another hierarchy.</p>
-        <p>Collapse state belongs to View and survives reloads of the selected storage object. A new model selection ID clears it, including when two projects have identical filenames. Selecting an entry highlights its source article and scrolls only the Source Pane; changing a disclosure control does not select an article. Selection is driven by clicks and resets on load, rather than following manual scrolling.</p>
+        <p>Collapse state belongs to View and survives reloads of the selected storage object. A new model selection ID clears it, including when two projects have identical filenames. Selecting an entry highlights its source article and scrolls only the Source Pane; changing a disclosure control does not select an article. Clicking a Source Pane article selects it without scrolling; both click paths share the same marker and TOC highlight. Selection resets on load, rather than following manual scrolling.</p>
     </section>
     <section data-lp5-kind="code">
         <name>View table of contents</name>
@@ -22,6 +22,10 @@ function selectArticle(filename) {
     const article = articleElements.get(filename);
     article.classList.add("LP5-Selected");
     tocEntries.get(filename).setAttribute("aria-current", "true");
+}
+
+function scrollToArticle(filename) {
+    const article = articleElements.get(filename);
     const pane = document.getElementById("LP5-Source");
     pane.scrollTop += article.getBoundingClientRect().top -
         pane.getBoundingClientRect().top - pane.clientTop;
@@ -50,7 +54,10 @@ function renderTableOfContents(articles) {
             button.textContent = title;
             button.title = article.filename;
             button.className = "LP5-TocEntry";
-            button.addEventListener("click", () => selectArticle(article.filename));
+            button.addEventListener("click", () => {
+                selectArticle(article.filename);
+                scrollToArticle(article.filename);
+            });
             entries.set(article.filename, button);
             li.append(row);
             if (children.has(article.filename)) {
