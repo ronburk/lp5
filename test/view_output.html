@@ -73,6 +73,8 @@ run.addEventListener("click", async () => {
         modifiedClick(rootOutput);
         check(rootOutput.classList.contains("LP5-OutputFolded") && rootOutput.getAttribute("aria-expanded") === "false" &&
             rootOutput.querySelector(":scope > .LP5-OutputFoldPlaceholder"), "Ctrl-click folds the clicked code section and exposes a placeholder");
+        check(rootOutput.querySelector(":scope > .LP5-OutputFoldPlaceholder").textContent.endsWith("\n"),
+            "Fold placeholder preserves the section's trailing newline");
         check(win.getComputedStyle(rootOutput.querySelector(":scope > .LP5-OutputText")).display === "none",
             "Folded code content is hidden");
         modifiedClick(rootOutput);
@@ -159,6 +161,26 @@ run.addEventListener("click", async () => {
             `Nested reference output: ${JSON.stringify(actualIndented)}`);
         choose("<dedent.txt>");
         check(code().textContent === "one\ntwo\n", "Common fragment leading spaces are removed");
+
+        const foldFiles = {
+            "fold.lp5": '<template><children><li id="1.lp5"/><li id="2.lp5"/><li id="3.lp5"/></children><section data-lp5-kind="code"><name>&lt;fold.txt&gt;</name><code><lp5- ref="Fold"/></code></section></template>',
+            "1.lp5": '<template><section data-lp5-kind="code"><name>Fold</name><code><![CDATA[first\n]]></code></section></template>',
+            "2.lp5": '<template><section data-lp5-kind="code"><name>Fold</name><code><![CDATA[second]]></code></section></template>',
+            "3.lp5": '<template><section data-lp5-kind="code"><name>Fold</name><code><![CDATA[third]]></code></section></template>'
+        };
+        await model.selectProject(storage.local.open({kind:"directory",name:"fold.lp5",async getFileHandle(filename) {
+            if (!(filename in foldFiles)) throw new Error("Missing " + filename);
+            return {async getFile() {return new File([foldFiles[filename]], filename);}};
+        }}));
+        await model.loadProject();
+        choose("<fold.txt>");
+        const foldSpans = articleSpans("1.lp5").concat(articleSpans("2.lp5"), articleSpans("3.lp5"));
+        modifiedClick(foldSpans[0]);
+        check(code().innerText === "⟪ folded: 1.lp5: Fold ⟫\nsecondthird\n",
+            `Folding a newline-terminated section keeps the next section on a new line: ${JSON.stringify(code().innerText)}`);
+        modifiedClick(foldSpans[1]);
+        check(code().innerText === "⟪ folded: 1.lp5: Fold ⟫\n⟪ folded: 2.lp5: Fold ⟫third\n",
+            "Folding a section without a trailing newline does not add one");
 
         await model.selectProject(storage.local.open({kind:"directory",name:"empty.lp5",async getFileHandle() {
             return {async getFile() {return new File(["<template/>"], "empty.lp5");}};
