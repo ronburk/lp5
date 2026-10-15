@@ -1,5 +1,5 @@
 <template>
-    <heading>Project State Machine</heading>
+    <heading>Command State Machine</heading>
     <keywords><li>startup</li><li>state machine</li><li>project selection</li></keywords>
     <section data-lp5-kind="explanation">
         <p>The dialog state retains ownership of the mounted UI while its child handles selection and loading. Suspending the dialog state preserves the decision after the call: successful loading closes the dialog; dismissing the picker leaves it available for retry. Displaying the dialog in entry code prevents later commands from mounting it again.</p>
@@ -7,7 +7,7 @@
         <p>Indentation rule for humans and agents: every directive's first token is right-justified at column 5. Thus <code>state</code> starts at column 1, <code>on</code> and <code>-&gt;</code> at column 4, and <code>-&gt;()</code> at column 2; their right-hand sides start at the current code indentation level, initially column 7, and move four columns to the right for each nested JavaScript block. Keep directive tokens in that fixed left-hand column even inside JavaScript conditions, so the state and transition structure can be read vertically. Ordinary JavaScript follows the same code indentation level as directive right-hand sides; indentation has no semantic effect on directives.</p>
     </section>
     <section data-lp5-kind="code">
-        <name>Project state machine</name>
+        <name>Command state machine</name>
         <code><![CDATA[
 const stateMachineSource = `
 state baseOperationsHandler

@@ -22,7 +22,7 @@
             <li><code>return</code> resumes the caller with the child's completion command. The returned JavaScript value is ignored; without a caller, dispatch ends.</li>
         </ol>
         <p>Compilation belongs to <code>startup()</code> so syntax failures use the same fatal-error reporting as runtime failures. Defining the unit earlier must not start command handling. The compiler and machine stay private because callers need to send commands, not manipulate state factories.</p>
-        <p>The project state machine and async selection work are explained in their own articles. The production controller currently supports calls, waits, and returns; the compiler's replacing transitions remain experimental and are exercised only by separate test drivers.</p>
+        <p>The command state machine and async selection work are explained in their own articles. The production controller currently supports calls, waits, and returns; the compiler's replacing transitions remain experimental and are exercised only by separate test drivers.</p>
     </section>
     <section data-lp5-kind="code">
         <name>JavaScript units</name>
@@ -32,12 +32,12 @@ let operations = (() => {
 
     ]]><lp5- ref="SelectProject async work"/><![CDATA[
 
-    ]]><lp5- ref="Project state machine"/><![CDATA[
+    ]]><lp5- ref="Command state machine"/><![CDATA[
 
     let stateMachine;
     function startup() {
         const code = compileStateMachine(stateMachineSource);
-        const define = util.scriptToFunction(code, "project-state-machine", "view", "asyncSelectProject");
+        const define = util.scriptToFunction(code, "command-state-machine", "view", "asyncSelectProject");
         stateMachine = define(view, asyncSelectProject);
         controller.init(stateMachine.states[stateMachine.initialState]());
     }
