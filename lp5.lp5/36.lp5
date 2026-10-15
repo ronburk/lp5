@@ -110,7 +110,9 @@ function compileStateMachine(source) {
     }
     closeState();
     output.push(`return { initialState: ${JSON.stringify(states.keys().next().value)}, states: __lp5_states };`);
-    return output.join("\n") + "\n";
+    const compiled = output.join("\n") + "\n";
+    console.log("Compiled state machine:\n" + compiled);
+    return compiled;
 }
 ]]></code></section>
 </template>
