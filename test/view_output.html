@@ -45,6 +45,9 @@ run.addEventListener("click", async () => {
             const select = output.querySelector("select"); select.value = name;
             select.dispatchEvent(new win.Event("change", {bubbles:true}));
         };
+        const modifiedClick = (element, shiftKey = false) => element.dispatchEvent(new win.MouseEvent("click", {
+            bubbles:true, ctrlKey:true, shiftKey, cancelable:true
+        }));
         check(code().textContent === expected[""], "Default expansion exactly matches harness output, including whitespace and wrappers");
         check(!code().querySelector("script, tag, lp5-wrapper"), "Expanded code is text, not live HTML");
         check(win.outputExecuted === undefined, "Expanded scripts do not execute");
@@ -54,6 +57,33 @@ run.addEventListener("click", async () => {
         const keys = [...output.querySelectorAll("[data-occurrence]")].map(el => el.dataset.occurrence);
         check(new Set(keys).size === keys.length, "Each expansion occurrence has a distinct identity");
         check(output.querySelectorAll("option").length === 2, "Default and named output are available");
+        const rootOutput = articleSpans("fixture.lp5")[0];
+        const descendants = [...rootOutput.querySelectorAll(".LP5-OutputArticle")];
+        check(descendants.length > 0, "Root output has nested code sections to fold");
+        modifiedClick(rootOutput.querySelector(".LP5-OutputText"), true);
+        check(!rootOutput.classList.contains("LP5-OutputFolded") && descendants.every(span => span.classList.contains("LP5-OutputFolded")),
+            "Ctrl-Shift-click folds every descendant code section without folding the clicked section");
+        const firstDescendant = descendants[0];
+        modifiedClick(firstDescendant);
+        check(!firstDescendant.classList.contains("LP5-OutputFolded"), "Ctrl-click unfolds one folded code section");
+        modifiedClick(firstDescendant);
+        check(firstDescendant.classList.contains("LP5-OutputFolded"), "Ctrl-click folds that code section again");
+        modifiedClick(rootOutput);
+        check(rootOutput.classList.contains("LP5-OutputFolded") && rootOutput.getAttribute("aria-expanded") === "false" &&
+            rootOutput.querySelector(":scope > .LP5-OutputFoldPlaceholder"), "Ctrl-click folds the clicked code section and exposes a placeholder");
+        check(win.getComputedStyle(rootOutput.querySelector(":scope > .LP5-OutputText")).display === "none",
+            "Folded code content is hidden");
+        modifiedClick(rootOutput);
+        check(!rootOutput.classList.contains("LP5-OutputFolded") && descendants.every(span => span.classList.contains("LP5-OutputFolded")),
+            "Unfolding a parent preserves each child fold");
+        choose("<other.js>");
+        choose("");
+        check(rootOutput.dataset.occurrence === articleSpans("fixture.lp5")[0].dataset.occurrence &&
+            articleSpans("fixture.lp5")[0].querySelectorAll(".LP5-OutputFolded").length === descendants.length,
+            "Fold state survives switching outputs and back");
+        for (const span of output.querySelectorAll(".LP5-OutputArticle.LP5-OutputFolded"))
+            modifiedClick(span);
+        check(!output.querySelector(".LP5-OutputFolded"), "Test restores all expanded code before continuing");
         const modelSource = new win.XMLSerializer().serializeToString(model.getArticle("fixture.lp5").document);
         toc.scrollTop = 0;
         output.scrollTop = 100;
@@ -94,6 +124,7 @@ run.addEventListener("click", async () => {
         files["2.lp5"] = files["2.lp5"].replace("B\n", "REVISED\n");
         await model.loadProject();
         check(code().textContent.includes("REVISED") && !code().textContent.includes("B\n"), "Reload replaces cached expansions");
+        check(!output.querySelector(".LP5-OutputFolded"), "Reload clears fold state for the newly loaded model");
         check(!output.querySelector(".LP5-ReferenceTarget"), "Reload removes reference highlighting");
         files["fixture.lp5"] = '<template><children><li id="6.lp5"/></children><section data-lp5-kind="code"><name/><code><lp5- ref="Future"/></code></section></template>';
         files["6.lp5"] = '<template><section data-lp5-kind="code"><name>Only named</name><code><![CDATA[named code]]></code></section></template>';

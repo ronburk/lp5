@@ -4,7 +4,7 @@
     <section data-lp5-kind="explanation">
         <p>The default view expands unnamed code. Named output declarations supply additional choices; an ordinary bundle can also be previewed when a Source reference has no occurrence in any output. This keeps unfinished or unreferenced code inspectable.</p>
         <p>Source reference navigation identifies the reference site, not merely a target article: several fragments may define a bundle, and a reference site may itself occur several times. Its expansions are highlighted together and only Output scrolls. Output text navigates back to its innermost defining article; article selection highlights that article's own text in every displayed occurrence without scrolling Output. Occurrence paths distinguish repeated expansions even when they have the same filename.</p>
-        <p>Plain text, ownership spans, and diagnostic markers remain separate. The DOM never interprets expanded code as HTML. Only the formatter supplies displayed text, keeping future indentation work independent of UI construction.</p>
+        <p>Plain text, ownership spans, and diagnostic markers remain separate. The DOM never interprets expanded code as HTML. Ctrl-click folds or unfolds one occurrence; Ctrl-Shift-click folds all code occurrences nested beneath it. Folding changes only the display and retains occurrence-specific state while outputs are switched.</p>
     </section>
     <section data-lp5-kind="code">
         <name>View output display</name>
@@ -13,6 +13,28 @@ let displayedOutput = "";
 let outputTrees = new Map();
 let outputArticles = new Map();
 let outputReferences = new Map();
+let foldedOccurrences = new Set();
+
+function setOutputFolded(span, folded) {
+    const key = span.dataset.occurrence;
+    if (folded) foldedOccurrences.add(key);
+    else foldedOccurrences.delete(key);
+    span.classList.toggle("LP5-OutputFolded", folded);
+    span.setAttribute("aria-expanded", String(!folded));
+    const placeholder = span.querySelector(":scope > .LP5-OutputFoldPlaceholder");
+    if (folded && !placeholder) {
+        const label = document.createElement("span");
+        label.className = "LP5-OutputFoldPlaceholder";
+        label.setAttribute("aria-hidden", "true");
+        label.textContent = `⟪ folded: ${span.title} ⟫`;
+        span.prepend(label);
+    } else if (!folded) placeholder?.remove();
+}
+
+function foldOutputChildren(span) {
+    for (const child of span.querySelectorAll(".LP5-OutputArticle"))
+        setOutputFolded(child, true);
+}
 
 function outputTree(name) {
     if (!outputTrees.has(name)) outputTrees.set(name, expandOutput(name));
@@ -69,6 +91,7 @@ function displayOutput(name) {
                 span.title = `${node.filename}: ${node.name || "Unnamed code"}`;
                 span.tabIndex = 0;
                 span.setAttribute("role", "link");
+                span.setAttribute("aria-expanded", "true");
                 index(outputArticles, node.filename, span);
             } else {
                 span.className = "LP5-OutputReference";
@@ -89,6 +112,13 @@ function displayOutput(name) {
         if (event.type === "keydown" && event.key !== "Enter") return;
         const span = event.target.closest(".LP5-OutputArticle");
         if (!span) return;
+        if (event.type === "click" && event.ctrlKey) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (event.shiftKey) foldOutputChildren(span);
+            else setOutputFolded(span, !foldedOccurrences.has(span.dataset.occurrence));
+            return;
+        }
         event.preventDefault();
         selectArticle(span.dataset.lp5Filename);
         scrollToArticle(span.dataset.lp5Filename);
@@ -97,11 +127,14 @@ function displayOutput(name) {
     code.addEventListener("keydown", navigate);
     pre.append(code);
     pane.replaceChildren(label, pre);
+    for (const span of code.querySelectorAll(".LP5-OutputArticle"))
+        if (foldedOccurrences.has(span.dataset.occurrence)) setOutputFolded(span, true);
     pane.scrollTop = 0;
     highlightOutputArticle();
 }
 
 function initializeOutput(articles, newSelection) {
+    foldedOccurrences.clear();
     outputNames = [""];
     for (const article of articles) {
         const definition = codeParts(article);

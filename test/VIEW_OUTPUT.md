@@ -2,7 +2,7 @@
 
 Build with `./lp5 lp5 tangle`, start `sites-preview start "$PWD"`, and open
 `/test/view_output.html` at the returned host. Click **Test expanded output**.
-Expect PASS with 34 assertions; the complete fixture is restored for inspection.
+Expect PASS with 44 assertions; the complete fixture is restored for inspection.
 The fixture endpoint invokes `test/output_fixture.py`, which tangles a temporary
 project through the current harness. Default and named display text must match
 those actual generated files exactly for the complete fixture.
@@ -12,7 +12,9 @@ wrappers containing references, literal entities and HTML-looking code,
 occurrence identity, article ownership/highlighting, Output-to-Source navigation,
 Source-reference navigation without moving Source or TOC, switching to the
 containing output, previewing unreferenced bundles, undefined-reference markers,
-reload cache replacement, and article-only or named-output-only projects.
+reload cache replacement, and article-only or named-output-only projects. Ctrl-click
+folds or unfolds one code occurrence; Ctrl-Shift-click folds all descendant code
+sections, preserving independent fold state when outputs are switched.
 
 Expansion and formatting live in separate View fragments. This first formatter
 preserves whitespace rather than reconstructing indentation. Reference offsets
