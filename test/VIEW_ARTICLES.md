@@ -19,3 +19,12 @@ The original three-article fixture is left visible for visual inspection.
 The first rendering pass fills only the Source Pane. Table-of-contents
 navigation and expanded output are not implemented here. Also run the existing
 selection/loading and unit-startup browser tests to check integration.
+
+After the test passes, drag each divider in the displayed application. Verify
+that only its two neighboring panes exchange width and their combined width
+stays constant. Drag beyond a neighbor's minimum: it should stop at 100 CSS
+pixels when sufficient space exists. Release outside the narrow divider and
+verify dragging stops and text selection works again. Resize the browser and
+verify pane proportions remain useful without overflowing the main row.
+Code blocks must continue to scroll horizontally without vertical clipping.
+Pointer cancellation and lost capture must also clear the resizing style.

@@ -9,6 +9,7 @@
     </keywords>
     <section data-lp5-kind="explanation">
         <p>The view subscribes to model load notifications during startup, so any successful load or reload refreshes the Source Pane without requiring its caller to know how articles are displayed. Rendering is private to the view; the operation still owns dialog cleanup and command-state changes.</p>
+        <p>Pane dragging belongs to the view because it changes presentation only. Pointer capture keeps a drag active outside the narrow divider; release, cancellation, or lost capture restores text selection. Only the adjacent panes exchange width, with a 100-pixel minimum where space permits. Flex weights preserve their proportions when the window changes size.</p>
         <p>Mounting a dialog and deciding which commands it accepts are separate responsibilities. The view owns its DOM lifetime; the operation owns the interaction's state and decides when to close it. <code>showModalDialog(dialogName)</code> therefore returns immediately; <code>closeModalDialog(dialogName)</code> ends that mount when the operation decides it is finished.</p>
         <p>A dialog template must provide a style immediately before its dialog, and its initialization script must return the mounted <code>HTMLDialogElement</code>. Shared modal styles are inserted before the dialog-specific styles so the latter can override them. The view tracks all three nodes as one mounted resource; closing removes the dialog and both style clones so repeated use leaves no styles behind.</p>
     </section>
@@ -56,7 +57,48 @@
 
     ]]><lp5- ref="View article rendering"/><![CDATA[
 
+    function initializePaneSplitters() {
+        const main = document.getElementById("LP5-Main");
+        const panes = [...main.children].filter(node => !node.classList.contains("LP5-PaneSplitter"));
+        for (const splitter of main.querySelectorAll(".LP5-PaneSplitter")) {
+            let drag;
+            function finish(event) {
+                if (!drag || event.pointerId !== drag.pointerId) return;
+                drag = null;
+                main.classList.remove("LP5-Resizing");
+                if (splitter.hasPointerCapture(event.pointerId))
+                    splitter.releasePointerCapture(event.pointerId);
+            }
+            splitter.addEventListener("pointerdown", event => {
+                if (event.button !== 0 || !event.isPrimary || drag || main.classList.contains("LP5-Resizing")) return;
+                const widths = panes.map(pane => pane.getBoundingClientRect().width);
+                const available = widths.reduce((sum, width) => sum + width, 0);
+                if (!available) return;
+                panes.forEach((pane, index) => pane.style.flex = `${widths[index]} 1 0px`);
+                const left = splitter.previousElementSibling;
+                const right = splitter.nextElementSibling;
+                const leftWidth = widths[panes.indexOf(left)];
+                const total = leftWidth + widths[panes.indexOf(right)];
+                drag = {pointerId: event.pointerId, x: event.clientX, left, right, leftWidth, total};
+                splitter.setPointerCapture(event.pointerId);
+                main.classList.add("LP5-Resizing");
+                event.preventDefault();
+            });
+            splitter.addEventListener("pointermove", event => {
+                if (!drag || event.pointerId !== drag.pointerId) return;
+                const minimum = Math.min(100, drag.total / 2);
+                const width = Math.max(minimum, Math.min(drag.total - minimum,
+                    drag.leftWidth + event.clientX - drag.x));
+                drag.left.style.flexGrow = width;
+                drag.right.style.flexGrow = drag.total - width;
+            });
+            for (const name of ["pointerup", "pointercancel", "lostpointercapture"])
+                splitter.addEventListener(name, finish);
+        }
+    }
+
     function startup() {
+        initializePaneSplitters();
         model.addEventListener("ProjectLoaded", renderProject);
     }
 

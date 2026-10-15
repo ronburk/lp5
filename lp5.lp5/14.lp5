@@ -127,6 +127,13 @@ body {
     position: relative;
     flex: 0 0 4px;
     cursor: col-resize;
+    touch-action: none;
+}
+
+#LP5-Main.LP5-Resizing,
+#LP5-Main.LP5-Resizing * {
+    cursor: col-resize;
+    user-select: none;
 }
 
 .LP5-PaneSplitter::after {
