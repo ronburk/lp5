@@ -12,8 +12,8 @@
         <li>IndexedDB</li>
     </keywords>
     <section data-lp5-kind="explanation">
-        <p><code>window.LP5.model</code> privately owns the selected project-storage object. <code>await model.selectProject(project)</code> installs an object returned by <code>storage.local.open(handle)</code> or <code>storage.remote.open(url)</code>. Loading uses its whole-file <code>load</code> method and <code>root_filename</code>; it does not depend on directory handles or HTTP.</p>
-        <p>The selecting operation owns local handle persistence. Selection and loading remain separate model calls, serialized by the operation. The model performs no picker, IndexedDB, or UI work.</p>
+        <p>The model keeps one authoritative article representation for navigation, code expansion, and future editing. Article records retain detached XML documents: the view may render the same source in different ways without making rendered HTML the project data. The maps below share those records rather than maintaining separate article copies.</p>
+        <p>File access is supplied as an opened storage object, so the same loader can work with a local directory or an HTTP project. Selection and loading are separate calls, serialized by the operation; choosing a storage location alone does not replace the loaded articles. Picker activation, remembered handles, and UI lifetime belong to the selecting operation and its helpers.</p>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 736 287" role="img" aria-label="Filename map and article XML document" style="display:block;width:100%;height:auto;margin:0.75rem 0;color:#17283a">
           <defs>
             <marker id="model-lookup-ref" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">

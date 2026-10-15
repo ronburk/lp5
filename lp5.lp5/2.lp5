@@ -40,7 +40,7 @@
                 the overwhelming majority would not know,
                 for example,
                 that there is a directed graph at the heart of
-                the techique, or what that is for.
+                the technique, or what that is for.
                 If Knuth jokingly took his <q>revenge</q> on
                 <q>structured programming</q> by using similar
                 language to name his new tools,
@@ -87,9 +87,7 @@
             </p>
 
             <p>
-                took away from Literate Programming.
-                First, lp5 takes the decomposition
-                tools of Literate Programming.
+                The other key concept is generalized decomposition.
                 It is astonishing how often this is belittled or
                 completely ignored in discussions of Literate Programming.
                 Kibitzers will even claim that this was merely a
@@ -205,7 +203,7 @@
                 Do I want to read code <q>like a book?</q>
                 No, I do not,
                 no more than I want to traverse Harry Potter like
-                a hyptertext pile of source code.
+                a hypertext pile of source code.
                 Knuth said:
             </p><blockquote>
                 My experiences have led me to believe that a person
@@ -249,7 +247,7 @@
                 Knuth is concerned with creating finished, polished works,
                 with the finality of committing ink to paper and paper
                 to book publisher.
-                I live a world where <q>finished</q> software is a mirage.
+                I live in a world where <q>finished</q> software is a mirage.
                 Few programs are ever finished, they're always being maintained,
                 extended, rethought.
             </p>
@@ -258,9 +256,6 @@
                 consistent (relentless?) push to analogize with
                 literature was that he was trying to create
                 hypertext with ink and paper.
-            </p>
-            <p>
-                blah
             </p>
 
         </div>

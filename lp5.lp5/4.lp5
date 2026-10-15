@@ -1,23 +1,6 @@
 <template><heading>Outermost Code</heading><keywords><li>doctype</li><li>meta</li></keywords><section data-lp5-kind="explanation">
-        <p>
-    Note that this code section has no name,
-    and recall the lp5 code generation algorithm:
-    it first gathers, in order, all the unnamed
-    code sections,
-    then starts recursively expanding the code
-    references they contain.
-    But because HTML is a (nearly) rigorously nested syntax,
-    that means that when you're using lp5 to write
-    an HTML5 program (i.e., a single HTML file),
-    there will be one and only one unnamed code section
-    (unless you want to give <code>doctype</code>
-    its very own lonely little code section).
-</p>
-        <p>
-    The code here contains an HTML <code>&lt;script&gt;</code>
-    element and its closing <code>&lt;/script&gt;</code> tag.
-    CDATA keeps those tags as literal code in this XML chunk.
-</p>
+        <p>This unnamed fragment is the assembly root for the single-file application. It keeps the HTML document structure visible in one place while named references let the implementation be explained in a different order. Using one assembly root is an organizational choice, not a requirement of HTML or the tangler.</p>
+        <p>Unit definitions run before the body is parsed; startup is deferred until the templates and page elements exist. Constructors therefore define services without trying to mount UI. The startup article explains initialization and failure reporting.</p>
     </section><section data-lp5-kind="code"><name/><code><![CDATA[<!doctype html>
 <!-- lp5.html <>  -->
 <html lang="en">
