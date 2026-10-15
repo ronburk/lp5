@@ -73,8 +73,9 @@ run.addEventListener("click", async () => {
         modifiedClick(rootOutput);
         check(rootOutput.classList.contains("LP5-OutputFolded") && rootOutput.getAttribute("aria-expanded") === "false" &&
             rootOutput.querySelector(":scope > .LP5-OutputFoldPlaceholder"), "Ctrl-click folds the clicked code section and exposes a placeholder");
-        check(rootOutput.querySelector(":scope > .LP5-OutputFoldPlaceholder").textContent.endsWith("\n"),
-            "Fold placeholder preserves the section's trailing newline");
+        check(rootOutput.nextElementSibling?.classList.contains("LP5-OutputFoldBreak") &&
+            rootOutput.nextElementSibling.textContent === "\n",
+            "Folded section retains its trailing newline outside the placeholder");
         check(win.getComputedStyle(rootOutput.querySelector(":scope > .LP5-OutputText")).display === "none",
             "Folded code content is hidden");
         modifiedClick(rootOutput);
@@ -181,6 +182,11 @@ run.addEventListener("click", async () => {
         modifiedClick(foldSpans[1]);
         check(code().innerText === "⟪ folded: 1.lp5: Fold ⟫\n⟪ folded: 2.lp5: Fold ⟫third\n",
             "Folding a section without a trailing newline does not add one");
+        const firstFoldTop = foldSpans[0].getBoundingClientRect().top;
+        const secondFoldTop = foldSpans[1].getBoundingClientRect().top;
+        const thirdSectionTop = foldSpans[2].getBoundingClientRect().top;
+        check(secondFoldTop > firstFoldTop && Math.abs(thirdSectionTop - secondFoldTop) < 2,
+            "Folded sections use an outside line break only when the preceding section ended with one");
 
         await model.selectProject(storage.local.open({kind:"directory",name:"empty.lp5",async getFileHandle() {
             return {async getFile() {return new File(["<template/>"], "empty.lp5");}};
