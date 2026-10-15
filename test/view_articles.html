@@ -64,7 +64,8 @@ button.addEventListener("click", async () => {
         check(articles.map(a => a.dataset.lp5Filename).join() === "fixture.lp5,1.lp5,2.lp5", "Display follows model document order");
         check(articles[0].querySelector("h2").firstChild.textContent === "Root & <display>", "Heading is literal text");
         check(articles[0].querySelector("h2 small").textContent === "fixture.lp5", "Title includes filename");
-        check(articles[1].querySelector("h2").textContent === "1.lp5", "Untitled article uses filename");
+        check(!articles[1].querySelector("h2"), "Untitled article has no generated heading");
+        check(articles[1].querySelector(".LP5-Explanation p").textContent === "Child explanation", "Untitled article explanation still renders");
         check(articles[0].querySelector(".LP5-Explanation strong").textContent === "this", "Explanation markup rendered");
         check(articles[0].querySelector("svg").namespaceURI === "http://www.w3.org/2000/svg", "SVG stays vector markup");
         check(articles[0].querySelector(".LP5-CodeName").textContent === "Root code", "Code name displayed");
@@ -117,8 +118,8 @@ button.addEventListener("click", async () => {
         }}));
         await model.loadProject();
         check(pane.children.length === 1 && pane.firstElementChild.dataset.lp5Filename === "other.lp5", "Different project replaces prior display");
-        check(pane.querySelector("h2").textContent === "other.lp5", "Empty article still has a filename heading");
-        check(doc.querySelectorAll("#LP5-Toc .LP5-TocEntry").length === 1 && !doc.getElementById("LP5-Output").children.length,
+        check(!pane.querySelector("h2"), "Empty article has no generated heading");
+        check(doc.querySelectorAll("#LP5-Toc .LP5-TocEntry").length === 0 && !doc.getElementById("LP5-Output").children.length,
             "TOC tracks the new project while expanded output remains empty");
         files["fixture.lp5"] = originalRoot;
         await model.selectProject(storage.local.open(window.displayFixture));

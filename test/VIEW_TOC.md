@@ -2,10 +2,11 @@
 
 Build with `./lp5 lp5 tangle`, run `sites-preview start "$PWD"`, and open
 `/test/view_toc.html` at the returned host. Click **Test table of contents**.
-Expect PASS with 48 assertions. The complete generated app selects a controlled fixture through
+Expect PASS with 53 assertions. The complete generated app selects a controlled fixture through
 the real startup dialog before testing the model/view connection.
 
-Checks cover nested document order, filename fallback and duplicate titles,
+Checks cover nested document order, untitled article omission, promoted titled
+descendants and duplicate titles,
 accessible disclosure controls, nested collapse state, selection highlighting,
 filenames containing quotes/brackets, Source Pane selection from headings,
 explanations and code without scrolling or disturbing text selection, and navigation that changes only Source
