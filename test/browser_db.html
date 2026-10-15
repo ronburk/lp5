@@ -1,0 +1,79 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>LP5 browserDB tests</title>
+<pre id="results">Running browserDB tests…</pre>
+<script type="module">
+const report = document.getElementById("results");
+let checks = 0;
+function check(condition, message) {
+    if (!condition) throw new Error(message);
+    checks++;
+}
+async function rejects(operation, name) {
+    let error;
+    try { await operation(); } catch (caught) { error = caught; }
+    check(error?.name === name, "Expected " + name + ", got " + error);
+}
+async function run() {
+    const response = await fetch("/lp5.lp5/lp5.out");
+    check(response.ok, "Generated output served");
+    const html = new DOMParser().parseFromString(await response.text(), "text/html");
+    const script = [...html.scripts].find(script => script.textContent.includes("window.LP5 ="));
+    new Function(script.textContent)();
+    const db = window.LP5.util.browserDB;
+    check(Object.keys(db).sort().join() === "entries,load,remove,store", "Public API");
+    const pending = sessionStorage.getItem("browserDB-test");
+    if (pending) {
+        check((await db.load(pending)).persisted === true, "Value survives page reload");
+        await db.remove(pending);
+        check(await db.load(pending) === undefined, "Reload fixture removed");
+        sessionStorage.removeItem("browserDB-test");
+        report.textContent = "PASS: reload persistence and cleanup (" + checks + " assertions)";
+        return;
+    }
+    const prefix = "browserDB-test-" + (Date.now() + "-" + Math.random().toString(36).slice(2)) + ":";
+    const key = suffix => prefix + suffix;
+    try {
+        check(await db.load(key("missing")) === undefined, "Missing key");
+        check(await db.remove(key("missing")) === undefined, "Remove absent key");
+        const value = {name: "Project", nested: [1, true, null]};
+        check(await db.store(key("a"), value) === undefined, "Store completion result");
+        value.nested.push(2);
+        const loaded = await db.load(key("a"));
+        check(loaded.nested.length === 3, "Store takes a clone");
+        loaded.nested.push(3);
+        check((await db.load(key("a"))).nested.length === 3, "Load returns a clone");
+        await db.store(key("a"), "replacement");
+        check(await db.load(key("a")) === "replacement", "Replace existing value");
+        const structured = {date: new Date(12345), map: new Map([["x", 9]]), bytes: new Uint8Array([4, 5])};
+        structured.self = structured;
+        await db.store(key("b"), structured);
+        const copy = await db.load(key("b"));
+        check(copy.date.getTime() === 12345 && copy.map.get("x") === 9 && copy.bytes[1] === 5 && copy.self === copy,
+            "Structured clone types and cycles");
+        await db.store(key("c"), undefined);
+        const entries = (await db.entries()).filter(([k]) => typeof k === "string" && k.startsWith(prefix));
+        check(entries.map(([k]) => k).join() === [key("a"), key("b"), key("c")].join(), "Entries in key order");
+        check(entries[0][1] === "replacement" && entries[2][1] === undefined, "Entries values including undefined");
+        await rejects(() => db.store(key("a"), () => {}), "DataCloneError");
+        check(await db.load(key("a")) === "replacement", "Failed replacement preserves committed value");
+        await rejects(() => db.store({}, "bad key"), "DataError");
+        await rejects(() => db.load(null), "DataError");
+        await rejects(() => db.remove(undefined), "DataError");
+        await Promise.all(Array.from({length: 5}, (_, i) => db.store(key("parallel" + i), i)));
+        check((await Promise.all(Array.from({length: 5}, (_, i) => db.load(key("parallel" + i)))))
+            .every((value, i) => value === i), "Concurrent independent operations commit after failures");
+        await db.remove(key("a"));
+        check(await db.load(key("a")) === undefined, "Remove existing key");
+    } finally {
+        for (const [k] of await db.entries())
+            if (typeof k === "string" && k.startsWith(prefix)) await db.remove(k);
+    }
+    check(!(await db.entries()).some(([k]) => typeof k === "string" && k.startsWith(prefix)), "Fixtures cleaned");
+    const sentinel = key("reload");
+    await db.store(sentinel, {persisted: true});
+    sessionStorage.setItem("browserDB-test", sentinel);
+    report.textContent = "PASS: " + checks + " assertions. Reload this page to verify persistence and remove the sentinel.";
+}
+run().catch(error => { report.textContent = "FAIL: " + error.stack; console.error(error); });
+</script>
