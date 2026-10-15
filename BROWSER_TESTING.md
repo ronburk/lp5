@@ -29,6 +29,9 @@ using a controlled picker installed before startup in a test-only iframe.
 `test/VIEW_ARTICLES.md` covers Source Pane rendering after model load/reload,
 literal code, explanation markup and SVG, and replacement of the prior display.
 
+`test/VIEW_TOC.md` covers the rewrite's TOC hierarchy, disclosure controls,
+navigation, selection, and collapse state across reloads/project changes.
+
 `test/STATE_MACHINE_COMPILER.md` covers the experimental compiler and a separate
 test driver; the production handler loop does not support tagged transitions yet.
 

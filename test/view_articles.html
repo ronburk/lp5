@@ -96,8 +96,8 @@ button.addEventListener("click", async () => {
         await model.loadProject();
         check(pane.children.length === 1 && pane.firstElementChild.dataset.lp5Filename === "other.lp5", "Different project replaces prior display");
         check(pane.querySelector("h2").textContent === "other.lp5", "Empty article still has a filename heading");
-        check(!doc.getElementById("LP5-Toc").children.length && !doc.getElementById("LP5-Output").children.length,
-            "Navigation and expanded output remain outside this first pass");
+        check(doc.querySelectorAll("#LP5-Toc .LP5-TocEntry").length === 1 && !doc.getElementById("LP5-Output").children.length,
+            "TOC tracks the new project while expanded output remains empty");
         files["fixture.lp5"] = originalRoot;
         await model.selectProject(storage.local.open(window.displayFixture));
         await model.loadProject();

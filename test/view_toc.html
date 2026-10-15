@@ -1,0 +1,134 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>LP5 table of contents tests</title>
+<button id="run">Test table of contents</button>
+<pre id="results">Choose the test.</pre>
+<iframe id="app" title="Generated LP5 application" style="width:100%;height:560px"></iframe>
+<script type="module">
+const frame = document.getElementById("app");
+const report = document.getElementById("results");
+const run = document.getElementById("run");
+let checks;
+function check(condition, message) {
+    if (!condition) throw new Error(message);
+    checks++;
+}
+async function until(predicate) {
+    for (let i = 0; i < 100; i++) {
+        if (predicate()) return;
+        await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    throw new Error("Timed out waiting for project display");
+}
+function article(title, children = []) {
+    return '<template>' + (title ? '<heading>' + title + '</heading>' : '') +
+        (children.length ? '<children>' + children.map(id => '<li id="' + id + '"/>').join('') + '</children>' : '') +
+        '<section data-lp5-kind="explanation"><p style="min-height:120px">Article text</p></section></template>';
+}
+function directory(files) {
+    return {kind: "directory", name: "fixture.lp5", async getFileHandle(filename) {
+        if (!(filename in files)) throw new Error("Missing " + filename);
+        return {async getFile() { return new File([files[filename]], filename); }};
+    }};
+}
+run.addEventListener("click", async () => {
+    checks = 0;
+    run.disabled = true;
+    try {
+        const extra = Array.from({length: 30}, (_, i) => `extra-${i}.lp5`);
+        const odd = "odd' [x].lp5";
+        const children = ["1.lp5", "2.lp5", odd, ...extra];
+        const files = {
+            "fixture.lp5": article("Root", children),
+            "1.lp5": article("Repeated", ["3.lp5"]),
+            "3.lp5": article(""),
+            "2.lp5": article("Repeated"),
+            [odd]: article("Special filename")
+        };
+        for (const [i, filename] of extra.entries()) files[filename] = article("Extra " + i);
+        window.tocFixture = directory(files);
+        const response = await fetch("/lp5.lp5/lp5.out");
+        check(response.ok, "Generated application served");
+        const html = await response.text();
+        const bootstrap = '<script>window.showDirectoryPicker = async () => parent.tocFixture;' +
+            'window.LP5.util.indexedDB.storeDirectoryHandle = async () => {};<\/script>';
+        const loaded = new Promise(resolve => frame.addEventListener("load", resolve, {once: true}));
+        frame.srcdoc = html.replace('<script type="module">', bootstrap + '<script type="module">');
+        await loaded;
+        const doc = frame.contentDocument, win = frame.contentWindow;
+        const {model, storage} = win.LP5;
+        check(!doc.getElementById("LP5-Toc").children.length, "TOC starts empty");
+        doc.getElementById("SelectCreateProject-Select").click();
+        await until(() => !doc.getElementById("SelectCreateProject-dialog") || doc.querySelector('dialog[role="alertdialog"]'));
+        check(!doc.querySelector('dialog[role="alertdialog"]'), "Project display succeeds");
+        const toc = doc.getElementById("LP5-Toc"), source = doc.getElementById("LP5-Source"), output = doc.getElementById("LP5-Output");
+        const item = filename => [...toc.querySelectorAll("li")].find(li => li.dataset.lp5Filename === filename);
+        const entry = filename => item(filename).firstElementChild.querySelector(".LP5-TocEntry");
+        const toggle = filename => item(filename).firstElementChild.querySelector(".LP5-TocToggle");
+        const shown = filename => [...source.children].find(el => el.dataset.lp5Filename === filename);
+        check(toc.querySelectorAll(".LP5-TocEntry").length === 35, "Every reachable article has a TOC entry");
+        check([...toc.querySelectorAll("li")].map(li => li.dataset.lp5Filename).join() ===
+            ["fixture.lp5", "1.lp5", "3.lp5", "2.lp5", odd, ...extra].join(), "TOC follows depth-first document order");
+        check(item("3.lp5").parentElement.parentElement === item("1.lp5"), "Child list is nested under its parent");
+        check(entry("3.lp5").textContent === "3.lp5", "Untitled entry falls back to filename");
+        check(entry("1.lp5").textContent === entry("2.lp5").textContent, "Duplicate headings are allowed");
+        check(entry("1.lp5").title === "1.lp5" && entry("2.lp5").title === "2.lp5", "Filename tooltips distinguish repeated titles");
+        check(toggle("fixture.lp5").getAttribute("aria-expanded") === "true" && toggle("1.lp5").getAttribute("aria-expanded") === "true", "Parents initially expanded");
+        check(toggle("2.lp5") === null, "Leaf has no disclosure control");
+        toggle("1.lp5").click();
+        check(toggle("1.lp5").getAttribute("aria-expanded") === "false" && item("1.lp5").lastElementChild.hidden, "Collapse hides children and updates accessibility state");
+        check(!toc.querySelector('[aria-current="true"]'), "Disclosure does not select an article");
+        toggle("fixture.lp5").click();
+        check(item("fixture.lp5").lastElementChild.hidden, "Root can collapse its entire subtree");
+        toggle("fixture.lp5").click();
+        check(toggle("1.lp5").getAttribute("aria-expanded") === "false", "Parent expansion preserves nested collapse state");
+        toggle("1.lp5").click();
+        check(!item("1.lp5").lastElementChild.hidden, "Child group can expand again");
+        const filler = doc.createElement("div");
+        filler.style.height = "2000px";
+        filler.textContent = "Output scroll sentinel";
+        output.append(filler);
+        output.scrollTop = 90;
+        toc.scrollTop = 40;
+        const before = {toc: toc.scrollTop, output: output.scrollTop, page: win.scrollY, outer: window.scrollY};
+        check(before.toc > 0 && before.output > 0, "Other panes have meaningful nonzero scroll positions");
+        entry("2.lp5").click();
+        check(source.scrollTop > 0, "Entry click scrolls the Source Pane");
+        check(Math.abs(shown("2.lp5").getBoundingClientRect().top - source.getBoundingClientRect().top - source.clientTop) < 1, "Target article aligns with Source Pane top");
+        check(toc.scrollTop === before.toc && output.scrollTop === before.output, "Navigation preserves TOC and Output scrolling");
+        check(win.scrollY === before.page && window.scrollY === before.outer, "Navigation does not scroll ancestor pages");
+        check(entry("2.lp5").getAttribute("aria-current") === "true" && shown("2.lp5").classList.contains("LP5-Selected"), "TOC entry and source article are selected together");
+        entry("1.lp5").click();
+        check(!entry("2.lp5").hasAttribute("aria-current") && !shown("2.lp5").classList.contains("LP5-Selected"), "Previous selection is cleared");
+        check(shown("1.lp5").classList.contains("LP5-Selected"), "Duplicate title navigates by filename");
+        entry(odd).click();
+        check(shown(odd).classList.contains("LP5-Selected"), "Quotes and brackets in filenames do not become selectors");
+        toggle("1.lp5").click();
+        const oldRoot = item("fixture.lp5");
+        await model.loadProject();
+        check(toggle("1.lp5").getAttribute("aria-expanded") === "false", "Reload preserves collapse state");
+        check(!oldRoot.isConnected && toc.querySelectorAll(".LP5-TocEntry").length === 35, "Reload replaces TOC without duplication");
+        check(!toc.querySelector('[aria-current="true"]') && !source.querySelector(".LP5-Selected"), "Reload clears click selection");
+        check(source.scrollTop === 0, "Reload resets Source Pane scroll");
+        files["fixture.lp5"] = article("Revised root", ["1.lp5", "new.lp5", "2.lp5", odd, ...extra]);
+        files["new.lp5"] = article("New parent", ["new-child.lp5"]);
+        files["new-child.lp5"] = article("New child");
+        await model.loadProject();
+        check(entry("fixture.lp5").textContent === "Revised root", "Reload refreshes TOC titles");
+        check(toggle("1.lp5").getAttribute("aria-expanded") === "false" && toggle("new.lp5").getAttribute("aria-expanded") === "true", "New entries expand while existing collapse state survives");
+        const other = {"fixture.lp5": article("Other project", ["1.lp5"]), "1.lp5": article("Other parent", ["3.lp5"]), "3.lp5": article("Other child")};
+        await model.selectProject(storage.local.open(directory(other)));
+        await model.loadProject();
+        check(entry("fixture.lp5").textContent === "Other project" && toc.querySelectorAll(".LP5-TocEntry").length === 3, "New project replaces old TOC even with the same root filename");
+        check(toggle("1.lp5").getAttribute("aria-expanded") === "true", "Different project starts expanded despite identical filenames");
+        entry("3.lp5").click();
+        check(shown("3.lp5").classList.contains("LP5-Selected"), "Navigation uses replacement source elements");
+        report.textContent = `PASS: ${checks} assertions; hierarchy, collapse, selection, isolated scrolling, reload, and project identity.`;
+    } catch (error) {
+        report.textContent = "FAIL: " + error.stack;
+    } finally {
+        run.disabled = false;
+        delete window.tocFixture;
+    }
+});
+</script>

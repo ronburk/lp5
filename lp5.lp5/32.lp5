@@ -45,7 +45,7 @@
     bundles = indexes.bundles;
     referrers = indexes.referrers;
     rootFilename = project.root_filename;
-    notifications.dispatchEvent(new Event("ProjectLoaded"));
+    notifications.dispatchEvent(new CustomEvent("ProjectLoaded", { detail: { selectionId } }));
 }
 
 function getArticle(filename) {

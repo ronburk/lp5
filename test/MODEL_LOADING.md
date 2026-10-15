@@ -24,6 +24,8 @@ successful load/reload, complete articles and indexes during notification,
 notification before the load Promise resolves, subscriptions surviving reload,
 once/removal behavior, and no completion events for selection, pending loads,
 or failed loads. This event is separate from the controller completion command.
+Its selectionId stays stable on reload and changes for a different opened
+storage object, even if both projects have the same root filename.
 
 If OPFS is available, the page additionally creates a uniquely named temporary
 project, writes and loads an actual file, and verifies its native directory

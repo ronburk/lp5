@@ -193,6 +193,55 @@ body {
     white-space: pre-wrap;
     overflow-wrap: anywhere;
 }
+
+#LP5-Toc ul {
+    list-style: none;
+    padding-left: 1rem;
+    margin: 0;
+}
+
+#LP5-Toc > ul {
+    padding: 0.5rem 0.25rem;
+}
+
+.LP5-TocRow {
+    display: flex;
+    align-items: baseline;
+}
+
+.LP5-TocToggle,
+.LP5-TocEntry {
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    padding: 0.2rem;
+    cursor: pointer;
+}
+
+.LP5-TocToggle,
+.LP5-TocSpacer {
+    flex: 0 0 1.25rem;
+}
+
+.LP5-TocEntry {
+    text-align: left;
+    overflow-wrap: anywhere;
+    min-width: 0;
+}
+
+.LP5-TocEntry:hover,
+.LP5-TocEntry[aria-current="true"] {
+    background: #dce8f5;
+}
+
+#LP5-Source > .LP5-Article {
+    border-left: 3px solid transparent;
+}
+
+#LP5-Source > .LP5-Article.LP5-Selected {
+    border-left-color: #17283a;
+}
 ]]></code>
     </section>
 </template>
