@@ -104,6 +104,15 @@ run.addEventListener("click", async () => {
         check(Math.abs(sourceArticle("3.lp5").getBoundingClientRect().top - source.getBoundingClientRect().top - source.clientTop) < 1,
             "Output click scrolls to the defining Source article");
         check([...toc.querySelectorAll('[aria-current="true"]')].some(el => el.title === "3.lp5"), "Output click selects the corresponding TOC entry");
+        const firstLine = output.querySelector('.LP5-OutputArticle[data-lp5-filename="fixture.lp5"] > .LP5-OutputText');
+        const firstLineRange = doc.createRange();
+        firstLineRange.selectNodeContents(firstLine.firstChild);
+        const firstLineRect = firstLineRange.getClientRects()[0];
+        output.querySelector("pre").dispatchEvent(new win.MouseEvent("click", {
+            bubbles:true, clientX:firstLineRect.right + 100, clientY:(firstLineRect.top + firstLineRect.bottom) / 2
+        }));
+        check(sourceArticle("fixture.lp5").classList.contains("LP5-Selected"),
+            "Clicking to the right of a line selects its nearest article span on that line");
         choose("<other.js>");
         check(withoutWhitespace(code().textContent) === withoutWhitespace(expected["<other.js>"]),
             "Named output preserves harness text and wrappers");

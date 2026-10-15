@@ -2,7 +2,7 @@
 
 Build with `./lp5 lp5 tangle`, start `sites-preview start "$PWD"`, and open
 `/test/view_output.html` at the returned host. Click **Test expanded output**.
-Expect PASS with 51 assertions; the complete fixture is restored for inspection.
+Expect PASS with 52 assertions; the complete fixture is restored for inspection.
 The fixture endpoint invokes `test/output_fixture.py`, which tangles a temporary
 project through the current harness. Default and named display text must retain
 the same non-whitespace code and wrappers as those generated files; the Output
