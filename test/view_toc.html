@@ -41,7 +41,8 @@ run.addEventListener("click", async () => {
         const files = {
             "fixture.lp5": article("Root", children),
             "1.lp5": article("Repeated", ["3.lp5"]),
-            "3.lp5": article(""),
+            "3.lp5": article(" ", ["4.lp5"]),
+            "4.lp5": article("Nested title"),
             "2.lp5": article("Repeated").replace("</template>",
                 '<section data-lp5-kind="code"><name>Example</name><code><![CDATA[const example = 1;]]></code></section></template>'),
             [odd]: article("Special filename")
@@ -64,14 +65,15 @@ run.addEventListener("click", async () => {
         check(!doc.querySelector('dialog[role="alertdialog"]'), "Project display succeeds");
         const toc = doc.getElementById("LP5-Toc"), source = doc.getElementById("LP5-Source"), output = doc.getElementById("LP5-Output");
         const item = filename => [...toc.querySelectorAll("li")].find(li => li.dataset.lp5Filename === filename);
-        const entry = filename => item(filename).firstElementChild.querySelector(".LP5-TocEntry");
+        const entry = filename => item(filename)?.firstElementChild.querySelector(".LP5-TocEntry");
         const toggle = filename => item(filename).firstElementChild.querySelector(".LP5-TocToggle");
         const shown = filename => [...source.children].find(el => el.dataset.lp5Filename === filename);
-        check(toc.querySelectorAll(".LP5-TocEntry").length === 35, "Every reachable article has a TOC entry");
+        check(toc.querySelectorAll(".LP5-TocEntry").length === 35, "Untitled reachable articles are omitted from the TOC");
         check([...toc.querySelectorAll("li")].map(li => li.dataset.lp5Filename).join() ===
-            ["fixture.lp5", "1.lp5", "3.lp5", "2.lp5", odd, ...extra].join(), "TOC follows depth-first document order");
-        check(item("3.lp5").parentElement.parentElement === item("1.lp5"), "Child list is nested under its parent");
-        check(entry("3.lp5").textContent === "3.lp5", "Untitled entry falls back to filename");
+            ["fixture.lp5", "1.lp5", "4.lp5", "2.lp5", odd, ...extra].join(), "TOC follows depth-first document order and promotes titled descendants");
+        check(!item("3.lp5") && !shown("3.lp5").querySelector("h2"), "Untitled article has no TOC entry or generated heading");
+        check(item("4.lp5").parentElement.parentElement === item("1.lp5"), "Titled descendant is nested under nearest titled ancestor");
+        check(entry("4.lp5").textContent === "Nested title", "Promoted descendant keeps its heading");
         check(entry("1.lp5").textContent === entry("2.lp5").textContent, "Duplicate headings are allowed");
         check(entry("1.lp5").title === "1.lp5" && entry("2.lp5").title === "2.lp5", "Filename tooltips distinguish repeated titles");
         check(toggle("fixture.lp5").getAttribute("aria-expanded") === "true" && toggle("1.lp5").getAttribute("aria-expanded") === "true", "Parents initially expanded");
@@ -104,13 +106,13 @@ run.addEventListener("click", async () => {
         check(shown("1.lp5").classList.contains("LP5-Selected"), "Duplicate title navigates by filename");
         entry(odd).click();
         check(shown(odd).classList.contains("LP5-Selected"), "Quotes and brackets in filenames do not become selectors");
-        for (const [filename, selector] of [["fixture.lp5", "h2"], ["2.lp5", ".LP5-Explanation p"], ["2.lp5", "pre code"]]) {
+        for (const [filename, selector] of [["fixture.lp5", "h2"], ["2.lp5", ".LP5-Explanation p"], ["2.lp5", "pre code"], ["3.lp5", ".LP5-Explanation p"]]) {
             const target = shown(filename).querySelector(selector);
             const beforeClick = [source.scrollTop, source.scrollLeft, toc.scrollTop, output.scrollTop, win.scrollY, window.scrollY];
             const width = shown(filename).getBoundingClientRect().width;
             target.click();
-            check(shown(filename).classList.contains("LP5-Selected") && entry(filename).getAttribute("aria-current") === "true", "Source click selects article and TOC: " + selector);
-            check(source.querySelectorAll(".LP5-Selected").length === 1 && toc.querySelectorAll('[aria-current="true"]').length === 1, "Exactly one selection after source click");
+            check(shown(filename).classList.contains("LP5-Selected") && (entry(filename)?.getAttribute("aria-current") === "true" || !entry(filename)), "Source click selects article and any TOC entry: " + selector);
+            check(source.querySelectorAll(".LP5-Selected").length === 1 && toc.querySelectorAll('[aria-current="true"]').length === (entry(filename) ? 1 : 0), "Selection remains valid for titled and untitled articles");
             check(JSON.stringify(beforeClick) === JSON.stringify([source.scrollTop, source.scrollLeft, toc.scrollTop, output.scrollTop, win.scrollY, window.scrollY]), "Source selection preserves all scrolling");
             check(shown(filename).getBoundingClientRect().width === width, "Selection marker does not change article width");
         }
