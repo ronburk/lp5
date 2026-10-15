@@ -9,7 +9,7 @@
     <section data-lp5-kind="explanation">
         <p>Selection involves asynchronous work, but command legality must remain with the HSM. This function reports completion rather than holding the state handler inside an <code>await</code>. A local picker must be invoked before the first suspension so the Select click's user activation reaches the browser API; remote selection needs no picker.</p>
         <p>Dismissing the picker is an expected user decision, represented by <code>ProjectPickerAborted</code>. Only the picker call has that interpretation: an <code>AbortError</code> from persistence or loading is still a failure. Other errors escape to fatal reporting because recovery has not been defined.</p>
-        <p><code>ProjectLoaded</code> means the entire model is available, not merely that a directory was chosen. Local handle persistence precedes model selection and loading; remote projects use the directory-name convention for their root filename. Completion uses deferred dispatch so even a prompt picker dismissal cannot reach the state generator while its entry code is running.</p>
+        <p>The <code>ProjectLoaded</code> controller command lets the HSM complete selection; it is separate from the model event of the same name, which informs data observers. Both mean the entire model is available, not merely that a directory was chosen. Local handle persistence precedes model selection and loading; remote projects use the directory-name convention for their root filename. Completion uses deferred dispatch so even a prompt picker dismissal cannot reach the state generator while its entry code is running.</p>
     </section>
     <section data-lp5-kind="code">
         <name>SelectProject async work</name>
