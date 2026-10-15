@@ -3,7 +3,7 @@
     <keywords><li>view</li><li>rendering</li><li>articles</li></keywords>
     <section data-lp5-kind="explanation">
         <p>The Source Pane is a presentation of model XML, not an editing copy of it. Explanation markup is parsed as HTML so paragraphs and SVG illustrations retain their browser presentation. Literal code and LP references are displayed as text, preventing source code from becoming live page elements. Untitled articles use their filename as a heading.</p>
-        <p>A model load replaces the entire article display in document order. Building the replacement offscreen keeps the old display intact until the new one is ready, and rendering never moves nodes out of the model. The view subscribes during startup, before the first project can be selected. This first pass leaves navigation and code expansion to later work.</p>
+        <p>A model load replaces the entire article display in document order. Building the replacement offscreen keeps the old display intact until the new one is ready, and rendering never moves nodes out of the model. The view subscribes during startup, before the first project can be selected. The TOC is built from the same records and installed alongside the source, so both panes change together. Code expansion remains separate work.</p>
     </section>
     <section data-lp5-kind="code">
         <name>View article rendering</name>
@@ -55,13 +55,27 @@
     return rendered;
 }
 
-function renderProject() {
+function renderProject(event) {
     const pane = document.getElementById("LP5-Source");
-    if (!pane) throw new Error("Missing LP5-Source pane");
+    const toc = document.getElementById("LP5-Toc");
+    if (!pane || !toc) throw new Error("Missing LP5-Source or LP5-Toc pane");
+    const selectionId = event.detail.selectionId;
+    if (selectionId !== displayedSelectionId) collapsedArticles.clear();
+    const articles = [...model.docOrder()];
     const content = document.createDocumentFragment();
-    for (const article of model.docOrder())
-        content.append(renderArticle(article));
+    const elements = new Map();
+    for (const article of articles) {
+        const element = renderArticle(article);
+        elements.set(article.filename, element);
+        content.append(element);
+    }
+    const navigation = renderTableOfContents(articles);
     pane.replaceChildren(content);
+    toc.replaceChildren(navigation.content);
+    articleElements = elements;
+    tocEntries = navigation.entries;
+    selectedFilename = null;
+    displayedSelectionId = selectionId;
     pane.scrollTop = 0;
 }
 ]]></code>

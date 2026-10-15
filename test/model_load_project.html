@@ -81,6 +81,7 @@ async function run() {
     const notification = notifications[0];
     check(notification.event instanceof Event && notification.event.type === "ProjectLoaded",
         "Load notification is a browser event");
+    check(Number.isInteger(notification.event.detail.selectionId), "Load identifies its selection lifetime");
     check(notification.event.target instanceof EventTarget &&
         notification.event.target !== window && notification.event.target !== document,
         "Model uses its own event target");
@@ -115,13 +116,18 @@ async function run() {
     const firstArticle = model.getArticle("fixture.lp5");
     await model.loadProject();
     check(notifications.length === 2, "Reload emits a second event to existing subscribers");
+    check(notifications[1].event.detail.selectionId === notification.event.detail.selectionId,
+        "Reload retains the selection identity");
     check(model.getArticle("fixture.lp5") !== firstArticle, "Reload replaces article records");
     check(onceCount === 1 && removedCount === 0, "Once and removed listeners stay inactive on reload");
     model.removeEventListener("ProjectLoaded", onLoaded);
     const ordinaryParsererror = directory({"fixture.lp5": article([], null, "",
         '<section data-lp5-kind="explanation"><parsererror>Ordinary content</parsererror></section>')});
+    let nextSelectionId;
+    model.addEventListener("ProjectLoaded", event => { nextSelectionId = event.detail.selectionId; }, {once: true});
     await selectDirectory(ordinaryParsererror);
     await model.loadProject();
+    check(nextSelectionId !== notification.event.detail.selectionId, "Different storage with the same root name has a new identity");
     check(notifications.length === 2, "Unsubscribed listener receives no later loads");
     check(model.rootFilename === "fixture.lp5", "Ordinary parsererror markup is not a parse error");
     const normalizedNames = directory({

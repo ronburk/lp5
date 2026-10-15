@@ -1,5 +1,6 @@
 <template>
     <children>
+        <li id="40.lp5"/>
         <li id="39.lp5"/>
     </children>
     <heading>View</heading>
@@ -8,7 +9,7 @@
         <li>modal dialog</li>
     </keywords>
     <section data-lp5-kind="explanation">
-        <p>The view subscribes to model load notifications during startup, so any successful load or reload refreshes the Source Pane without requiring its caller to know how articles are displayed. Rendering is private to the view; the operation still owns dialog cleanup and command-state changes.</p>
+        <p>The view subscribes to model load notifications during startup, so any successful load or reload refreshes the Source and Table of Contents panes without requiring its caller to know how articles are displayed. Rendering is private to the view; the operation still owns dialog cleanup and command-state changes.</p>
         <p>Pane dragging belongs to the view because it changes presentation only. Pointer capture keeps a drag active outside the narrow divider; release, cancellation, or lost capture restores text selection. Only the adjacent panes exchange width, with a 100-pixel minimum where space permits. Flex weights preserve their proportions when the window changes size.</p>
         <p>Mounting a dialog and deciding which commands it accepts are separate responsibilities. The view owns its DOM lifetime; the operation owns the interaction's state and decides when to close it. <code>showModalDialog(dialogName)</code> therefore returns immediately; <code>closeModalDialog(dialogName)</code> ends that mount when the operation decides it is finished.</p>
         <p>A dialog template must provide a style immediately before its dialog, and its initialization script must return the mounted <code>HTMLDialogElement</code>. Shared modal styles are inserted before the dialog-specific styles so the latter can override them. The view tracks all three nodes as one mounted resource; closing removes the dialog and both style clones so repeated use leaves no styles behind.</p>
@@ -55,7 +56,7 @@
         dialogs.delete(dialogName);
     }
 
-    ]]><lp5- ref="View article rendering"/><![CDATA[
+    ]]><lp5- ref="View table of contents"/><lp5- ref="View article rendering"/><![CDATA[
 
     function initializePaneSplitters() {
         const main = document.getElementById("LP5-Main");
