@@ -1,0 +1,92 @@
+<template>
+    <heading>Table of Contents</heading>
+    <keywords><li>view</li><li>navigation</li><li>table of contents</li></keywords>
+    <section data-lp5-kind="explanation">
+        <p>The TOC and Source Pane describe the same model records. Filenames connect their elements because titles may be absent or repeated; maps avoid turning filenames into CSS selectors. Model document order and parent filenames determine the nested lists without inventing another hierarchy.</p>
+        <p>Collapse state belongs to View and survives reloads of the selected storage object. A new model selection ID clears it, including when two projects have identical filenames. Selecting an entry highlights its source article and scrolls only the Source Pane; changing a disclosure control does not select an article. Selection is driven by clicks and resets on load, rather than following manual scrolling.</p>
+    </section>
+    <section data-lp5-kind="code">
+        <name>View table of contents</name>
+        <code><![CDATA[let displayedSelectionId;
+const collapsedArticles = new Set();
+let articleElements = new Map();
+let tocEntries = new Map();
+let selectedFilename = null;
+
+function selectArticle(filename) {
+    if (selectedFilename !== null) {
+        articleElements.get(selectedFilename)?.classList.remove("LP5-Selected");
+        tocEntries.get(selectedFilename)?.removeAttribute("aria-current");
+    }
+    selectedFilename = filename;
+    const article = articleElements.get(filename);
+    article.classList.add("LP5-Selected");
+    tocEntries.get(filename).setAttribute("aria-current", "true");
+    const pane = document.getElementById("LP5-Source");
+    pane.scrollTop += article.getBoundingClientRect().top -
+        pane.getBoundingClientRect().top - pane.clientTop;
+}
+
+function renderTableOfContents(articles) {
+    const children = new Map();
+    for (const article of articles) {
+        if (!children.has(article.parentFilename))
+            children.set(article.parentFilename, []);
+        children.get(article.parentFilename).push(article);
+    }
+    const entries = new Map();
+    function list(parentFilename) {
+        const ul = document.createElement("ul");
+        for (const article of children.get(parentFilename) || []) {
+            const li = document.createElement("li");
+            li.dataset.lp5Filename = article.filename;
+            const row = document.createElement("div");
+            row.className = "LP5-TocRow";
+            const button = document.createElement("button");
+            button.type = "button";
+            const heading = Array.from(article.document.documentElement.children)
+                .find(element => element.tagName === "heading");
+            const title = heading?.textContent.trim() || article.filename;
+            button.textContent = title;
+            button.title = article.filename;
+            button.className = "LP5-TocEntry";
+            button.addEventListener("click", () => selectArticle(article.filename));
+            entries.set(article.filename, button);
+            li.append(row);
+            if (children.has(article.filename)) {
+                const nested = list(article.filename);
+                const toggle = document.createElement("button");
+                toggle.type = "button";
+                toggle.className = "LP5-TocToggle";
+                function showExpansion() {
+                    const open = !collapsedArticles.has(article.filename);
+                    nested.hidden = !open;
+                    toggle.textContent = open ? "▾" : "▸";
+                    toggle.setAttribute("aria-expanded", String(open));
+                    toggle.setAttribute("aria-label", (open ? "Collapse " : "Expand ") + title);
+                }
+                toggle.addEventListener("click", () => {
+                    if (collapsedArticles.has(article.filename))
+                        collapsedArticles.delete(article.filename);
+                    else
+                        collapsedArticles.add(article.filename);
+                    showExpansion();
+                });
+                showExpansion();
+                row.append(toggle, button);
+                li.append(nested);
+            } else {
+                const spacer = document.createElement("span");
+                spacer.className = "LP5-TocSpacer";
+                spacer.setAttribute("aria-hidden", "true");
+                row.append(spacer, button);
+            }
+            ul.append(li);
+        }
+        return ul;
+    }
+    return { content: list(null), entries };
+}
+]]></code>
+    </section>
+</template>

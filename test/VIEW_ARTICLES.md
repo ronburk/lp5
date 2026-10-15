@@ -16,6 +16,6 @@ Reload and project replacement must replace the display and reset its scroll.
 Native picker permissions and persistence are bypassed before startup.
 The original three-article fixture is left visible for visual inspection.
 
-The first rendering pass fills only the Source Pane. Table-of-contents
-navigation and expanded output are not implemented here. Also run the existing
-selection/loading and unit-startup browser tests to check integration.
+The Source Pane and TOC rebuild together; expanded output remains unfinished.
+`test/VIEW_TOC.md` covers hierarchy, navigation, and collapse state. Also run
+the selection/loading browser tests to check integration.
