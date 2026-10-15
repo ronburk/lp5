@@ -3,7 +3,7 @@
     <keywords><li>startup</li><li>state machine</li><li>project selection</li></keywords>
     <section data-lp5-kind="explanation">
         <p>The dialog state retains ownership of the mounted UI while its child handles selection and loading. Suspending the dialog state preserves the decision after the call: successful loading closes the dialog; dismissing the picker leaves it available for retry. Displaying the dialog in entry code prevents later commands from mounting it again.</p>
-        <p>The selection state accepts only completion commands while async work is pending, so repeated Select clicks cannot start overlapping loads. Its entry action must start during immediate dispatch from the click to preserve picker activation. Rendering and project creation remain unfinished; this machine currently uses the controller's supported calls and returns.</p>
+        <p>The selection state accepts only completion commands while async work is pending, so repeated Select clicks cannot start overlapping loads. Its entry action must start during immediate dispatch from the click to preserve picker activation. The view refreshes from the model notification; project creation remains unfinished; this machine currently uses the controller's supported calls and returns.</p>
         <p>Indentation rule for humans and agents: every directive's first token is right-justified at column 5. Thus <code>state</code> starts at column 1, <code>on</code> and <code>-&gt;</code> at column 4, and <code>-&gt;()</code> at column 2; their right-hand sides start at the current code indentation level, initially column 7, and move four columns to the right for each nested JavaScript block. Keep directive tokens in that fixed left-hand column even inside JavaScript conditions, so the state and transition structure can be read vertically. Ordinary JavaScript follows the same code indentation level as directive right-hand sides; indentation has no semantic effect on directives.</p>
     </section>
     <section data-lp5-kind="code">
@@ -23,7 +23,6 @@ state SelectCreateProject
  ->() SelectProject
       if (event.name === "ProjectLoaded") {
           view.closeModalDialog("SelectCreateProject");
-          // TODO: Ask the view to render the loaded model.
           return;
       }
 

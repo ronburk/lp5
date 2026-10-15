@@ -1,0 +1,69 @@
+<template>
+    <heading>Displaying articles</heading>
+    <keywords><li>view</li><li>rendering</li><li>articles</li></keywords>
+    <section data-lp5-kind="explanation">
+        <p>The Source Pane is a presentation of model XML, not an editing copy of it. Explanation markup is parsed as HTML so paragraphs and SVG illustrations retain their browser presentation. Literal code and LP references are displayed as text, preventing source code from becoming live page elements. Untitled articles use their filename as a heading.</p>
+        <p>A model load replaces the entire article display in document order. Building the replacement offscreen keeps the old display intact until the new one is ready, and rendering never moves nodes out of the model. The view subscribes during startup, before the first project can be selected. This first pass leaves navigation and code expansion to later work.</p>
+    </section>
+    <section data-lp5-kind="code">
+        <name>View article rendering</name>
+        <code><![CDATA[function renderArticle(article) {
+    const source = article.document.documentElement;
+    const sections = Array.from(source.children);
+    const heading = sections.find(element => element.tagName === "heading");
+    const explanation = sections.find(element =>
+        element.tagName === "section" && element.getAttribute("data-lp5-kind") === "explanation");
+    const codeSection = sections.find(element =>
+        element.tagName === "section" && element.getAttribute("data-lp5-kind") === "code");
+    const rendered = document.createElement("article");
+    rendered.className = "LP5-Article";
+    rendered.dataset.lp5Filename = article.filename;
+
+    const title = document.createElement("h2");
+    title.textContent = heading?.textContent.trim() || article.filename;
+    if (heading?.textContent.trim()) {
+        const filename = document.createElement("small");
+        filename.textContent = article.filename;
+        title.append(" ", filename);
+    }
+    rendered.append(title);
+
+    if (explanation) {
+        const content = document.createElement("div");
+        content.className = "LP5-Explanation";
+        content.innerHTML = explanation.innerHTML;
+        rendered.append(content);
+    }
+    if (codeSection) {
+        const name = codeSection.querySelector("name");
+        const code = codeSection.querySelector("code");
+        const label = document.createElement("div");
+        label.className = "LP5-CodeName";
+        label.textContent = name.textContent.trim() || "Unnamed code";
+        const pre = document.createElement("pre");
+        const text = document.createElement("code");
+        const serializer = new XMLSerializer();
+        for (const node of code.childNodes) {
+            if (node.nodeType === Node.CDATA_SECTION_NODE)
+                text.append(document.createTextNode(node.data));
+            else if (node.nodeType === Node.ELEMENT_NODE)
+                text.append(document.createTextNode(serializer.serializeToString(node)));
+        }
+        pre.append(text);
+        rendered.append(label, pre);
+    }
+    return rendered;
+}
+
+function renderProject() {
+    const pane = document.getElementById("LP5-Source");
+    if (!pane) throw new Error("Missing LP5-Source pane");
+    const content = document.createDocumentFragment();
+    for (const article of model.docOrder())
+        content.append(renderArticle(article));
+    pane.replaceChildren(content);
+    pane.scrollTop = 0;
+}
+]]></code>
+    </section>
+</template>
