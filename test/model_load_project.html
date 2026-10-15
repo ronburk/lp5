@@ -49,15 +49,49 @@ async function run() {
     check(Boolean(namespace), "Generated namespace script exists");
     new Function(namespace.textContent)();
     const {model, util, storage} = window.LP5;
+    const notifications = [];
+    let loadReturned = false;
+    const onLoaded = event => notifications.push({
+        event,
+        loadReturned,
+        root: model.rootFilename,
+        articles: [...model.docOrder()].map(a => a.filename),
+        bundle: model.getBundle("Shared").map(a => a.filename),
+        referrers: model.getReferrers("Shared").map(a => a.filename)
+    });
+    model.addEventListener("ProjectLoaded", onLoaded);
+    let onceCount = 0, removedCount = 0;
+    model.addEventListener("ProjectLoaded", () => onceCount++, {once: true});
+    const removed = () => removedCount++;
+    model.addEventListener("ProjectLoaded", removed);
+    model.removeEventListener("ProjectLoaded", removed);
     const selectDirectory = handle => model.selectProject(storage.local.open(handle));
     const persist = util.indexedDB.storeDirectoryHandle;
     util.indexedDB.storeDirectoryHandle = async () => {};
     check(model.directoryHandle === undefined, "Directory handle is private");
     try { await model.loadProject(); throw new Error("Expected no-selection failure"); }
     catch (error) { check(error.message.includes("No project"), "No-selection failure"); }
+    check(notifications.length === 0, "Failed load emits no completion event");
     const selected = directory(fixture);
     await selectDirectory(selected);
+    check(notifications.length === 0, "Selecting storage emits no load event");
     check(await model.loadProject() === undefined, "Loader returns no source handle");
+    loadReturned = true;
+    check(notifications.length === 1, "Successful load emits exactly one event");
+    const notification = notifications[0];
+    check(notification.event instanceof Event && notification.event.type === "ProjectLoaded",
+        "Load notification is a browser event");
+    check(notification.event.target instanceof EventTarget &&
+        notification.event.target !== window && notification.event.target !== document,
+        "Model uses its own event target");
+    check(model.dispatchEvent === undefined, "Dispatch is not exported on the model");
+    check(!notification.loadReturned, "Notification precedes load Promise completion");
+    check(notification.root === "fixture.lp5", "Root is installed before notification");
+    equal(notification.articles, ["fixture.lp5", "1.lp5", "3.lp5", "2.lp5"],
+        "Listeners see the complete article tree");
+    equal(notification.bundle, ["1.lp5", "2.lp5"], "Listeners see complete bundle indexes");
+    equal(notification.referrers, ["fixture.lp5"], "Listeners see complete referrer indexes");
+    check(onceCount === 1 && removedCount === 0, "Once and removed listener options work");
     equal(selected.reads, ["fixture.lp5", "1.lp5", "3.lp5", "2.lp5"], "Reachable DFS reads");
     equal([...model.docOrder()].map(a => a.filename), selected.reads, "Document order");
     check(model.rootFilename === "fixture.lp5", "Root filename");
@@ -78,10 +112,17 @@ async function run() {
         "Draft XML serialization round trip");
     check(reparsed.querySelector("code").firstChild.nodeType === Node.CDATA_SECTION_NODE,
         "Code CDATA survives serialization");
+    const firstArticle = model.getArticle("fixture.lp5");
+    await model.loadProject();
+    check(notifications.length === 2, "Reload emits a second event to existing subscribers");
+    check(model.getArticle("fixture.lp5") !== firstArticle, "Reload replaces article records");
+    check(onceCount === 1 && removedCount === 0, "Once and removed listeners stay inactive on reload");
+    model.removeEventListener("ProjectLoaded", onLoaded);
     const ordinaryParsererror = directory({"fixture.lp5": article([], null, "",
         '<section data-lp5-kind="explanation"><parsererror>Ordinary content</parsererror></section>')});
     await selectDirectory(ordinaryParsererror);
     await model.loadProject();
+    check(notifications.length === 2, "Unsubscribed listener receives no later loads");
     check(model.rootFilename === "fixture.lp5", "Ordinary parsererror markup is not a parse error");
     const normalizedNames = directory({
         "fixture.lp5": article(["1.lp5"], "", '<lp5- ref="  A&#10;B  "/>'),
@@ -203,6 +244,9 @@ async function run() {
     }
     for (const [name, files, expected] of cases) {
         await selectDirectory(directory(files));
+        let loaded = false;
+        const unexpectedLoad = () => { loaded = true; };
+        model.addEventListener("ProjectLoaded", unexpectedLoad);
         let failed = false;
         try { await model.loadProject(); }
         catch (error) {
@@ -210,6 +254,8 @@ async function run() {
             check(error.message.includes(expected), name + ": " + error.message);
         }
         check(failed, name + " must fail");
+        model.removeEventListener("ProjectLoaded", unexpectedLoad);
+        check(!loaded, name + " emits no completion event");
         check(model.rootFilename === null && [...model.docOrder()].length === 0,
             name + " leaves no partial model");
         check(model.getBundle("Shared").length === 0 && model.getReferrers("Shared").length === 0,
@@ -224,14 +270,20 @@ async function run() {
         if (filename === "2.lp5") { reached(); await blocked; }
     });
     await selectDirectory(slow);
+    const pendingNotifications = [];
+    const onPendingLoad = () => pendingNotifications.push([...model.docOrder()].length);
+    model.addEventListener("ProjectLoaded", onPendingLoad);
     const loading = model.loadProject();
     check(model.rootFilename === null && model.getArticle("fixture.lp5") === null,
         "Old model discarded synchronously at load entry");
     await entered;
     check([...model.docOrder()].length === 0, "Partial articles remain private during loading");
+    check(pendingNotifications.length === 0, "Pending load emits no completion event");
     release();
     await loading;
     check([...model.docOrder()].length === 4, "Complete model published after loading");
+    equal(pendingNotifications, [4], "Pending load notifies once with the complete model");
+    model.removeEventListener("ProjectLoaded", onPendingLoad);
     await selectDirectory(directory({}, "invalid-name"));
     try { await model.loadProject(); throw new Error("Expected invalid directory failure"); }
     catch (error) { check(error.message.includes("Invalid filename"), "Directory naming convention"); }

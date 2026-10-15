@@ -18,6 +18,13 @@ bundles) are allowed, retain deduplicated referrers, and resolve when their
 definitions are added and the project reloaded. They also verify immediate old-state
 discard, no partial publication, empty state after failure, and successful retry.
 
+Model notifications use a private EventTarget exposed through addEventListener
+and removeEventListener. Tests verify exactly one ProjectLoaded event per
+successful load/reload, complete articles and indexes during notification,
+notification before the load Promise resolves, subscriptions surviving reload,
+once/removal behavior, and no completion events for selection, pending loads,
+or failed loads. This event is separate from the controller completion command.
+
 If OPFS is available, the page additionally creates a uniquely named temporary
 project, writes and loads an actual file, and verifies its native directory
 handle can be persisted separately using the utility. The test removes that fixture and its stored
