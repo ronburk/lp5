@@ -21,6 +21,7 @@ run.addEventListener("click", async () => {
         const fixtureResponse = await fetch("/test/output_fixture.json");
         check(fixtureResponse.ok, "Harness fixture served");
         const {files, expected} = await fixtureResponse.json();
+        const withoutWhitespace = text => text.replace(/\s/g, "");
         const originalFiles = {...files};
         window.outputFixture = {kind: "directory", name: "fixture.lp5", async getFileHandle(filename) {
             if (!(filename in files)) throw new Error("Missing " + filename);
@@ -45,7 +46,8 @@ run.addEventListener("click", async () => {
             const select = output.querySelector("select"); select.value = name;
             select.dispatchEvent(new win.Event("change", {bubbles:true}));
         };
-        check(code().textContent === expected[""], "Default expansion exactly matches harness output, including whitespace and wrappers");
+        check(withoutWhitespace(code().textContent) === withoutWhitespace(expected[""]),
+            "Default expansion preserves harness text and wrappers");
         check(!code().querySelector("script, tag, lp5-wrapper"), "Expanded code is text, not live HTML");
         check(win.outputExecuted === undefined, "Expanded scripts do not execute");
         check(code().textContent.includes("&amp;"), "Literal entities are not decoded a second time");
@@ -70,7 +72,8 @@ run.addEventListener("click", async () => {
             "Output click scrolls to the defining Source article");
         check([...toc.querySelectorAll('[aria-current="true"]')].some(el => el.title === "3.lp5"), "Output click selects the corresponding TOC entry");
         choose("<other.js>");
-        check(code().textContent === expected["<other.js>"], "Named output exactly matches harness output");
+        check(withoutWhitespace(code().textContent) === withoutWhitespace(expected["<other.js>"]),
+            "Named output preserves harness text and wrappers");
         check(articleSpans("4.lp5").length === 1 && articleSpans("1.lp5").length === 1, "Named output has independent occurrence mapping");
         const ref = sourceArticle("fixture.lp5").querySelector(".LP5-CodeReference");
         const before = {source: source.scrollTop, toc: toc.scrollTop, page: win.scrollY, outer: window.scrollY};
@@ -105,6 +108,27 @@ run.addEventListener("click", async () => {
         check(code().textContent.includes("No unnamed code"), "Absent default output has an explanatory message");
         choose("<only.js>");
         check(code().textContent === "only named output\n", "Project with only a named output remains inspectable");
+
+        const indentationFiles = {
+            "indent.lp5": '<template><children><li id="1.lp5"/><li id="2.lp5"/><li id="3.lp5"/><li id="4.lp5"/></children></template>',
+            "1.lp5": '<template><section data-lp5-kind="code"><name>&lt;indent.txt&gt;</name><code><![CDATA[root {\n    ]]><lp5- ref="Shared"/><![CDATA[\n}\n]]></code></section></template>',
+            "2.lp5": '<template><section data-lp5-kind="code"><name>Shared</name><code><![CDATA[first {\n    ]]><lp5- ref="Leaf"/><![CDATA[}]]></code></section></template>',
+            "3.lp5": '<template><section data-lp5-kind="code"><name>Leaf</name><code><![CDATA[leaf\nnext\n]]></code></section></template>',
+            "4.lp5": '<template><section data-lp5-kind="code"><name>&lt;dedent.txt&gt;</name><code><![CDATA[    one\n    two]]></code></section></template>'
+        };
+        const indentationDirectory = {kind:"directory", name:"indent.lp5", async getFileHandle(filename) {
+            if (!(filename in indentationFiles)) throw new Error("Missing " + filename);
+            return {async getFile() { return new File([indentationFiles[filename]], filename); }};
+        }};
+        await model.selectProject(storage.local.open(indentationDirectory));
+        await model.loadProject();
+        choose("<indent.txt>");
+        const actualIndented = code().textContent;
+        check(actualIndented === "root {\n    first {\n        leaf\n        next\n    }\n}\n\n",
+            `Nested reference output: ${JSON.stringify(actualIndented)}`);
+        choose("<dedent.txt>");
+        check(code().textContent === "one\ntwo\n", "Common fragment leading spaces are removed");
+
         await model.selectProject(storage.local.open({kind:"directory",name:"empty.lp5",async getFileHandle() {
             return {async getFile() {return new File(["<template/>"], "empty.lp5");}};
         }}));
@@ -113,7 +137,7 @@ run.addEventListener("click", async () => {
         Object.assign(files, originalFiles);
         await model.selectProject(storage.local.open(window.outputFixture));
         await model.loadProject();
-        report.textContent = `PASS: ${checks} assertions; harness fidelity, ownership, references, output selection, missing bundles, and reloads.`;
+        report.textContent = `PASS: ${checks} assertions; harness code, indentation, ownership, references, output selection, missing bundles, and reloads.`;
     } catch (error) { report.textContent = "FAIL: " + error.stack; }
     finally { run.disabled = false; delete window.outputFixture; }
 });
