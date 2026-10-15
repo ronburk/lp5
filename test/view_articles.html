@@ -77,6 +77,25 @@ button.addEventListener("click", async () => {
         check(pre.textContent === longCode, "Long multiline code preserved");
         check(!["auto", "scroll"].includes(win.getComputedStyle(pre).overflowY), "Code block has no vertical scroll container");
         check(pane.scrollHeight > pane.clientHeight, "Source pane owns vertical scrolling");
+        check(win.getComputedStyle(pre).whiteSpace === "pre", "Code lines do not wrap");
+        check(win.getComputedStyle(pre).overflowX === "auto", "Horizontal scrollbar is conditional");
+        check(pre.scrollWidth > pre.clientWidth, "Long lines overflow within their code block");
+        check(pre.scrollHeight <= pre.clientHeight + 1, "All code lines fit without vertical clipping");
+        check(pane.scrollWidth <= pane.clientWidth + 1, "Code does not widen the Source Pane");
+        pre.scrollLeft = 100;
+        check(pre.scrollLeft > 0, "Long code can scroll horizontally");
+        const initialWidth = pre.clientWidth;
+        pane.style.flex = "0 0 180px";
+        await new Promise(resolve => win.requestAnimationFrame(resolve));
+        const narrowWidth = pre.clientWidth;
+        check(narrowWidth < initialWidth && pre.scrollWidth > pre.clientWidth, "Code follows a narrower pane");
+        check(pre.scrollHeight <= pre.clientHeight + 1, "Narrowing leaves every code line visible");
+        pane.style.flex = "0 0 600px";
+        await new Promise(resolve => win.requestAnimationFrame(resolve));
+        check(pre.clientWidth > narrowWidth, "Code follows a wider pane");
+        check(pre.scrollHeight <= pre.clientHeight + 1, "Widening leaves every code line visible");
+        pane.style.flex = "";
+
         const originalDocument = model.getArticle("fixture.lp5").document;
         articles[0].querySelector("strong").textContent = "Edited display";
         check(originalDocument.querySelector("strong").textContent === "this", "Rendered markup is independent of model XML");
@@ -87,6 +106,9 @@ button.addEventListener("click", async () => {
         check(pane.children.length === 1, "Reload replaces rather than appends articles");
         check(pane.querySelector("h2").firstChild.textContent === "Reloaded", "Reload displays new heading");
         check(pane.querySelector("pre").textContent === "replacement", "Reload displays new code");
+        const shortCode = pane.querySelector("pre");
+        check(shortCode.scrollWidth <= shortCode.clientWidth + 1, "Short code needs no horizontal scrollbar");
+        check(shortCode.scrollHeight <= shortCode.clientHeight + 1, "Short code needs no vertical scrollbar");
         check(pane.querySelector(".LP5-CodeName").textContent === "Unnamed code", "Unnamed bundle has a readable label");
         check(pane.scrollTop === 0, "Reload resets source scroll position");
         check(!articles[0].isConnected, "Old display is detached");

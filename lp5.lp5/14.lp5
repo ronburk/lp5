@@ -190,8 +190,10 @@ body {
     margin: 0;
     padding: 0.5rem;
     background: white;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
+    white-space: pre;
+    overflow-wrap: normal;
+    overflow-x: auto;
+    overflow-y: hidden;
 }
 ]]></code>
     </section>
