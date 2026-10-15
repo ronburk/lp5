@@ -4,7 +4,7 @@
     <section data-lp5-kind="explanation">
         <p>The default view expands unnamed code. Named output declarations supply additional choices; an ordinary bundle can also be previewed when a Source reference has no occurrence in any output. This keeps unfinished or unreferenced code inspectable.</p>
         <p>Source reference navigation identifies the reference site, not merely a target article: several fragments may define a bundle, and a reference site may itself occur several times. Its expansions are highlighted together and only Output scrolls. Output text navigates back to its innermost defining article; article selection highlights that article's own text in every displayed occurrence without scrolling Output. Occurrence paths distinguish repeated expansions even when they have the same filename.</p>
-        <p>Plain text, ownership spans, and diagnostic markers remain separate. The DOM never interprets expanded code as HTML. Ctrl-click folds or unfolds one occurrence; Ctrl-Shift-click folds all code occurrences nested beneath it. Folding changes only the display and retains occurrence-specific state while outputs are switched.</p>
+        <p>Plain text, ownership spans, and diagnostic markers remain separate. The DOM never interprets expanded code as HTML. The formatter supplies displayed text and reconstructed indentation, while expansion nodes retain occurrence and ownership metadata for navigation. Ctrl-click folds or unfolds one occurrence; Ctrl-Shift-click folds all code occurrences nested beneath it. Folding changes only the display and retains occurrence-specific state while outputs are switched.</p>
     </section>
     <section data-lp5-kind="code">
         <name>View output display</name>
