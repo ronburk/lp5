@@ -13,23 +13,27 @@ const stateMachineSource = `
 state baseOperationsHandler
    on ModalDialog
         if (event.dialogName === "SelectCreateProject") {
- ->()       SelectCreateProject
+ ->() SelectCreateProject
         }
 
 state SelectCreateProject
-   on ModalDialog
         view.showModalDialog("SelectCreateProject");
+
    on SelectProject
  ->() SelectProject
-      if (event.name === "ProjectLoaded") {
-          view.closeModalDialog("SelectCreateProject");
-          // TODO: Ask the view to render the loaded model.
-          return;
-      }
+        if (event.name === "ProjectLoaded") {
+            view.closeModalDialog("SelectCreateProject");
+            // TODO: Ask the view to render the loaded model.
+            return;
+        }
 
 state SelectProject
-   on SelectProject
-      event = yield selectProjectHandler(event);
-      return;
+        asyncSelectProject(event);
+
+   on ProjectLoaded
+        return;
+
+   on ProjectPickerAborted
+        return;
 `;
 ]]></code></section></template>
