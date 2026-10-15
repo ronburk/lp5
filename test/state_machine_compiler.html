@@ -69,6 +69,22 @@ state ready
     send({name: "Next"});
     check(log.at(-1) === "ready", "Destination waits for next command");
     check(machine.states.parent() !== machine.states.parent(), "Factories create independent generators");
+    const entryLog = [];
+    const entryMachine = util.scriptToFunction(compileStateMachine(`
+state entry
+    const saved = event.value;
+    log.push("entry");
+    on Go
+        log.push(saved);
+`), "compiler-entry-test", "log")(entryLog);
+    const handler = entryMachine.states.entry();
+    check(entryLog.length === 0, "Priming waits for initiating command");
+    handler.next({name: "Go", value: 42});
+    handler.next({name: "Ignored"});
+    handler.next({name: "Go", value: 99});
+    check(JSON.stringify(entryLog) === '["entry",42,42]', "Entry runs once and retains locals across commands");
+    entryMachine.states.entry().next({name: "Go", value: 7});
+    check(JSON.stringify(entryLog.slice(-2)) === '["entry",7]', "A new call runs fresh entry code");
     report.textContent = `PASS: ${checks} assertions; generated state factories and experimental driver.`;
 }
 run().catch(error => { report.textContent = "FAIL: " + error.stack; console.error(error); });

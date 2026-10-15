@@ -48,6 +48,11 @@ button.addEventListener("click", async () => {
             return {async getFile() { return new File(["<template><heading>Loaded</heading></template>"], filename); }};
         }};
         await start(() => { pickCount++; return Promise.resolve(directory); });
+        frame.contentWindow.LP5.controller.dispatchImmediate({
+            name: "ModalDialog", dialogName: "SelectCreateProject"
+        });
+        check(frame.contentDocument.querySelectorAll("#SelectCreateProject-dialog").length === 1,
+            "A later ModalDialog command cannot repeat dialog entry");
         select();
         check(pickCount === 1, "Picker starts synchronously with Select");
         await tick();

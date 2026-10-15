@@ -7,7 +7,7 @@ obtained through the LP5 harness.
 
 Build with `./lp5 lp5 tangle`, start `sites-preview start "$PWD"`, and open
 `/test/select_project.html` at the returned host. Click **Test selection and
-loading**. It must report PASS with 38 assertions.
+loading**. It must report PASS with 39 assertions.
 
 The page loads the complete generated application in fresh iframes. Before
 startup it installs a controlled picker and bypasses handle persistence; the

@@ -174,6 +174,46 @@ state ready
     d.send({name: "Other"});
     assert.deepEqual(log, ["named", "wildcard"]);
 }
+{
+    const log = [];
+    const d = driver(machine(`
+state parent
+    log.push(["parent entry", event.name]);
+    on Call
+        ->() child
+        log.push("returned");
+state child
+    const saved = event.value;
+    log.push(["child entry", saved]);
+    on Call
+        log.push("initial command handled");
+    on Done
+        log.push(["done", saved]);
+        return;
+`, log));
+    assert.deepEqual(log, [], "Entry waits for the initiating command, not priming");
+    d.send({name: "Call", value: 1});
+    d.send({name: "Ignored"});
+    d.send({name: "Done"});
+    d.send({name: "Call", value: 2});
+    d.send({name: "Ignored"});
+    d.send({name: "Done"});
+    assert.deepEqual(log, [["parent entry", "Call"], ["child entry", 1],
+        "initial command handled", ["done", 1], "returned", ["child entry", 2],
+        "initial command handled", ["done", 2], "returned"],
+        "Entry runs once per call and entry locals survive across commands");
+}
+{
+    const log = [];
+    const d = driver(machine(`
+state once
+    log.push(event.name);
+    return;
+`, log));
+    d.send({name: "Start"});
+    assert.deepEqual(log, ["Start"], "States without on clauses can finish in entry code");
+    assert.equal(d.stack.length, 0);
+}
 for (const [source, expected] of [
     ["", /line 1: No states/],
     ["on Go", /line 1: on requires/],

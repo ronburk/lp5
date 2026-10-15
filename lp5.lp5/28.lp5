@@ -7,7 +7,7 @@
         <li>completion command</li>
     </keywords>
     <section data-lp5-kind="explanation">
-        <p><code>asyncSelectProject(selection)</code> runs beside the <code>SelectProject</code> generator. The generator starts it during priming so a local picker is invoked in the Select click's user activation. The command's <code>location</code> selects local directory storage or remote HTTP storage; remote selection uses its <code>url</code> without invoking a picker.</p>
+        <p><code>asyncSelectProject(selection)</code> is private to Operations. The compiled <code>SelectProject</code> state starts it once in entry code with the initiating command, so a local picker is invoked synchronously in the Select click's user activation. The command's <code>location</code> selects local directory storage or remote HTTP storage; remote selection uses its <code>url</code> without invoking a picker.</p>
         <p>Only the local picker call is caught. <code>AbortError</code> dispatches <code>ProjectPickerAborted</code>, permitting retry; every other exception is fatal. The local branch constructs its storage object and persists the directory handle before installing the model selection. Remote root filenames are derived from the project directory name, with no user override.</p>
         <p>Both branches await <code>model.selectProject(project)</code> and <code>model.loadProject()</code>, then dispatch <code>ProjectLoaded</code>. Persistence, URL, and loading errors escape to global fatal-error handling. Completion dispatch is queued so the generator is installed before receiving the result.</p>
     </section>
