@@ -26,7 +26,7 @@ function setOutputFolded(span, folded) {
         const label = document.createElement("span");
         label.className = "LP5-OutputFoldPlaceholder";
         label.setAttribute("aria-hidden", "true");
-        label.textContent = `⟪ folded: ${span.title} ⟫`;
+        label.textContent = `⟪ folded: ${span.title} ⟫${span.dataset.outputEndsWithNewline === "true" ? "\n" : ""}`;
         span.prepend(label);
     } else if (!folded) placeholder?.remove();
 }
@@ -105,6 +105,9 @@ function displayOutput(name) {
             const text = document.createElement("span");
             text.className = token.kind === "missing" ? "LP5-OutputMissing" : "LP5-OutputText";
             text.textContent = token.kind === "missing" ? `[[Undefined bundle: ${token.name}]]` : token.text;
+            for (let parent = stack.at(-1); parent && parent !== code; parent = parent.parentElement)
+                if (parent.classList.contains("LP5-OutputArticle"))
+                    parent.dataset.outputEndsWithNewline = String(text.textContent.endsWith("\n"));
             stack.at(-1).append(text);
         }
     }
