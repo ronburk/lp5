@@ -10,14 +10,14 @@
         <li>status</li>
     </keywords>
     <section data-lp5-kind="explanation">
-        <p>These stable pane IDs give the view destinations for navigation, article source, and expanded code. Keeping each pane's scroll container separate lets a reader inspect an expansion without losing their place in the source. Dragging a splitter redistributes the width of its neighboring panes. Toolbar actions still need behavior in this rewrite.</p>
+        <p>These stable pane IDs give the view destinations for navigation, article source, and expanded code. Keeping each pane's scroll container separate lets a reader inspect an expansion without losing their place in the source. Dragging a splitter redistributes the width of its neighboring panes. Reload rereads the selected project; Export remains a placeholder.</p>
     </section>
     <section data-lp5-kind="code">
         <name>DOM declarations</name>
         <code><![CDATA[<header id="LP5-TopNav">
     <div role="toolbar" aria-label="Main commands">
         <span>LP5</span>
-        <button type="button">Reload</button>
+        <button id="LP5-Reload" type="button" disabled>Reload</button>
         <button type="button">Export</button>
     </div>
 </header>

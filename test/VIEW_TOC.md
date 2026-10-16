@@ -2,7 +2,7 @@
 
 Build with `./lp5 lp5 tangle`, run `sites-preview start "$PWD"`, and open
 `/test/view_toc.html` at the returned host. Click **Test table of contents**.
-Expect PASS with 53 assertions. The complete generated app selects a controlled fixture through
+Expect PASS with 59 assertions. The complete generated app selects a controlled fixture through
 the real startup dialog before testing the model/view connection.
 
 Checks cover nested document order, untitled article omission, promoted titled

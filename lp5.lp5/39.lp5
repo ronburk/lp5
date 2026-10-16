@@ -45,10 +45,10 @@
         const text = document.createElement("code");
         for (const part of codeParts(article).parts) {
             if (part.kind === "reference") {
-                const reference = document.createElement("span");
+                const reference = document.createElement("button");
+                reference.type = "button";
                 reference.className = "LP5-CodeReference";
-                reference.dataset.ref = part.name;
-                reference.textContent = part.name;
+                reference.textContent = part.sourceText;
                 reference.addEventListener("click", event => {
                     event.preventDefault();
                     event.stopPropagation();
@@ -85,6 +85,7 @@ function renderProject(event) {
     tocEntries = navigation.entries;
     selectedFilename = null;
     displayedSelectionId = selectionId;
+    document.getElementById("LP5-Reload").disabled = false;
     pane.scrollTop = 0;
     initializeOutput(articles, newSelection);
 }

@@ -103,6 +103,11 @@
     function startup() {
         initializePaneSplitters();
         model.addEventListener("ProjectLoaded", renderProject);
+        const reload = document.getElementById("LP5-Reload");
+        reload.addEventListener("click", () => {
+            reload.disabled = true;
+            controller.dispatch({ name: "ReloadProject" });
+        });
     }
 
     return { startup, showModalDialog, closeModalDialog };
