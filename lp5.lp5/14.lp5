@@ -253,7 +253,7 @@ body {
 }
 
 .LP5-CodeReference {
-    background: lightyellow;
+    background: #f7f4e8;
     cursor: pointer;
 }
 
