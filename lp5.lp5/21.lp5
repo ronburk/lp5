@@ -14,7 +14,7 @@
         <li>modal dialog</li>
     </keywords>
     <section data-lp5-kind="explanation">
-        <p>Operations express command legality and the continuation of an interaction. The state-machine source keeps that control flow together; nested generators preserve local variables and the work following a child call. Async functions perform the waiting and report completion through commands, leaving the state handler available to interpret incoming commands.</p>
+        <p>Operations express command legality and the continuation of an interaction. The state-machine source keeps that control flow together; nested <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Iterators_and_generators">JavaScript generators</a> preserve local variables and the work following a child call. Async functions perform the waiting and report completion through commands, leaving the state handler available to interpret incoming commands.</p>
         <p>The controller and generated states share this protocol:</p>
         <ol>
             <li><code>yield self()</code> consumes the command and waits for the next one in the same handler.</li>

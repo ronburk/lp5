@@ -12,8 +12,8 @@
         <p>
             Long articles and expanded code must scroll within their panes
             while commands and status remain visible. Flex children need explicit
-            minimum sizes of zero so their content cannot force the whole page
-            beyond the viewport; overflow belongs to each pane instead.
+            <a href="https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/min-width">minimum sizes of zero</a> so their content cannot force the whole page
+            beyond the viewport; <a href="https://developer.mozilla.org/en-US/docs/Web/CSS/Guides/Display/Flow_layout_and_overflow">overflow</a> belongs to each pane instead.
         </p>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 214" role="img" aria-labelledby="pageLayoutTitle pageLayoutDescription" style="display:block; width:min(100%, 560px); height:auto; margin:0.75rem auto; font:12px sans-serif">
             <title id="pageLayoutTitle">LP5 page layout</title>
