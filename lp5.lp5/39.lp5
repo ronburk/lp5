@@ -45,10 +45,10 @@
         const text = document.createElement("code");
         for (const part of codeParts(article).parts) {
             if (part.kind === "reference") {
-                const reference = document.createElement("button");
-                reference.type = "button";
+                const reference = document.createElement("span");
                 reference.className = "LP5-CodeReference";
-                reference.textContent = part.sourceText;
+                reference.dataset.ref = part.name;
+                reference.textContent = part.name;
                 reference.addEventListener("click", event => {
                     event.preventDefault();
                     event.stopPropagation();
