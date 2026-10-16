@@ -69,7 +69,14 @@ button.addEventListener("click", async () => {
         check(articles[0].querySelector(".LP5-Explanation strong").textContent === "this", "Explanation markup rendered");
         check(articles[0].querySelector("svg").namespaceURI === "http://www.w3.org/2000/svg", "SVG stays vector markup");
         check(articles[0].querySelector(".LP5-CodeName").textContent === "Root code", "Code name displayed");
-        check(articles[0].querySelector("pre code").textContent === sourceCode + reference + "\nlast line", "Literal code and references retain order and text");
+        check(articles[0].querySelector("pre code").textContent === sourceCode + "Shared\nlast line", "Literal code and reference names retain order and text");
+        const sourceRef = articles[0].querySelector(".LP5-CodeReference");
+        check(sourceRef.tagName === "SPAN" && sourceRef.textContent === "Shared"
+            && sourceRef.dataset.ref === "Shared", "Source references show the name, not serialized XML");
+        check(win.getComputedStyle(sourceRef).backgroundColor === "rgb(255, 255, 224)"
+            && win.getComputedStyle(sourceRef, "::before").content === '"〈"'
+            && win.getComputedStyle(sourceRef, "::after").content === '"〉"',
+            "Source references use the bracketed light-yellow style");
         check(!articles[0].querySelector("pre script, pre em, pre lp5-"), "Code is not interpreted as HTML");
         check(win.sourceExecuted === undefined, "Source scripts do not execute");
         check(!articles[1].querySelector("pre"), "Explanation-only article needs no code block");
