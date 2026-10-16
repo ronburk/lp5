@@ -8,25 +8,33 @@
     </section>
     <section data-lp5-kind="code">
         <name>View output expansion</name>
-        <code><![CDATA[function normalizedCodeName(name) {
+        <code><![CDATA[// Trim a code name and collapse its internal whitespace to single spaces.
+function normalizedCodeName(name) {
     return name.replace(/^[ \t\r\n]+|[ \t\r\n]+$/g, "").replace(/[ \t\r\n]+/g, " ");
 }
 
+// Split an article's code into text and reference parts, retaining source positions for navigation.
 function codeParts(article) {
-    const section = Array.from(article.document.documentElement.children).find(element =>
+    // Locate the code section among the article's direct children.
+    const section = Array.from(article.document.documentElement.children).find(
+        // Select only the section marked as code.
+        element =>
         element.tagName === "section" && element.getAttribute("data-lp5-kind") === "code");
     if (!section) return null;
     const code = section.querySelector("code");
     const parts = [];
     let offset = 0;
     const serializer = new XMLSerializer();
+    // Record a text fragment and advance the virtual source position when it is represented in sourceText.
     function text(value, emit = true, showSource = true) {
         parts.push({ kind: "text", text: value, sourceOffset: offset, emit, showSource });
         offset += showSource ? value.length : 0;
     }
+    // Walk code XML, preserving wrapper markup and representing lp5- elements as expandable references.
     function visit(node, top = false) {
         if (node.nodeType === Node.CDATA_SECTION_NODE || node.nodeType === Node.TEXT_NODE) {
             const whitespace = /^[ \t\r\n]*$/.test(node.data);
+            // Ignore top-level formatting whitespace in source positions while retaining it for display formatting.
             text(node.data, !(top && code.children.length && whitespace),
                 !top || node.nodeType === Node.CDATA_SECTION_NODE);
         } else if (node.nodeType === Node.ELEMENT_NODE) {
@@ -45,8 +53,10 @@ function codeParts(article) {
         }
     }
     for (const node of code.childNodes) visit(node, true);
+    // Reconstruct the code string used for common indentation and reference-site positions.
     const sourceText = parts.map(part => part.kind === "reference" ? part.sourceText : part.showSource ? part.text : "").join("");
     const baseIndent = minimumIndent(sourceText);
+    // Store each reference's indentation relative to this fragment's common leading indentation.
     for (const part of parts) {
         if (part.kind === "reference")
             part.indent = referenceIndent(sourceText, part.sourceOffset, baseIndent);
@@ -54,31 +64,42 @@ function codeParts(article) {
     return { name: normalizedCodeName(section.querySelector("name").textContent), parts, sourceText, baseIndent };
 }
 
+// Return the smallest leading-space count among nonblank lines.
 function minimumIndent(text) {
-    const indents = text.split(/\r?\n/).filter(line => /\S/.test(line))
-        .map(line => line.match(/^ */)[0].length);
+    const lines = text.split(/\r?\n/);
+    // Ignore blank lines because they have no indentation to preserve.
+    const nonblankLines = lines.filter(
+        line => /\S/.test(line));
+    // Measure the shared prefix using spaces, which are the indentation unit removed below.
+    const indents = nonblankLines.map(
+        line => line.match(/^ */)[0].length);
     return indents.length ? Math.min(...indents) : 0;
 }
 
+// Measure indentation at a reference after removing the fragment's common indentation.
 function referenceIndent(sourceText, offset, baseIndent) {
     const lineStart = sourceText.lastIndexOf("\n", offset - 1) + 1;
     const prefix = sourceText.slice(lineStart, offset);
     return /^[ ]*$/.test(prefix) ? Math.max(0, prefix.length - baseIndent) : 0;
 }
 
+// Create a stable key for one reference site within an article.
 function referenceKey(filename, offset) {
     return JSON.stringify([filename, offset]);
 }
 
+// Recursively expand a bundle while retaining article ownership and reference-site identity.
 function expandOutput(name, path = [name], active = new Set()) {
     if (active.has(name)) throw new Error(`Code bundle cycle while displaying ${name}`);
     active.add(name);
     const articles = model.getBundle(name);
+    // Give every definition an occurrence path so repeated expansions remain distinguishable.
     const children = articles.map((article, index) => {
         const definition = codeParts(article);
         const key = [...path, index];
         return { kind: "article", filename: article.filename, name, key: JSON.stringify(key),
             sourceText: definition.sourceText, baseIndent: definition.baseIndent,
+            // Expand each reference in place, recording its source site for later highlighting.
             children: definition.parts.map((part, partIndex) => {
                 if (part.kind === "text") return part;
                 return { kind: "reference", name: part.name, indent: part.indent,
@@ -91,8 +112,10 @@ function expandOutput(name, path = [name], active = new Set()) {
     return articles.length ? children : [{ kind: "missing", name }];
 }
 
+// Format expanded nodes into display tokens, reconstructing indentation without changing code ownership.
 function* formatOutput(nodes, outermost = true) {
     let atLineStart = true;
+    // Adjust only the start of each line, preserving its authored text and newline.
     function formatText(value, indent, baseIndent) {
         let result = "";
         for (const line of value.match(/[^\n]*\n|[^\n]+$/g) || []) {
@@ -114,6 +137,7 @@ function* formatOutput(nodes, outermost = true) {
         }
         return result;
     }
+    // Walk expanded nodes in order while carrying the indentation context through references.
     function* walk(items, indent = 0, baseIndent = 0) {
         for (const node of items) {
             if (node.kind === "text" || node.kind === "missing") {
@@ -121,7 +145,10 @@ function* formatOutput(nodes, outermost = true) {
                     indent, baseIndent);
                 if (text) yield { ...node, text };
             } else if (node.kind === "article") {
-                const sourceLine = node.sourceText.split(/\r?\n/).find(line => /\S/.test(line)) || "";
+                // Use the first nonblank source line to keep folded markers aligned with the code section.
+                const sourceLine = node.sourceText.split(/\r?\n/).find(
+                    // Find the first line that contains code text.
+                    line => /\S/.test(line)) || "";
                 const sourceIndent = sourceLine.match(/^[ \t]*/)[0];
                 const outputIndent = atLineStart ?
                     " ".repeat(indent) + sourceIndent.slice(node.baseIndent) : sourceIndent;
