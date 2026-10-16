@@ -1,0 +1,48 @@
+<template>
+    <heading>Remote storage</heading>
+    <keywords><li>remote storage</li><li>HTTP</li><li>HTTP(S)</li></keywords>
+    <section data-lp5-kind="explanation">
+        <p><code>storage.remote.open(directoryURL, root_filename?)</code> creates a project backed by an HTTP(S) directory URL. The URL must be absolute, end in a slash, and have no query or fragment. If the root filename is omitted, it is the decoded final directory name.</p>
+        <p>The protocol uses GET on a file URL to load, PUT with UTF-8 text to store, DELETE to remove, and GET on the directory URL to return a JSON array of filenames. File names are URL-encoded. Non-success HTTP statuses reject, and reads bypass the browser cache. The server must acknowledge a store only after accepting all contents and permit cross-origin requests when called from another origin.</p>
+        <p>Loads and listings pass an <a href="https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal"><code>AbortSignal</code></a> to <code>fetch</code>, including response-body consumption. A failed request or lost response can leave the commit outcome unknown.</p>
+    </section>
+    <section data-lp5-kind="code"><name>Remote storage backend</name><code><![CDATA[    async function request(base, name, options) {
+        const url = name === null ? base : new URL(encodeURIComponent(filename(name)), base);
+        const response = await fetch(url, {cache: "no-store", ...options});
+        if (!response.ok) throw new Error(`Storage ${options.method} ${url}: HTTP ${response.status}`);
+        return response;
+    }
+
+    const remote = {
+        open(url, root_filename) {
+            const base = new URL(url);
+            if (!["http:", "https:"].includes(base.protocol) ||
+                !base.pathname.endsWith("/") || base.search || base.hash)
+                throw new Error("Expected an HTTP(S) project directory URL ending in /");
+            return project(remote, base, root_filename ?? decodeURIComponent(base.pathname.split("/").at(-2)));
+        },
+        async load(name, signal) {
+            const response = await request(location(this), name, {method: "GET", signal});
+            return await response.text();
+        },
+        async store(name, text) {
+            if (typeof text !== "string") throw new Error("Expected file text");
+            await request(location(this), name, {
+                method: "PUT", headers: {"Content-Type": "text/plain; charset=utf-8"}, body: text
+            });
+        },
+        async remove(name) {
+            await request(location(this), name, {method: "DELETE"});
+        },
+        async list_files(signal) {
+            const response = await request(location(this), null, {method: "GET", signal});
+            const names = await response.json();
+            if (!Array.isArray(names)) throw new Error("Expected a JSON filename array");
+            names.forEach(filename);
+            if (new Set(names).size !== names.length) throw new Error("Duplicate storage filename");
+            return names.sort();
+        }
+    };
+
+]]></code></section>
+</template>

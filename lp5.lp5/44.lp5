@@ -1,0 +1,57 @@
+<template>
+    <heading>Local storage</heading>
+    <keywords><li>local storage</li><li>directory handle</li><li>File System Access API</li></keywords>
+    <section data-lp5-kind="explanation">
+        <p><code>storage.local.open(directoryHandle, root_filename = directoryHandle.name)</code> creates a project backed by the supplied directory handle. The optional root filename defaults to the directory name. The handle is retained privately and is never exposed through the returned project object.</p>
+        <p>Loads and listings accept an <a href="https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal"><code>AbortSignal</code></a>. Cancellation is checked before and after local operations, but cannot interrupt native file reads. Stores and removals accept no signal: stopping the caller's wait cannot establish that a modification did not commit. Stores await <a href="https://developer.mozilla.org/en-US/docs/Web/API/FileSystemWritableFileStream"><code>FileSystemWritableFileStream</code></a> close and attempt abort on failure; a newly created empty file may remain if storing fails.</p>
+    </section>
+    <section data-lp5-kind="code"><name>Local storage backend</name><code><![CDATA[    const local = {
+        open(handle, root_filename = handle?.name) {
+            if (handle?.kind !== "directory") throw new Error("Expected a directory handle");
+            return project(local, handle, root_filename);
+        },
+        async load(name, signal) {
+            const directory = location(this);
+            filename(name);
+            signal?.throwIfAborted();
+            const handle = await directory.getFileHandle(name);
+            const file = await handle.getFile();
+            const text = await file.text();
+            signal?.throwIfAborted();
+            return text;
+        },
+        async store(name, text) {
+            const directory = location(this);
+            filename(name);
+            if (typeof text !== "string") throw new Error("Expected file text");
+            const handle = await directory.getFileHandle(name, {create: true});
+            const stream = await handle.createWritable();
+            try {
+                await stream.write(text);
+                await stream.close();
+            } catch (error) {
+                try { await stream.abort(); } catch {}
+                throw error;
+            }
+        },
+        async remove(name) {
+            const directory = location(this);
+            filename(name);
+            await directory.getFileHandle(name);
+            await directory.removeEntry(name);
+        },
+        async list_files(signal) {
+            const directory = location(this);
+            signal?.throwIfAborted();
+            const names = [];
+            for await (const [name, handle] of directory.entries()) {
+                signal?.throwIfAborted();
+                if (handle.kind === "file") names.push(name);
+            }
+            signal?.throwIfAborted();
+            return names.sort();
+        }
+    };
+
+]]></code></section>
+</template>
