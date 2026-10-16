@@ -73,10 +73,10 @@ button.addEventListener("click", async () => {
         const sourceRef = articles[0].querySelector(".LP5-CodeReference");
         check(sourceRef.tagName === "SPAN" && sourceRef.textContent === "Shared"
             && sourceRef.dataset.ref === "Shared", "Source references show the name, not serialized XML");
-        check(win.getComputedStyle(sourceRef).backgroundColor === "rgb(255, 255, 224)"
+        check(win.getComputedStyle(sourceRef).backgroundColor === "rgb(247, 244, 232)"
             && win.getComputedStyle(sourceRef, "::before").content === '"〈"'
             && win.getComputedStyle(sourceRef, "::after").content === '"〉"',
-            "Source references use the bracketed light-yellow style");
+            "Source references use brackets and the explanation background color");
         check(!articles[0].querySelector("pre script, pre em, pre lp5-"), "Code is not interpreted as HTML");
         check(win.sourceExecuted === undefined, "Source scripts do not execute");
         check(!articles[1].querySelector("pre"), "Explanation-only article needs no code block");
