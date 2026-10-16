@@ -253,14 +253,12 @@ body {
 }
 
 .LP5-CodeReference {
-    border: 0;
-    padding: 0;
-    background: #edf2f7;
-    color: #174575;
-    font: inherit;
-    white-space: inherit;
+    background: lightyellow;
     cursor: pointer;
 }
+
+.LP5-CodeReference::before { content: "〈"; }
+.LP5-CodeReference::after { content: "〉"; }
 
 .LP5-OutputChoice {
     display: block;
