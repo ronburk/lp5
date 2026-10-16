@@ -31,7 +31,7 @@ button.addEventListener("click", async () => {
             window.startupLog = [];
             let source = original;
             if (scenario === "directive error")
-                source = source.replace("state baseOperationsHandler\n", "state baseOperationsHandler garbage\n");
+                source = source.replace("state startState\n", "state startState garbage\n");
             if (scenario === "JavaScript error")
                 source = source.replace('view.showModalDialog("SelectCreateProject");', "const = 1;");
             const bootstrap = `<script>
