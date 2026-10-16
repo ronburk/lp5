@@ -2,13 +2,15 @@
 
 Build with `./lp5 lp5 tangle`, start `sites-preview start "$PWD"`, and open
 `/test/view_articles.html` at the returned host. Click **Test article display**.
-Expect PASS with 49 assertions.
+Expect PASS with 54 assertions.
 
 The test runs the complete generated application, including startup hooks,
 command routing, model loading, and the view's private model subscription. It
 selects a controlled local fixture through the real dialog, then checks article
 order, heading omission for untitled articles, explanation HTML and SVG, code names, literal CDATA
-and code references, context-menu opening and dismissal, independence from model XML, and pane-owned scrolling.
+and code references, internal explanation links, context-menu opening and dismissal,
+independence from model XML, and pane-owned scrolling. Internal links select and
+scroll the target article in Source without changing the URL or Output scroll.
 Long code lines scroll horizontally within each block, without wrapping or
 vertical clipping, and follow narrower and wider pane sizes. Short blocks need
 no horizontal scrollbar.
