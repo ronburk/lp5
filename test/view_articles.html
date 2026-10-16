@@ -81,6 +81,25 @@ button.addEventListener("click", async () => {
         check(win.sourceExecuted === undefined, "Source scripts do not execute");
         check(!articles[1].querySelector("pre"), "Explanation-only article needs no code block");
         check(!articles[2].querySelector(".LP5-Explanation"), "Code-only article needs no explanation block");
+        const sourceMenu = doc.getElementById("LP5-SourceContextMenu");
+        const openSourceMenu = article => {
+            const event = new win.MouseEvent("contextmenu", {
+                bubbles: true, cancelable: true, clientX: 120, clientY: 90
+            });
+            article.dispatchEvent(event);
+            return event;
+        };
+        const contextEvent = openSourceMenu(articles[0]);
+        check(contextEvent.defaultPrevented && !sourceMenu.hidden,
+            "Right-clicking an article opens the custom context menu and suppresses the browser menu");
+        check(sourceMenu.dataset.lp5Filename === "fixture.lp5"
+            && sourceMenu.style.left === "120px" && sourceMenu.style.top === "90px",
+            "Context menu records its article and opens at the pointer");
+        sourceMenu.querySelector('[role="menuitem"]').click();
+        check(sourceMenu.hidden, "Selecting a menu item dismisses the context menu");
+        openSourceMenu(articles[1]);
+        doc.body.dispatchEvent(new win.MouseEvent("click", {bubbles: true}));
+        check(sourceMenu.hidden, "Clicking outside the menu dismisses it");
         const pre = articles[2].querySelector("pre");
         check(pre.textContent === longCode, "Long multiline code preserved");
         check(!["auto", "scroll"].includes(win.getComputedStyle(pre).overflowY), "Code block has no vertical scroll container");
