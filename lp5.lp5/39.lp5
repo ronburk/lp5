@@ -88,6 +88,30 @@ function renderProject(event) {
     document.getElementById("LP5-Reload").disabled = false;
     pane.scrollTop = 0;
     initializeOutput(articles, newSelection);
+    initializeSourceContextMenu(pane);
+}
+
+function initializeSourceContextMenu(pane) {
+    const menu = document.getElementById("LP5-SourceContextMenu");
+    const item = menu?.querySelector('[role="menuitem"]');
+    if (!menu || !item || pane.dataset.contextMenuReady) return;
+    pane.dataset.contextMenuReady = "true";
+
+    pane.addEventListener("contextmenu", event => {
+        const article = event.target.closest(".LP5-Article");
+        if (!article || !pane.contains(article)) return;
+        event.preventDefault();
+        menu.dataset.lp5Filename = article.dataset.lp5Filename;
+        menu.hidden = false;
+        menu.style.left = `${Math.max(0, Math.min(event.clientX, innerWidth - menu.offsetWidth))}px`;
+        menu.style.top = `${Math.max(0, Math.min(event.clientY, innerHeight - menu.offsetHeight))}px`;
+        item.focus();
+    });
+
+    item.addEventListener("click", () => { menu.hidden = true; });
+    document.addEventListener("click", event => {
+        if (!menu.hidden && !menu.contains(event.target)) menu.hidden = true;
+    });
 }
 ]]></code>
     </section>
