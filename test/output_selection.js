@@ -1,4 +1,4 @@
-// Run through the explicit test adapter's “Test output selection” button.
+// Tests Output selection state across project switches and article changes through the explicit adapter.
 export async function run_output_selection_tests(model, views) {
     if(!window.LP5.testProjectIO)
         throw new Error('Output selection checks require the explicit test adapter');

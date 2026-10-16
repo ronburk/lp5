@@ -1,3 +1,4 @@
+// Experimental Selenium smoke test for the legacy page; it opens a hard-coded Windows checkout and makes no assertions.
 const {Builder, By, Key, until} = require('selenium-webdriver');
 
 (async function example() {

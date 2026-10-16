@@ -1,4 +1,4 @@
-// Run through the explicit test adapter's “Test article moves” button.
+// Tests moving articles while preserving valid parent links and project order through the explicit adapter.
 export async function run_move_article_tests(app_model) {
     let passed = 0;
     function check(condition, message) {

@@ -1,4 +1,4 @@
-// Run through the explicit test adapter's “Test ToC expansion” button.
+// Tests ToC expansion persistence within a selection and reset behavior across project changes.
 export async function run_toc_expansion_tests(model, views) {
     let passed = 0;
     function check(condition, message) {
