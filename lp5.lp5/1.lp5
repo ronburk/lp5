@@ -138,7 +138,7 @@
     </p>
     <b>explanation and code:</b>
     <p>
-        An article is an XML document rooted at <code>&lt;template&gt;</code>.
+        <a href="#34.lp5">An article is an XML document</a> rooted at <code>&lt;template&gt;</code>.
         Its optional <code>&lt;heading&gt;</code> supplies the title;
         ordered <code>&lt;children&gt;</code> links organize the reading hierarchy.
         Explanation is HTML markup in a section marked

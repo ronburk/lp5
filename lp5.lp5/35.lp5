@@ -5,7 +5,7 @@
     <section data-lp5-kind="explanation">
         <p>This unit provides whole-file storage for projects through <code>storage.local</code> and <code>storage.remote</code>. Each <code>open</code> method returns an independent project object with <code>root_filename</code>, <code>load(filename, signal?)</code>, <code>store(filename, text)</code>, <code>remove(filename)</code>, and <code>list_files(signal?)</code>. The directory handle or URL stays private. Filenames are single relative names; subdirectories are outside this interface.</p>
         <p>All operations return Promises and reject on failure. <code>load</code> returns complete text; <code>store</code> creates or replaces a complete text file; <code>list_files</code> returns sorted immediate file names. Missing-file removal rejects. Listing does not reserve a name, so concurrent creation of an unused article filename needs a later exclusive-create contract. Neither backend promises transactions or rollback across files.</p>
-        <p>This unit does not select directories, persist selections, or change the current model. The selecting operation supplies an opened storage object to the model; the model does not inspect its location.</p>
+        <p>This unit does not select directories, persist selections, or change the current model. The <a href="#28.lp5">selecting operation</a> supplies an opened storage object to the model; the model does not inspect its location.</p>
     </section>
     <section data-lp5-kind="code"><name>JavaScript units</name><code><![CDATA[
 let storage = (() => {

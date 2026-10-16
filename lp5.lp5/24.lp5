@@ -8,7 +8,7 @@
     </keywords>
     <section data-lp5-kind="explanation">
         <p>Local and remote selection identify the same kind of project: a directory whose final name is also its root article filename. Keeping that convention removes a second choice that could point at the wrong root. The remote field accepts a project-directory URL, not a root-file URL. Project creation remains unfinished; Remote Create is disabled and Local Create has no action yet.</p>
-        <p>The click handler supplies a snapshot of the location and URL, so async work does not depend on later field changes. It validates the required URL before dispatching. Selection must use <code>dispatchImmediate</code> so the HSM can invoke the local <a href="https://developer.mozilla.org/en-US/docs/Web/API/Window/showDirectoryPicker">directory picker</a> during the click's user activation; later async completions use ordinary deferred dispatch. Storage validates the directory URL and the model checks root filename validity.</p>
+        <p>The click handler supplies a snapshot of the location and URL, so async work does not depend on later field changes. It validates the required URL before dispatching. Selection must use <code>dispatchImmediate</code> so the <a href="#37.lp5">HSM</a> can invoke the local <a href="https://developer.mozilla.org/en-US/docs/Web/API/Window/showDirectoryPicker">directory picker</a> during the click's user activation; later async completions use ordinary deferred dispatch. <a href="#35.lp5">Storage</a> validates the directory URL and the <a href="#29.lp5">model</a> checks root filename validity.</p>
     </section>
     <section data-lp5-kind="code">
         <name>SelectCreateProject</name>

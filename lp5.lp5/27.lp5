@@ -18,7 +18,7 @@
         <li>utility</li>
     </keywords>
     <section data-lp5-kind="explanation">
-        <p>Unit boundaries separate responsibilities that change for different reasons: the model owns project data, storage supplies file access, the view owns mounted UI, and operations decide which commands may act on them. The controller supplies the call/return mechanism without knowing project-specific states. Utilities provide shared mechanisms without selecting application policy.</p>
+        <p>Unit boundaries separate responsibilities that change for different reasons: the <a href="#29.lp5">model</a> owns project data, <a href="#35.lp5">storage</a> supplies file access, the <a href="#31.lp5">view</a> owns mounted UI, and <a href="#21.lp5">operations</a> decide which commands may act on them. The <a href="#20.lp5">controller</a> supplies the call/return mechanism without knowing project-specific states. Utilities provide shared mechanisms without selecting application policy.</p>
         <p>Definitions share the enclosing application scope, so units can cooperate without making every helper public. Public members of <code>window.LP5</code> form the interface used by template scripts and startup.</p>
     </section>
 </template>
