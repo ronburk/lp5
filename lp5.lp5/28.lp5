@@ -10,6 +10,7 @@
         <p>Selection involves asynchronous work, but command legality must remain with the HSM. This function reports completion rather than holding the state handler inside an <code>await</code>. A local picker must be invoked before the first suspension so the Select click's user activation reaches the browser API; remote selection needs no picker.</p>
         <p>Dismissing the picker is an expected user decision, represented by <code>ProjectPickerAborted</code>. Only the picker call has that interpretation: an <code>AbortError</code> from persistence or loading is still a failure. Other errors escape to fatal reporting because recovery has not been defined.</p>
         <p>The <code>ProjectLoaded</code> controller command lets the HSM complete selection; it is separate from the model event of the same name, which informs data observers. Both mean the entire model is available, not merely that a directory was chosen. Local handle persistence precedes model selection and loading; remote projects use the directory-name convention for their root filename. Completion uses deferred dispatch so even a prompt picker dismissal cannot reach the state generator while its entry code is running.</p>
+        <p>Reload reuses the model's selected storage object and calls <code>loadProject()</code> without opening a picker or changing selection. It reports the same completion command so the HSM returns to its normal command handler.</p>
     </section>
     <section data-lp5-kind="code">
         <name>SelectProject async work</name>
@@ -32,6 +33,11 @@ async function asyncSelectProject(selection) {
     }
 
     await model.selectProject(project);
+    await model.loadProject();
+    controller.dispatch({ name: "ProjectLoaded" });
+}
+
+async function asyncReloadProject() {
     await model.loadProject();
     controller.dispatch({ name: "ProjectLoaded" });
 }

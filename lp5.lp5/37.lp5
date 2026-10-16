@@ -16,6 +16,9 @@ state baseOperationsHandler
  ->()     SelectCreateProject
       }
 
+   on ReloadProject
+ ->() ReloadProject
+
 state SelectCreateProject
       view.showModalDialog("SelectCreateProject");
 
@@ -33,6 +36,12 @@ state SelectProject
       return;
 
    on ProjectPickerAborted
+      return;
+
+state ReloadProject
+      asyncReloadProject();
+
+   on ProjectLoaded
       return;
 `;
 ]]></code></section></template>

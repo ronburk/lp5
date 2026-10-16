@@ -37,8 +37,8 @@ let operations = (() => {
     let stateMachine;
     function startup() {
         const code = compileStateMachine(stateMachineSource);
-        const define = util.scriptToFunction(code, "command-state-machine", "view", "asyncSelectProject");
-        stateMachine = define(view, asyncSelectProject);
+        const define = util.scriptToFunction(code, "command-state-machine", "view", "asyncSelectProject", "asyncReloadProject");
+        stateMachine = define(view, asyncSelectProject, asyncReloadProject);
         controller.init(stateMachine.states[stateMachine.initialState]());
     }
 

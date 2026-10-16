@@ -85,6 +85,7 @@ function renderProject(event) {
     tocEntries = navigation.entries;
     selectedFilename = null;
     displayedSelectionId = selectionId;
+    document.getElementById("LP5-Reload").disabled = false;
     pane.scrollTop = 0;
     initializeOutput(articles, newSelection);
 }
