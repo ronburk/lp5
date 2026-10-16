@@ -29,7 +29,7 @@ async function asyncSelectProject(selection) {
             return;
         }
         project = storage.local.open(directoryHandle);
-        await util.indexedDB.storeDirectoryHandle(directoryHandle);
+        await util.indexedDB.addHandle(directoryHandle);
     }
 
     await model.selectProject(project);

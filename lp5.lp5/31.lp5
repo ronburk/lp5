@@ -108,6 +108,24 @@
             reload.disabled = true;
             controller.dispatch({ name: "ReloadProject" });
         });
+        const deleteDatabase = document.getElementById("LP5-DeleteDatabase");
+        const status = document.getElementById("LP5-Status");
+        deleteDatabase.addEventListener("click", async () => {
+            if (!confirm("Delete the current LP5 IndexedDB database? This removes remembered local directories."))
+                return;
+            deleteDatabase.disabled = true;
+            status.textContent = "Deleting LP5 database…";
+            try {
+                await util.indexedDB.deleteDatabase(() => {
+                    status.textContent = "Waiting for other LP5 tabs to release the database…";
+                });
+                status.textContent = "LP5 database deleted. Reload the page to recreate it.";
+            } catch (error) {
+                status.textContent = `Database deletion failed: ${error.message}`;
+            } finally {
+                deleteDatabase.disabled = false;
+            }
+        });
     }
 
     return { startup, showModalDialog, closeModalDialog };

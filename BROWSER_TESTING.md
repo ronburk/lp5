@@ -67,6 +67,3 @@ add its route and restart the runner, then remove that temporary change after
 capturing the result. Use the returned preview URL, not `file://` or the
 execution container's loopback address. Native picker behavior, actual disk
 permissions, and IndexedDB persistence remain separate tests.
-
-`test/BROWSER_DB.md` covers the generic Utilities browserDB API using real
-IndexedDB, including structured values, failure recovery, and page reload.

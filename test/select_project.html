@@ -28,12 +28,15 @@ async function start(picker) {
     check(response.ok, "Generated output is served");
     const html = await response.text();
     const bootstrap = '<script>window.showDirectoryPicker = () => parent.fixturePicker();' +
-        'window.LP5.util.indexedDB.storeDirectoryHandle = async () => {};<\/script>';
+        'window.LP5.util.indexedDB.addHandle = async () => {};<\/script>';
     check(html.includes('<script type="module">'), "Startup module exists");
     const loaded = new Promise(resolve => frame.addEventListener("load", resolve, {once: true}));
     frame.srcdoc = html.replace('<script type="module">', bootstrap + '<script type="module">');
     await loaded;
     check(frame.contentDocument.querySelector("#SelectCreateProject-dialog:modal"), "Startup dialog opens");
+    const resetButton = frame.contentDocument.getElementById("LP5-DeleteDatabase");
+    check(resetButton?.textContent === "Delete current database", "Developer menu exposes database reset");
+    check(resetButton.getAttribute("aria-label") === "Delete current database", "Database reset has an accessible name");
 }
 function select() {
     frame.contentDocument.getElementById("SelectCreateProject-Select").click();
