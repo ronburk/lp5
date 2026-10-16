@@ -28,6 +28,7 @@ const longCode = Array.from({length: 80}, (_, i) => "line " + i + " " + "long te
 const originalRoot = '<template><children><li id="1.lp5"/><li id="2.lp5"/></children>' +
     '<heading>Root &amp; &lt;display&gt;</heading>' +
     '<section data-lp5-kind="explanation"><p>Read <strong>this</strong>.</p>' +
+    '<p><a href="#2.lp5">Go to the code article</a></p>' +
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 30"><rect width="80" height="30" fill="teal"/></svg></section>' +
     '<section data-lp5-kind="code"><name>Root code</name><code>' + literal(sourceCode) + reference +
     literal("\nlast line") + '</code></section></template>';
@@ -74,6 +75,20 @@ button.addEventListener("click", async () => {
         const sourceRef = articles[0].querySelector(".LP5-CodeReference");
         check(sourceRef.tagName === "SPAN" && sourceRef.textContent === "Shared"
             && sourceRef.dataset.ref === "Shared", "Source references show the name, not serialized XML");
+        const outputPane = doc.getElementById("LP5-Output");
+        outputPane.scrollTop = Math.min(35, outputPane.scrollHeight - outputPane.clientHeight);
+        const outputScroll = outputPane.scrollTop;
+        pane.scrollTop = 0;
+        const sourceURL = win.location.href;
+        const internalLink = articles[0].querySelector('.LP5-Explanation a[href="#2.lp5"]');
+        const linkClick = new win.MouseEvent("click", {bubbles: true, cancelable: true});
+        internalLink.dispatchEvent(linkClick);
+        check(linkClick.defaultPrevented, "Internal article links suppress browser fragment navigation");
+        check(win.location.href === sourceURL, "Internal article links leave the browser URL unchanged");
+        check(articles[2].classList.contains("LP5-Selected")
+            && !articles[0].classList.contains("LP5-Selected"), "Internal article links select the target article");
+        check(pane.scrollTop > 0, "Internal article links scroll the Source Pane to the target");
+        check(outputPane.scrollTop === outputScroll, "Internal article links leave Output scrolling unchanged");
         check(win.getComputedStyle(sourceRef).backgroundColor === "rgb(247, 244, 232)"
             && win.getComputedStyle(sourceRef, "::before").content === '"〈"'
             && win.getComputedStyle(sourceRef, "::after").content === '"〉"',
