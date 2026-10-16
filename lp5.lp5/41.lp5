@@ -3,7 +3,7 @@
     <keywords><li>view</li><li>output</li><li>expansion</li><li>indentation</li></keywords>
     <section data-lp5-kind="explanation">
         <p>Output is a view of the model's bundle graph. Expansion retains article ownership, distinct occurrence paths, and reference offsets into each fragment's authored text. These boundaries matter when one definition is expanded several times or inside another definition.</p>
-        <p>Expansion, formatting, and DOM rendering are separate stages. The formatter removes each fragment's common leading spaces, then indents continuation lines to match the reference site. Reference indentation is measured after removing the fragment's common prefix. Literal code is already decoded by the XML parser; decoding HTML entities again would corrupt it.</p>
+        <p>Expansion, formatting, and DOM rendering are separate stages. The formatter removes each fragment's common leading spaces, then indents continuation lines to match the reference site. Reference indentation is measured after removing the fragment's common prefix. Literal code is already decoded by the <a href="https://developer.mozilla.org/en-US/docs/Web/API/DOMParser">XML parser</a>; decoding HTML entities again would corrupt it.</p>
         <p>Undefined references remain visible as diagnostic placeholders, allowing unfinished projects to be read. They are presentation diagnostics, not valid generated code. Other XML wrapper elements retain their markup while references within them expand. This display does not write output files.</p>
     </section>
     <section data-lp5-kind="code">

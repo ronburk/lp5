@@ -19,7 +19,8 @@
                 lp5 is obviously related to Literate Programming,
                 yet not the same.
                 Some differences are structurally driven by the
-                desire to reimagine the "web" of Literate Programming
+                desire to reimagine the "web" of Knuth's
+                <a href="https://cs-faculty.stanford.edu/~knuth/lp.html">Literate Programming</a>
                 as the web that HTML5 natively supplies.
             </p>
             <p>

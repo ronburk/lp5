@@ -3,7 +3,7 @@
     <section data-lp5-kind="explanation">
         <div>
             <p>
-                lp5 is written in <q>vanilla</q> HTML5.
+                lp5 is written in <q>vanilla</q> <a href="https://developer.mozilla.org/en-US/docs/Web/HTML">HTML</a>.
                 It is self-contained, so you can copy it
                 (<code>lp5.html</code>)
                 to your local filesystem and run it on a

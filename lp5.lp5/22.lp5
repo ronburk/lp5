@@ -10,7 +10,7 @@
         <li>status</li>
     </keywords>
     <section data-lp5-kind="explanation">
-        <p>These stable pane IDs give the view destinations for navigation, article source, and expanded code. Keeping each pane's scroll container separate lets a reader inspect an expansion without losing their place in the source. Dragging a splitter redistributes the width of its neighboring panes. Reload rereads the selected project; Export remains a placeholder.</p>
+        <p>These stable pane IDs give the view destinations for navigation, article source, and expanded code. Keeping each pane's scroll container separate lets a reader inspect an expansion without losing their place in the source. Dragging a splitter redistributes the width of its neighboring panes using <a href="https://developer.mozilla.org/en-US/docs/Web/CSS/Guides/Flexible_box_layout/Basic_concepts">CSS flexbox</a>. Reload rereads the selected project; Export remains a placeholder.</p>
     </section>
     <section data-lp5-kind="code">
         <name>DOM declarations</name>

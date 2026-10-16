@@ -8,7 +8,7 @@
             </div>
             <hr/>
             <div>
-            –Donald Knuth, p. 130, "Literate Programming"
+            –Donald Knuth, p. 130, <a href="https://cs.stanford.edu/~knuth/lp.html">"Literate Programming"</a>
             </div>
         </div>
         <div>
@@ -158,7 +158,7 @@
                 Most importantly, lp5 rejects the core Knuth notion
                 of programs as literature.
                 I remember how excited I was when I
-                read Knuth's paper <i>Literate Programming</i>
+                read Knuth's paper <a href="https://doi.org/10.1093/comjnl/27.2.97"><i>Literate Programming</i></a>
                 in 1984.
                 And how much less excited I was when I actually
                 read his

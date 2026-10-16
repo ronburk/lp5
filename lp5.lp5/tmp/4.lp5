@@ -19,7 +19,7 @@
             Note also that the code here (and this paragraph!)
             contain the dreaded <code>&lt;/script&gt;</code>—the
             one character sequence that must not appear inside of
-            a <code>&lt;script&gt;</code> element,
+            a <a href="https://developer.mozilla.org/en-US/docs/Web/HTML/Element/script"><code>&lt;script&gt;</code> element</a>,
             and lp5 keeps code inside a <code>&lt;script&gt;</code> element
             when it's not being displayed.
             In both situations (as you can see if you edit this article),
