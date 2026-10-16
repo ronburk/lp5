@@ -96,12 +96,30 @@ function initializeExplanationLinks(pane) {
     if (pane.dataset.explanationLinksReady) return;
     pane.dataset.explanationLinksReady = "true";
 
+    for (const link of pane.querySelectorAll(".LP5-Explanation a[href]")) {
+        const href = link.getAttribute("href");
+        if (href.startsWith("#") && articleElements.has(href.slice(1))) {
+            link.classList.add("LP5-InternalLink");
+            continue;
+        }
+        let url;
+        try {
+            url = new URL(href, document.baseURI);
+        } catch {
+            continue;
+        }
+        if (url.protocol !== "http:" && url.protocol !== "https:") continue;
+        link.classList.add("LP5-ExternalLink");
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.setAttribute("aria-label", `${link.textContent.trim() || "External link"} (opens in a new tab)`);
+    }
+
     pane.addEventListener("click", event => {
         if (!(event.target instanceof Element)) return;
-        const link = event.target.closest(".LP5-Explanation a[href^='#']");
+        const link = event.target.closest(".LP5-Explanation a.LP5-InternalLink");
         if (!link) return;
         const filename = link.getAttribute("href").slice(1);
-        if (!articleElements.has(filename)) return;
         event.preventDefault();
         event.stopPropagation();
         selectArticle(filename);

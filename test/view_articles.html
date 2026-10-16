@@ -29,6 +29,7 @@ const originalRoot = '<template><children><li id="1.lp5"/><li id="2.lp5"/></chil
     '<heading>Root &amp; &lt;display&gt;</heading>' +
     '<section data-lp5-kind="explanation"><p>Read <strong>this</strong>.</p>' +
     '<p><a href="#2.lp5">Go to the code article</a></p>' +
+    '<p><a href="https://example.com/docs">External documentation</a></p>' +
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 30"><rect width="80" height="30" fill="teal"/></svg></section>' +
     '<section data-lp5-kind="code"><name>Root code</name><code>' + literal(sourceCode) + reference +
     literal("\nlast line") + '</code></section></template>';
@@ -81,6 +82,16 @@ button.addEventListener("click", async () => {
         pane.scrollTop = 0;
         const sourceURL = win.location.href;
         const internalLink = articles[0].querySelector('.LP5-Explanation a[href="#2.lp5"]');
+        const externalLink = articles[0].querySelector('.LP5-Explanation a[href="https://example.com/docs"]');
+        check(internalLink.classList.contains("LP5-InternalLink") && !internalLink.target,
+            "Internal article links are identified without opening another tab");
+        check(externalLink.classList.contains("LP5-ExternalLink") && externalLink.target === "_blank"
+            && externalLink.rel === "noopener noreferrer"
+            && externalLink.getAttribute("aria-label") === "External documentation (opens in a new tab)",
+            "External links open safely in a new tab with an accessible announcement");
+        check(win.getComputedStyle(internalLink).color !== win.getComputedStyle(externalLink).color
+            && win.getComputedStyle(externalLink, "::after").content.includes("↗"),
+            "Internal and external links have distinct visual styles");
         const linkClick = new win.MouseEvent("click", {bubbles: true, cancelable: true});
         internalLink.dispatchEvent(linkClick);
         check(linkClick.defaultPrevented, "Internal article links suppress browser fragment navigation");

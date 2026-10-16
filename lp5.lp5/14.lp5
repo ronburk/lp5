@@ -186,6 +186,23 @@ body {
     overflow-wrap: anywhere;
 }
 
+.LP5-Explanation a.LP5-InternalLink {
+    color: #155f63;
+    text-decoration-style: dotted;
+    text-underline-offset: 0.12em;
+}
+
+.LP5-Explanation a.LP5-ExternalLink {
+    color: #704080;
+    text-underline-offset: 0.12em;
+}
+
+.LP5-Explanation a.LP5-ExternalLink::after {
+    content: " ↗";
+    font-size: 0.8em;
+    text-decoration: none;
+}
+
 .LP5-Article > .LP5-CodeName {
     padding: 0.25rem 0.5rem;
     font-size: 0.85rem;
