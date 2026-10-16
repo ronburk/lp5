@@ -1,6 +1,6 @@
 <template><heading>Outermost Code</heading><keywords><li>doctype</li><li>meta</li></keywords><section data-lp5-kind="explanation">
         <p>This unnamed fragment is the assembly root for the single-file application. It keeps the HTML document structure visible in one place while named references let the implementation be explained in a different order. Using one assembly root is an organizational choice, not a requirement of HTML or the tangler.</p>
-        <p>Unit definitions run before the body is parsed; startup is deferred until the templates and page elements exist. Constructors therefore define services without trying to mount UI. The startup article explains initialization and failure reporting.</p>
+        <p>Unit definitions run before the body is parsed; startup is deferred until the <a href="#23.lp5">templates</a> and <a href="#22.lp5">page elements</a> exist. Constructors therefore define services without trying to mount UI. The <a href="#25.lp5">startup article</a> explains initialization and failure reporting.</p>
     </section><section data-lp5-kind="code"><name/><code><![CDATA[<!doctype html>
 <!-- lp5.html <>  -->
 <html lang="en">

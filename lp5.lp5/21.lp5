@@ -21,8 +21,8 @@
             <li><code>yield child</code> calls a fresh, primed child with the same command. The caller remains suspended until the child finishes.</li>
             <li><code>return</code> resumes the caller with the child's completion command. The returned JavaScript value is ignored; without a caller, dispatch ends.</li>
         </ol>
-        <p>Compilation belongs to <code>startup()</code> so syntax failures use the same fatal-error reporting as runtime failures. Defining the unit earlier must not start command handling. The compiler and machine stay private because callers need to send commands, not manipulate state factories.</p>
-        <p>The command state machine and async selection work are explained in their own articles. The production controller currently supports calls, waits, and returns; the compiler's replacing transitions remain experimental and are exercised only by separate test drivers.</p>
+        <p>Compilation belongs to <code>startup()</code> so syntax failures use the same <a href="#25.lp5">fatal-error reporting</a> as runtime failures. Defining the unit earlier must not start command handling. The <a href="#36.lp5">compiler</a> and machine stay private because callers need to send commands, not manipulate state factories.</p>
+        <p>The <a href="#37.lp5">command state machine</a> and <a href="#28.lp5">async selection work</a> are explained in their own articles. The production controller currently supports calls, waits, and returns; the compiler's replacing transitions remain experimental and are exercised only by separate test drivers.</p>
     </section>
     <section data-lp5-kind="code">
         <name>JavaScript units</name>

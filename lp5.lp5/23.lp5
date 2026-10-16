@@ -1,7 +1,7 @@
 <template><children>
         <li id="24.lp5"/>
     </children><heading>Dialog templates</heading><keywords><li>dialog</li><li>template</li><li>modal</li></keywords><section data-lp5-kind="explanation">
-        <p>Dialog definitions stay inert until an operation needs them. Keeping each dialog's markup, style, and initialization script in one child <a href="https://developer.mozilla.org/en-US/docs/Web/HTML/Element/template">HTML template</a> makes it a reusable UI unit with a fresh DOM lifetime on each mount. Shared modal styling belongs in the parent template so dialogs can use the same conventions and override them locally.</p>
+        <p>Dialog definitions stay inert until an operation needs them. Keeping each dialog's <a href="#24.lp5">markup, style, and initialization script</a> in one child <a href="https://developer.mozilla.org/en-US/docs/Web/HTML/Element/template">HTML template</a> makes it a reusable UI unit with a fresh DOM lifetime on each mount. Shared modal styling belongs in the parent template so dialogs can use the same conventions and override them locally.</p>
     </section><section data-lp5-kind="code"><name>Dialog templates</name><code><![CDATA[
 <template id="LP5-Dialog-Templates">
     <style> // dynamically inserted ahead of modal dialogs
