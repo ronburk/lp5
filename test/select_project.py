@@ -25,7 +25,7 @@ const storage = {
     local: {open(actual) { assert.equal(actual, handle); return localProject; }},
     remote: {open(url) { assert.equal(url, "https://example.com/remote.lp5/"); return remoteProject; }}
 };
-const util = {indexedDB: {async storeDirectoryHandle(actual) { calls.push(["persist", actual]); }}};
+const util = {indexedDB: {async addHandle(actual) { calls.push(["persist", actual]); }}};
 const run = new Function("window", "controller", "model", "storage", "util",
     CODE + "; return asyncSelectProject;")(window, controller, model, storage, util);
 const local = {location: "local"};
@@ -49,7 +49,7 @@ const local = {location: "local"};
     assert.deepEqual(calls, [["select", remoteProject], ["load"]]);
     calls.length = 0;
     window.showDirectoryPicker = async () => handle;
-    for (const [object, stage] of [[util.indexedDB, "storeDirectoryHandle"], [model, "selectProject"], [model, "loadProject"]]) {
+    for (const [object, stage] of [[util.indexedDB, "addHandle"], [model, "selectProject"], [model, "loadProject"]]) {
         for (const name of ["AbortError", "Error"]) {
             const error = new Error("Storage/model failed"); error.name = name;
             const original = object[stage];

@@ -19,6 +19,10 @@
         <span>LP5</span>
         <button id="LP5-Reload" type="button" disabled>Reload</button>
         <button type="button">Export</button>
+        <details id="LP5-DeveloperMenu">
+            <summary>Developer</summary>
+            <button id="LP5-DeleteDatabase" type="button" aria-label="Delete current database">Delete current database</button>
+        </details>
     </div>
 </header>
 <main id="LP5-Main">

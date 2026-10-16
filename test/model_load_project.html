@@ -67,8 +67,8 @@ async function run() {
     model.addEventListener("ProjectLoaded", removed);
     model.removeEventListener("ProjectLoaded", removed);
     const selectDirectory = handle => model.selectProject(storage.local.open(handle));
-    const persist = util.indexedDB.storeDirectoryHandle;
-    util.indexedDB.storeDirectoryHandle = async () => {};
+    const persist = util.indexedDB.addHandle;
+    util.indexedDB.addHandle = async () => {};
     check(model.directoryHandle === undefined, "Directory handle is private");
     try { await model.loadProject(); throw new Error("Expected no-selection failure"); }
     catch (error) { check(error.message.includes("No project"), "No-selection failure"); }
@@ -296,7 +296,7 @@ async function run() {
     catch (error) { check(error.message.includes("Invalid filename"), "Directory naming convention"); }
     check(model.rootFilename === null, "Bad directory also discards previous model");
 
-    util.indexedDB.storeDirectoryHandle = persist;
+    util.indexedDB.addHandle = persist;
     let nativeResult = "OPFS unavailable";
     if (navigator.storage?.getDirectory) {
         const storageRoot = await navigator.storage.getDirectory();
@@ -307,19 +307,46 @@ async function run() {
             const writable = await file.createWritable();
             await writable.write(article([], "", literal("native file text")));
             await writable.close();
-            await util.indexedDB.storeDirectoryHandle(project);
             await selectDirectory(project);
             await model.loadProject();
             check(model.rootFilename === name, "Native OPFS directory loading");
             check(model.getArticle(name).document.querySelector("code").textContent === "native file text",
                 "Native file contents parsed");
-            const handles = await util.indexedDB.getDirectoryHandles();
-            let found = false;
-            for (const handle of handles) if (await handle.isSameEntry(project)) found = true;
-            check(found, "Native directory handle persisted in IndexedDB");
-            nativeResult = "OPFS and IndexedDB passed";
+
+            const otherName = "lp5-loader-test-" + crypto.randomUUID() + ".lp5";
+            const otherProject = await storageRoot.getDirectoryHandle(otherName, {create: true});
+            const namespaceScript = [...html.querySelectorAll("script")]
+                .find(script => script.textContent.includes("window.LP5 ="));
+            new Function(namespaceScript.textContent)();
+            const secondTabDB = window.LP5.util.indexedDB;
+            try {
+                const [first, second] = await Promise.all([
+                    util.indexedDB.addHandle(project),
+                    secondTabDB.addHandle(otherProject)
+                ]);
+                check(first.id !== second.id, "Distinct local projects receive distinct IDs");
+                const [duplicateA, duplicateB] = await Promise.all([
+                    util.indexedDB.addHandle(project),
+                    secondTabDB.addHandle(project)
+                ]);
+                check(duplicateA.id === duplicateB.id && duplicateA.id === first.id,
+                    "Concurrent tabs converge on the same ID for one directory");
+                const handles = await util.indexedDB.loadHandles();
+                check(handles[first.id]?.id === first.id && handles[second.id]?.id === second.id,
+                    "Concurrent writes preserve both distinct directory handles");
+                check(await handles[first.id].directoryHandle.isSameEntry(project),
+                    "Directory handle survives IndexedDB structured cloning");
+                await util.indexedDB.deleteHandle(first);
+                await secondTabDB.deleteHandle(first);
+                await util.indexedDB.deleteHandle(second);
+                check(!Object.hasOwn(await util.indexedDB.loadHandles(), first.id) &&
+                    !Object.hasOwn(await util.indexedDB.loadHandles(), second.id),
+                    "Deleting handles is idempotent and removes their IDs");
+                nativeResult = "OPFS and cross-instance IndexedDB concurrency passed";
+            } finally {
+                await storageRoot.removeEntry(otherName, {recursive: true});
+            }
         } finally {
-            await util.indexedDB.deleteDirectoryHandle(project);
             await storageRoot.removeEntry(name, {recursive: true});
         }
     }
