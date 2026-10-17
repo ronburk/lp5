@@ -187,7 +187,8 @@ body {
     border: 0;
     background: transparent;
     color: #526174;
-    opacity: 0.45;
+    opacity: 0;
+    transition: opacity 100ms ease, background-color 100ms ease;
     cursor: row-resize;
     touch-action: none;
     line-height: 0.6rem;
@@ -198,6 +199,12 @@ body {
 .LP5-ViewSplitHandle.LP5-SplitDragging {
     opacity: 1;
     background: #dce8f5;
+}
+
+@media (hover: none) {
+    .LP5-ViewSplitHandle {
+        opacity: 0.35;
+    }
 }
 
 .LP5-ViewSplitter {
