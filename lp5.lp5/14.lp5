@@ -170,7 +170,7 @@ body {
     overflow: auto;
 }
 
-.LP5-PaneViewActive {
+.LP5-PaneSelected .LP5-PaneViewActive {
     box-shadow: inset 0 2px #155f63;
 }
 
@@ -338,7 +338,6 @@ body {
 
 .LP5-SourceView > .LP5-Article {
     margin: 0.5rem;
-    border: 1px solid #c8c3af;
 }
 
 .LP5-Article > h2 {
