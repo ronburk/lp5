@@ -67,6 +67,10 @@ button.addEventListener("click", async () => {
         const doc = frame.contentDocument, win = frame.contentWindow;
         const {model, storage} = win.LP5;
         const pane = doc.getElementById("LP5-Source");
+        check(pane.classList.contains("LP5-PaneSelected") &&
+            !doc.getElementById("LP5-Toc").classList.contains("LP5-PaneSelected") &&
+            !doc.getElementById("LP5-Output").classList.contains("LP5-PaneSelected"),
+            "Source is selected by default");
         check(pane.children.length === 0, "Source starts empty");
         doc.getElementById("SelectCreateProject-Select").click();
         await until(() => !doc.getElementById("SelectCreateProject-dialog") || doc.querySelector('dialog[role="alertdialog"]'));
@@ -228,7 +232,7 @@ button.addEventListener("click", async () => {
         files["fixture.lp5"] = originalRoot;
         await model.selectProject(storage.local.open(window.displayFixture));
         await model.loadProject();
-        report.textContent = `PASS: ${checks} assertions; startup rendering, source fidelity, SVG, scrolling, and reload replacement.`;
+        report.textContent = `PASS: ${checks} assertions; default pane selection, startup rendering, source fidelity, SVG, scrolling, and reload replacement.`;
     } catch (error) {
         report.textContent = "FAIL: " + error.stack;
     } finally {

@@ -83,7 +83,7 @@
 
     ]]><lp5- ref="View output expansion"/><lp5- ref="View output display"/><lp5- ref="View table of contents"/><lp5- ref="View article rendering"/><![CDATA[
 
-    // Mark the pane the user is interacting with so its top rule identifies the selection.
+    // Select Source initially, then mark the pane the user is interacting with.
     function initializePaneSelection() {
         const panes = ["LP5-Toc", "LP5-Source", "LP5-Output"]
             .map(id => document.getElementById(id));
@@ -91,6 +91,7 @@
             for (const candidate of panes)
                 candidate.classList.toggle("LP5-PaneSelected", candidate === pane);
         }
+        select(document.getElementById("LP5-Source"));
         for (const pane of panes) {
             pane.addEventListener("pointerdown", () => select(pane));
             pane.addEventListener("focusin", () => select(pane));

@@ -2,7 +2,7 @@
 
 Build with `./lp5 lp5 tangle`, start `sites-preview start "$PWD"`, and open
 `/test/view_articles.html` at the returned host. Click **Test article display**.
-Expect PASS with 67 assertions.
+Expect PASS with 68 assertions, including Source as the initial selected pane.
 
 The test runs the complete generated application, including startup hooks,
 command routing, model loading, and the view's private model subscription. It
