@@ -61,6 +61,11 @@ run.addEventListener("click", async () => {
         const views = id => [...host(id).querySelectorAll(":scope > .LP5-PaneViews > .LP5-PaneView")];
         const split = id => host(id).querySelector(":scope > .LP5-ViewSplitHandle").click();
         const source = views("Source")[0];
+        const sourceHandle = host("Source").querySelector(":scope > .LP5-ViewSplitHandle");
+        check(win.getComputedStyle(sourceHandle).opacity === "0",
+            "Split grip is visually hidden at rest on hover-capable devices");
+        check(sourceHandle.getBoundingClientRect().width >= 48 && sourceHandle.getBoundingClientRect().height >= 10,
+            "Hidden split grip keeps its pointer hit area");
         source.scrollTop = 48;
         split("Source");
         const sourceViews = views("Source");
