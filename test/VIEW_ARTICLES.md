@@ -2,8 +2,9 @@
 
 Build with `./lp5 lp5 tangle`, start `sites-preview start "$PWD"`, and open
 `/test/view_articles.html` at the returned host. Click **Test article display**.
-Expect PASS with 82 assertions, including tighter title spacing, Source as the
-initial selected pane, and Ctrl-F search confined to the selected pane.
+Expect PASS with 83 assertions, including unclipped editor focus outlines,
+tighter title spacing, Source as the initial selected pane, and Ctrl-F search
+confined to the selected pane.
 
 The find-bar checks cover shortcut capture, match counting and navigation, and
 scope changes when the selected pane changes. The article layout check keeps the

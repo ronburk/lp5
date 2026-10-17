@@ -186,6 +186,18 @@ button.addEventListener("click", async () => {
             && doc.getElementById("EditArticle-dialog").querySelector('[data-id="divider"][role="separator"]')
             && !doc.querySelector('[data-id="hasCode"]'),
             "Code references use readable markers, the panes have an accessible divider, and no redundant section toggle appears");
+        const outlineFits = (field, pane, edge) => {
+            field.focus();
+            const fieldRect = field.getBoundingClientRect();
+            const paneRect = pane.getBoundingClientRect();
+            const style = win.getComputedStyle(field);
+            const extent = parseFloat(style.outlineWidth) + parseFloat(style.outlineOffset);
+            return edge === "left" ? fieldRect.left - paneRect.left >= extent :
+                paneRect.right - fieldRect.right >= extent;
+        };
+        check(outlineFits(headingEditor, editor.querySelector('[data-id="articlePane"]'), "left")
+            && outlineFits(codeEditor, editor.querySelector('[data-id="codePane"]'), "right"),
+            "Focused Article and Code fields have unclipped outer focus outlines");
         check(doc.getElementById("EditArticle-save").disabled,
             "Save starts disabled for an unchanged article");
         doc.getElementById("EditArticle-cancel").click();
