@@ -121,6 +121,26 @@ body {
     border-top-color: #155f63;
 }
 
+#LP5-FindBar {
+    position: fixed;
+    z-index: 1000;
+    top: 0.4rem;
+    right: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.35rem;
+    border: 1px solid #7890aa;
+    border-radius: 3px;
+    background: #fff;
+    box-shadow: 0 2px 8px #0003;
+}
+
+#LP5-FindBar[hidden] { display: none; }
+#LP5-FindScope { white-space: nowrap; }
+#LP5-FindInput { width: 16rem; max-width: 30vw; }
+#LP5-FindCount { min-width: 3rem; text-align: center; }
+
 #LP5-Toc {
     flex: 0 0 25%;
 }
