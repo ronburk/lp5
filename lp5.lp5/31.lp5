@@ -56,18 +56,18 @@
 
     function showArticleEditorError(message) {
         const dialog = document.getElementById("EditArticle-dialog");
-        const source = document.getElementById("EditArticle-source");
-        const save = document.getElementById("EditArticle-save");
-        const cancel = document.getElementById("EditArticle-cancel");
         const error = document.getElementById("EditArticle-error");
-        if (!dialog || !source || !save || !cancel || !error)
+        const save = dialog?.querySelector('[data-id="save"]');
+        const cancel = dialog?.querySelector('[data-id="cancel"]');
+        if (!dialog || !error || !save || !cancel)
             throw new Error("Edit Article dialog is not mounted");
         error.textContent = message;
         error.hidden = false;
-        source.disabled = false;
+        for (const control of dialog.querySelectorAll("input, textarea"))
+            control.disabled = false;
         cancel.disabled = false;
-        save.disabled = source.value === source.defaultValue;
-        source.focus();
+        save.disabled = false;
+        save.focus();
     }
 
     function closeModalDialog(dialogName) {
@@ -83,113 +83,6 @@
 
     ]]><lp5- ref="View output expansion"/><lp5- ref="View output display"/><lp5- ref="View table of contents"/><lp5- ref="View article rendering"/><![CDATA[
 
-    // Search the currently selected pane and keep the browser's document-wide find closed.
-    function initializePaneFind() {
-        const panes = ["LP5-Toc", "LP5-Source", "LP5-Output"]
-            .map(id => document.getElementById(id));
-        const bar = document.getElementById("LP5-FindBar");
-        const scope = document.getElementById("LP5-FindScope");
-        const input = document.getElementById("LP5-FindInput");
-        const count = document.getElementById("LP5-FindCount");
-        let matches = [];
-        let current = -1;
-        let searchPane = panes.find(pane => pane.classList.contains("LP5-PaneSelected")) || panes[1];
-
-        function paneName(pane) {
-            return pane.id === "LP5-Toc" ? "Table of Contents" :
-                pane.id === "LP5-Source" ? "Source" : "Output";
-        }
-
-        function positionAt(index) {
-            if (!matches.length) return;
-            current = (index + matches.length) % matches.length;
-            const range = matches[current];
-            const selection = window.getSelection();
-            selection.removeAllRanges();
-            selection.addRange(range);
-            range.startContainer.parentElement?.scrollIntoView({block: "nearest", inline: "nearest"});
-            count.textContent = `${current + 1}/${matches.length}`;
-        }
-
-        function locate(nodes, offset) {
-            return nodes.find(item => item.start <= offset && offset < item.end);
-        }
-
-        function update() {
-            searchPane = panes.find(pane => pane.classList.contains("LP5-PaneSelected")) || panes[1];
-            scope.textContent = `Find in ${paneName(searchPane)}`;
-            matches = [];
-            current = -1;
-            const query = input.value.toLowerCase();
-            if (query) {
-                const nodes = [];
-                const walker = document.createTreeWalker(searchPane, NodeFilter.SHOW_TEXT);
-                let node, text = "";
-                while ((node = walker.nextNode())) {
-                    if (!node.data) continue;
-                    const parent = node.parentElement;
-                    if (parent.closest("script, style, [hidden], [aria-hidden='true']")) continue;
-                    const visible = document.createRange();
-                    visible.selectNodeContents(node);
-                    if (!visible.getClientRects().length) continue;
-                    const start = text.length;
-                    text += node.data;
-                    nodes.push({node, start, end: text.length});
-                }
-                const folded = text.toLowerCase();
-                for (let offset = folded.indexOf(query); offset >= 0; offset = folded.indexOf(query, offset + 1)) {
-                    const first = locate(nodes, offset);
-                    const last = locate(nodes, offset + query.length - 1);
-                    if (!first || !last) continue;
-                    const range = document.createRange();
-                    range.setStart(first.node, offset - first.start);
-                    range.setEnd(last.node, offset + query.length - last.start);
-                    matches.push(range);
-                }
-            }
-            count.textContent = matches.length ? `1/${matches.length}` : "0/0";
-            if (matches.length) positionAt(0);
-            else window.getSelection().removeAllRanges();
-        }
-
-        function close() {
-            bar.hidden = true;
-            searchPane.focus({preventScroll: true});
-        }
-
-        function open() {
-            searchPane = panes.find(pane => pane.classList.contains("LP5-PaneSelected")) || panes[1];
-            scope.textContent = `Find in ${paneName(searchPane)}`;
-            bar.hidden = false;
-            input.focus();
-            input.select();
-            update();
-        }
-
-        input.addEventListener("input", update);
-        input.addEventListener("keydown", event => {
-            if (event.key === "Enter") {
-                event.preventDefault();
-                positionAt(current + (event.shiftKey ? -1 : 1));
-            } else if (event.key === "Escape") {
-                event.preventDefault();
-                close();
-            }
-        });
-        document.getElementById("LP5-FindPrevious").addEventListener("click", () => positionAt(current - 1));
-        document.getElementById("LP5-FindNext").addEventListener("click", () => positionAt(current + 1));
-        document.getElementById("LP5-FindClose").addEventListener("click", close);
-        document.addEventListener("LP5-PaneSelectionChanged", () => {
-            if (!bar.hidden) update();
-        });
-        window.addEventListener("keydown", event => {
-            if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === "f") {
-                event.preventDefault();
-                open();
-            }
-        }, true);
-    }
-
     // Select Source initially, then mark the pane the user is interacting with.
     function initializePaneSelection() {
         const panes = ["LP5-Toc", "LP5-Source", "LP5-Output"]
@@ -197,7 +90,6 @@
         function select(pane) {
             for (const candidate of panes)
                 candidate.classList.toggle("LP5-PaneSelected", candidate === pane);
-            document.dispatchEvent(new Event("LP5-PaneSelectionChanged"));
         }
         select(document.getElementById("LP5-Source"));
         for (const pane of panes) {
@@ -248,7 +140,6 @@
 
     function startup() {
         initializePaneSelection();
-        initializePaneFind();
         initializePaneSplitters();
         model.addEventListener("ProjectLoaded", renderProject);
         const reload = document.getElementById("LP5-Reload");
