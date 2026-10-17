@@ -1,0 +1,215 @@
+<template>
+    <heading>View split panes</heading>
+    <keywords>
+        <li>view</li>
+        <li>split panes</li>
+        <li>scrolling</li>
+        <li>pointer events</li>
+    </keywords>
+    <section data-lp5-kind="explanation">
+        <p>Each main pane contains one or more views over the same project data. A view owns its scroll position; the pane selection, article selection, output choice, TOC expansion, and output folding remain shared. A top-edge grip creates one lower copy at the dragged position, and both views begin at the same content position. The horizontal divider resizes the copies and its close button joins them, keeping the active view.</p>
+        <p>Rendering functions receive a pane view rather than relying on a pane ID. This lets project reloads rebuild every view while Find and cross-pane navigation address the active copy.</p>
+    </section>
+    <section data-lp5-kind="code">
+        <name>View split panes</name>
+        <code><![CDATA[
+const paneViewByHost = new Map();
+
+function paneViews(hostId) {
+    const host = document.getElementById(hostId);
+    const container = host?.querySelector(":scope > .LP5-PaneViews");
+    return container ? [...container.querySelectorAll(":scope > .LP5-PaneView")] : [];
+}
+
+function activePaneView(hostId) {
+    return paneViewByHost.get(hostId) || paneViews(hostId)[0] || null;
+}
+
+function selectPaneView(paneView) {
+    const host = paneView.closest("#LP5-Toc, #LP5-Source, #LP5-Output");
+    if (!host) return;
+    const previous = paneViewByHost.get(host.id);
+    previous?.classList.remove("LP5-PaneViewActive");
+    paneViewByHost.set(host.id, paneView);
+    paneView.classList.add("LP5-PaneViewActive");
+    let paneChanged = false;
+    for (const candidate of document.querySelectorAll("#LP5-Toc, #LP5-Source, #LP5-Output")) {
+        const selected = candidate === host;
+        if (candidate.classList.contains("LP5-PaneSelected") !== selected) paneChanged = true;
+        candidate.classList.toggle("LP5-PaneSelected", selected);
+    }
+    if (paneChanged) document.dispatchEvent(new Event("LP5-PaneSelectionChanged"));
+    if (previous !== paneView)
+        document.dispatchEvent(new Event("LP5-PaneViewSelectionChanged"));
+}
+
+function initializePaneView(paneView) {
+    paneView.tabIndex = 0;
+    paneView.addEventListener("pointerdown", () => selectPaneView(paneView));
+    paneView.addEventListener("focusin", () => selectPaneView(paneView));
+}
+
+function renderPaneView(hostId, paneView) {
+    if (hostId === "LP5-Toc") renderTocPane(paneView, displayedArticles);
+    else if (hostId === "LP5-Source") renderSourcePane(paneView, displayedArticles);
+    else if (hostId === "LP5-Output") renderOutputPane(paneView, displayedOutput);
+}
+
+function forgetPaneView(paneView) {
+    articleElementsByView.delete(paneView);
+    tocEntriesByView.delete(paneView);
+    outputArticlesByView.delete(paneView);
+    outputReferencesByView.delete(paneView);
+}
+
+function closePaneSplit(hostId) {
+    const host = document.getElementById(hostId);
+    const container = host?.querySelector(":scope > .LP5-PaneViews");
+    if (!container) return;
+    const views = paneViews(hostId);
+    if (views.length < 2) return;
+    const keep = activePaneView(hostId);
+    for (const view of views)
+        if (view !== keep) forgetPaneView(view);
+    container.replaceChildren(keep);
+    keep.style.flex = "1 1 0";
+    paneViewByHost.set(hostId, keep);
+    keep.classList.add("LP5-PaneViewActive");
+}
+
+function resizePaneViews(hostId, firstView, secondView, separator, event) {
+    const container = document.getElementById(hostId).querySelector(":scope > .LP5-PaneViews");
+    const bounds = container.getBoundingClientRect();
+    const minimum = Math.min(80, bounds.height / 2);
+    const firstSize = Math.max(minimum, Math.min(bounds.height - minimum, event.clientY - bounds.top));
+    firstView.style.flex = firstSize + " 1 0px";
+    secondView.style.flex = (bounds.height - firstSize) + " 1 0px";
+    separator.dataset.position = String(firstSize / bounds.height);
+}
+
+function installViewSeparator(hostId, firstView, secondView, separator) {
+    const join = document.createElement("button");
+    join.type = "button";
+    join.className = "LP5-JoinViews";
+    join.setAttribute("aria-label", "Join views");
+    join.title = "Join views";
+    join.textContent = "×";
+    join.addEventListener("click", event => {
+        event.stopPropagation();
+        closePaneSplit(hostId);
+    });
+    separator.append(join);
+
+    let pointerId = null;
+    function finish(event) {
+        if (pointerId !== event.pointerId) return;
+        pointerId = null;
+        separator.classList.remove("LP5-ViewResizing");
+        if (separator.hasPointerCapture(event.pointerId))
+            separator.releasePointerCapture(event.pointerId);
+    }
+    separator.addEventListener("pointerdown", event => {
+        if (event.button !== 0 || !event.isPrimary || event.target === join) return;
+        pointerId = event.pointerId;
+        separator.setPointerCapture(pointerId);
+        separator.classList.add("LP5-ViewResizing");
+        event.preventDefault();
+    });
+    separator.addEventListener("pointermove", event => {
+        if (pointerId !== event.pointerId) return;
+        resizePaneViews(hostId, firstView, secondView, separator, event);
+    });
+    for (const name of ["pointerup", "pointercancel", "lostpointercapture"])
+        separator.addEventListener(name, finish);
+}
+
+function splitPaneView(hostId, ratio) {
+    const host = document.getElementById(hostId);
+    const container = host?.querySelector(":scope > .LP5-PaneViews");
+    const views = paneViews(hostId);
+    if (!container || views.length !== 1) return;
+    const firstView = views[0];
+    const scrollTop = firstView.scrollTop;
+    const scrollLeft = firstView.scrollLeft;
+    const separator = document.createElement("div");
+    separator.className = "LP5-ViewSplitter";
+    separator.setAttribute("aria-label", "Resize or join split views");
+    const secondView = document.createElement("div");
+    secondView.className = "LP5-PaneView " +
+        (hostId === "LP5-Toc" ? "LP5-TocView" : hostId === "LP5-Source" ? "LP5-SourceView" : "LP5-OutputView");
+    firstView.style.flex = ratio + " 1 0px";
+    secondView.style.flex = (1 - ratio) + " 1 0px";
+    container.append(separator, secondView);
+    initializePaneView(secondView);
+    renderPaneView(hostId, firstView);
+    renderPaneView(hostId, secondView);
+    firstView.scrollTop = secondView.scrollTop = scrollTop;
+    firstView.scrollLeft = secondView.scrollLeft = scrollLeft;
+    installViewSeparator(hostId, firstView, secondView, separator);
+    selectPaneView(secondView);
+}
+
+function installTopSplitHandle(host, handle) {
+    let drag = null;
+    let suppressClick = false;
+    const preview = document.createElement("div");
+    preview.className = "LP5-ViewSplitPreview";
+    preview.hidden = true;
+    host.append(preview);
+
+    function finish(event) {
+        if (!drag || drag.pointerId !== event.pointerId) return;
+        const current = drag;
+        drag = null;
+        preview.hidden = true;
+        handle.classList.remove("LP5-SplitDragging");
+        if (handle.hasPointerCapture(event.pointerId))
+            handle.releasePointerCapture(event.pointerId);
+        if (current.moved) {
+            suppressClick = true;
+            const area = host.querySelector(":scope > .LP5-PaneViews").getBoundingClientRect();
+            splitPaneView(host.id, Math.max(0.2, Math.min(0.8, (current.y - area.top) / area.height)));
+        }
+    }
+    handle.addEventListener("pointerdown", event => {
+        if (event.button !== 0 || !event.isPrimary || paneViews(host.id).length !== 1) return;
+        drag = {pointerId: event.pointerId, startY: event.clientY, y: event.clientY, moved: false};
+        handle.setPointerCapture(event.pointerId);
+        event.preventDefault();
+    });
+    handle.addEventListener("pointermove", event => {
+        if (!drag || drag.pointerId !== event.pointerId) return;
+        drag.y = event.clientY;
+        if (Math.abs(drag.y - drag.startY) < 12) return;
+        drag.moved = true;
+        const area = host.querySelector(":scope > .LP5-PaneViews").getBoundingClientRect();
+        const hostBounds = host.getBoundingClientRect();
+        preview.style.top = Math.max(10, Math.min(hostBounds.height - 10, drag.y - hostBounds.top)) + "px";
+        preview.hidden = false;
+    });
+    for (const name of ["pointerup", "pointercancel", "lostpointercapture"])
+        handle.addEventListener(name, finish);
+    handle.addEventListener("click", () => {
+        if (suppressClick) {
+            suppressClick = false;
+            return;
+        }
+        splitPaneView(host.id, 0.5);
+    });
+}
+
+function initializePaneViews() {
+    for (const hostId of ["LP5-Toc", "LP5-Source", "LP5-Output"]) {
+        const host = document.getElementById(hostId);
+        const view = paneViews(hostId)[0];
+        const handle = host?.querySelector(":scope > .LP5-ViewSplitHandle");
+        if (!host || !view || !handle)
+            throw new Error("Missing initial pane view: " + hostId);
+        initializePaneView(view);
+        selectPaneView(view);
+        installTopSplitHandle(host, handle);
+    }
+}
+]]></code>
+    </section>
+</template>

@@ -66,8 +66,9 @@ button.addEventListener("click", async () => {
         await loaded;
         const doc = frame.contentDocument, win = frame.contentWindow;
         const {model, storage} = win.LP5;
-        const pane = doc.getElementById("LP5-Source");
-        check(pane.classList.contains("LP5-PaneSelected") &&
+        const sourceHost = doc.getElementById("LP5-Source");
+        const pane = sourceHost.querySelector(".LP5-SourceView");
+        check(sourceHost.classList.contains("LP5-PaneSelected") &&
             !doc.getElementById("LP5-Toc").classList.contains("LP5-PaneSelected") &&
             !doc.getElementById("LP5-Output").classList.contains("LP5-PaneSelected"),
             "Source is selected by default");
@@ -118,7 +119,7 @@ button.addEventListener("click", async () => {
         const sourceRef = articles[0].querySelector(".LP5-CodeReference");
         check(sourceRef.tagName === "SPAN" && sourceRef.textContent === "Shared"
             && sourceRef.dataset.ref === "Shared", "Source references show the name, not serialized XML");
-        const outputPane = doc.getElementById("LP5-Output");
+        const outputPane = doc.getElementById("LP5-Output").querySelector(".LP5-OutputView");
         outputPane.scrollTop = Math.min(35, outputPane.scrollHeight - outputPane.clientHeight);
         const outputScroll = outputPane.scrollTop;
         pane.scrollTop = 0;
@@ -239,16 +240,16 @@ button.addEventListener("click", async () => {
         pre.scrollLeft = 100;
         check(pre.scrollLeft > 0, "Long code can scroll horizontally");
         const initialWidth = pre.clientWidth;
-        pane.style.flex = "0 0 180px";
+        sourceHost.style.flex = "0 0 180px";
         await new Promise(resolve => win.requestAnimationFrame(resolve));
         const narrowWidth = pre.clientWidth;
         check(narrowWidth < initialWidth && pre.scrollWidth > pre.clientWidth, "Code follows a narrower pane");
         check(pre.scrollHeight <= pre.clientHeight + 1, "Narrowing leaves every code line visible");
-        pane.style.flex = "0 0 600px";
+        sourceHost.style.flex = "0 0 600px";
         await new Promise(resolve => win.requestAnimationFrame(resolve));
         check(pre.clientWidth > narrowWidth, "Code follows a wider pane");
         check(pre.scrollHeight <= pre.clientHeight + 1, "Widening leaves every code line visible");
-        pane.style.flex = "";
+        sourceHost.style.flex = "";
 
         const originalDocument = model.getArticle("fixture.lp5").document;
         pane.children[0].querySelector("em").textContent = "Edited display";

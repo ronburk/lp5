@@ -11,33 +11,39 @@
         <code><![CDATA[let outputNames = [""];
 let displayedOutput = "";
 let outputTrees = new Map();
-let outputArticles = new Map();
-let outputReferences = new Map();
+const outputArticlesByView = new Map();
+const outputReferencesByView = new Map();
 let foldedOccurrences = new Set();
 
 function setOutputFolded(span, folded) {
     const key = span.dataset.occurrence;
     if (folded) foldedOccurrences.add(key);
     else foldedOccurrences.delete(key);
-    span.classList.toggle("LP5-OutputFolded", folded);
-    span.setAttribute("aria-expanded", String(!folded));
-    const placeholder = span.querySelector(":scope > .LP5-OutputFoldPlaceholder");
-    const lineBreak = span.nextElementSibling?.classList.contains("LP5-OutputFoldBreak") ?
-        span.nextElementSibling : null;
-    if (folded && !placeholder) {
-        const label = document.createElement("span");
-        label.className = "LP5-OutputFoldPlaceholder";
-        label.setAttribute("aria-hidden", "true");
-        label.textContent = `${span.dataset.outputIndent || ""}⟪ folded: ${span.title} ⟫`;
-        span.prepend(label);
-    } else if (!folded) placeholder?.remove();
-    if (folded && span.dataset.outputEndsWithNewline === "true" && !lineBreak) {
-        const separator = document.createElement("span");
-        separator.className = "LP5-OutputFoldBreak";
-        separator.setAttribute("aria-hidden", "true");
-        separator.textContent = "\n";
-        span.after(separator);
-    } else if ((!folded || span.dataset.outputEndsWithNewline !== "true") && lineBreak) lineBreak.remove();
+    const targets = paneViews("LP5-Output").flatMap(pane =>
+        [...pane.querySelectorAll(".LP5-OutputArticle")]
+            .filter(element => element.dataset.occurrence === key));
+    if (!targets.includes(span)) targets.push(span);
+    for (const target of targets) {
+        target.classList.toggle("LP5-OutputFolded", folded);
+        target.setAttribute("aria-expanded", String(!folded));
+        const placeholder = target.querySelector(":scope > .LP5-OutputFoldPlaceholder");
+        const lineBreak = target.nextElementSibling?.classList.contains("LP5-OutputFoldBreak") ?
+            target.nextElementSibling : null;
+        if (folded && !placeholder) {
+            const label = document.createElement("span");
+            label.className = "LP5-OutputFoldPlaceholder";
+            label.setAttribute("aria-hidden", "true");
+            label.textContent = (target.dataset.outputIndent || "") + "⟪ folded: " + target.title + " ⟫";
+            target.prepend(label);
+        } else if (!folded) placeholder?.remove();
+        if (folded && target.dataset.outputEndsWithNewline === "true" && !lineBreak) {
+            const separator = document.createElement("span");
+            separator.className = "LP5-OutputFoldBreak";
+            separator.setAttribute("aria-hidden", "true");
+            separator.textContent = "\n";
+            target.after(separator);
+        } else if ((!folded || target.dataset.outputEndsWithNewline !== "true") && lineBreak) lineBreak.remove();
+    }
 }
 
 function foldOutputChildren(span) {
@@ -51,16 +57,24 @@ function outputTree(name) {
 }
 
 function highlightOutputArticle() {
-    for (const target of document.querySelectorAll("#LP5-Output .LP5-ReferenceTarget"))
-        target.classList.remove("LP5-ReferenceTarget");
-    for (const [filename, elements] of outputArticles)
-        for (const element of elements)
-            element.classList.toggle("LP5-OutputSelected", filename === selectedFilename);
+    for (const pane of paneViews("LP5-Output")) {
+        for (const target of pane.querySelectorAll(".LP5-ReferenceTarget"))
+            target.classList.remove("LP5-ReferenceTarget");
+        for (const [filename, elements] of outputArticlesByView.get(pane) || [])
+            for (const element of elements)
+                element.classList.toggle("LP5-OutputSelected", filename === selectedFilename);
+    }
 }
 
-function displayOutput(name) {
+function displayOutput(name, resetScroll = false) {
     displayedOutput = name;
-    const pane = document.getElementById("LP5-Output");
+    for (const pane of paneViews("LP5-Output"))
+        renderOutputPane(pane, name, resetScroll);
+}
+
+function renderOutputPane(pane, name, resetScroll = false) {
+    const oldScrollTop = pane.scrollTop;
+    const oldScrollLeft = pane.scrollLeft;
     const label = document.createElement("label");
     label.className = "LP5-OutputChoice";
     label.append("Output ");
@@ -74,14 +88,17 @@ function displayOutput(name) {
         select.append(option);
     }
     select.value = name;
-    select.addEventListener("change", () => displayOutput(select.value));
+    select.addEventListener("change", () => {
+        selectPaneView(pane);
+        displayOutput(select.value);
+    });
     label.append(select);
     const pre = document.createElement("pre");
     pre.className = "LP5-ExpandedCode";
     const code = document.createElement("code");
     const stack = [code];
-    outputArticles = new Map();
-    outputReferences = new Map();
+    const outputArticles = new Map();
+    const outputReferences = new Map();
     function index(map, key, element) {
         if (!map.has(key)) map.set(key, []);
         map.get(key).push(element);
@@ -154,6 +171,7 @@ function displayOutput(name) {
             return;
         }
         event.preventDefault();
+        selectPaneView(pane);
         selectArticle(span.dataset.lp5Filename);
         scrollToArticle(span.dataset.lp5Filename);
     }
@@ -161,10 +179,41 @@ function displayOutput(name) {
     code.addEventListener("keydown", navigate);
     pre.append(code);
     pane.replaceChildren(label, pre);
+    outputArticlesByView.set(pane, outputArticles);
+    outputReferencesByView.set(pane, outputReferences);
     for (const span of code.querySelectorAll(".LP5-OutputArticle"))
         if (foldedOccurrences.has(span.dataset.occurrence)) setOutputFolded(span, true);
-    pane.scrollTop = 0;
+    pane.scrollTop = resetScroll ? 0 : oldScrollTop;
+    pane.scrollLeft = resetScroll ? 0 : oldScrollLeft;
     highlightOutputArticle();
+}
+
+function showCodeReference(filename, offset, name, sourceView) {
+    if (sourceView) selectPaneView(sourceView);
+    const key = referenceKey(filename, offset);
+    function contains(nodes) {
+        return nodes.some(node => node.sourceKey === key || node.children && contains(node.children));
+    }
+    let preview = false;
+    let pane = activePaneView("LP5-Output");
+    if (!outputReferencesByView.get(pane)?.has(key)) {
+        const root = outputNames.find(rootName => contains(outputTree(rootName)));
+        preview = root === undefined;
+        displayOutput(preview ? name : root);
+        pane = activePaneView("LP5-Output");
+    }
+    for (const outputPane of paneViews("LP5-Output")) {
+        for (const old of outputPane.querySelectorAll(".LP5-ReferenceTarget"))
+            old.classList.remove("LP5-ReferenceTarget");
+        const references = outputReferencesByView.get(outputPane);
+        const targets = preview ? [outputPane.querySelector(".LP5-ExpandedCode code")] : references?.get(key);
+        for (const target of targets || []) target?.classList.add("LP5-ReferenceTarget");
+    }
+    const references = outputReferencesByView.get(pane);
+    const targets = preview ? [pane.querySelector(".LP5-ExpandedCode code")] : references?.get(key);
+    const target = targets?.[0];
+    if (target) pane.scrollTop += target.getBoundingClientRect().top -
+        pane.getBoundingClientRect().top - pane.clientTop;
 }
 
 function initializeOutput(articles, newSelection) {
@@ -178,27 +227,10 @@ function initializeOutput(articles, newSelection) {
     }
     outputTrees = new Map();
     if (newSelection || (displayedOutput && !model.getBundle(displayedOutput).length)) displayedOutput = "";
-    displayOutput(displayedOutput);
+    displayOutput(displayedOutput, true);
 }
 
-function showCodeReference(filename, offset, name) {
-    const key = referenceKey(filename, offset);
-    function contains(nodes) {
-        return nodes.some(node => node.sourceKey === key || node.children && contains(node.children));
-    }
-    let preview = false;
-    if (!outputReferences.has(key)) {
-        const root = outputNames.find(rootName => contains(outputTree(rootName)));
-        preview = root === undefined;
-        displayOutput(preview ? name : root);
-    }
-    const pane = document.getElementById("LP5-Output");
-    for (const old of pane.querySelectorAll(".LP5-ReferenceTarget")) old.classList.remove("LP5-ReferenceTarget");
-    const targets = preview ? [pane.querySelector(".LP5-ExpandedCode code")] : outputReferences.get(key);
-    for (const target of targets || []) target.classList.add("LP5-ReferenceTarget");
-    const target = targets?.[0];
-    if (target) pane.scrollTop += target.getBoundingClientRect().top - pane.getBoundingClientRect().top - pane.clientTop;
-}
+
 ]]></code>
     </section>
 </template>

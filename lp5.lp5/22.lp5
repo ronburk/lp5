@@ -26,11 +26,20 @@
     </div>
 </header>
 <main id="LP5-Main">
-    <nav id="LP5-Toc" aria-label="Table of contents" tabindex="-1"></nav>
+    <nav id="LP5-Toc" aria-label="Table of contents" tabindex="-1">
+        <button class="LP5-ViewSplitHandle" type="button" aria-label="Split Table of Contents into two views" title="Drag down to split; activate to split evenly"><span aria-hidden="true">⠿</span></button>
+        <div class="LP5-PaneViews"><div class="LP5-PaneView LP5-TocView" data-pane-view="toc"></div></div>
+    </nav>
     <div class="LP5-PaneSplitter" role="separator" aria-orientation="vertical"></div>
-    <section id="LP5-Source" aria-label="Source" tabindex="-1"></section>
+    <section id="LP5-Source" aria-label="Source" tabindex="-1">
+        <button class="LP5-ViewSplitHandle" type="button" aria-label="Split Source into two views" title="Drag down to split; activate to split evenly"><span aria-hidden="true">⠿</span></button>
+        <div class="LP5-PaneViews"><div class="LP5-PaneView LP5-SourceView" data-pane-view="source"></div></div>
+    </section>
     <div class="LP5-PaneSplitter" role="separator" aria-orientation="vertical"></div>
-    <section id="LP5-Output" aria-label="Output" tabindex="-1"></section>
+    <section id="LP5-Output" aria-label="Output" tabindex="-1">
+        <button class="LP5-ViewSplitHandle" type="button" aria-label="Split Output into two views" title="Drag down to split; activate to split evenly"><span aria-hidden="true">⠿</span></button>
+        <div class="LP5-PaneViews"><div class="LP5-PaneView LP5-OutputView" data-pane-view="output"></div></div>
+    </section>
 </main>
 <div id="LP5-FindBar" role="search" aria-label="Find in selected pane" hidden>
     <label id="LP5-FindScope" for="LP5-FindInput">Find in Source</label>
