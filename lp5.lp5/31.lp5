@@ -259,6 +259,7 @@
         initializePaneViews();
         initializePaneFind();
         initializePaneSelection();
+        initializePaneFind();
         initializePaneSplitters();
         model.addEventListener("ProjectLoaded", renderProject);
         const reload = document.getElementById("LP5-Reload");
