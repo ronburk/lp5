@@ -66,6 +66,9 @@ run.addEventListener("click", async () => {
             "Split grip is visually hidden at rest on hover-capable devices");
         check(sourceHandle.getBoundingClientRect().width >= 48 && sourceHandle.getBoundingClientRect().height >= 10,
             "Hidden split grip keeps its pointer hit area");
+        const sourceViewsContainer = host("Source").querySelector(":scope > .LP5-PaneViews");
+        check(Math.abs(source.getBoundingClientRect().top - sourceViewsContainer.getBoundingClientRect().top) < 1,
+            "Pane content starts at the top edge without a reserved grip gap");
         source.scrollTop = 48;
         split("Source");
         const sourceViews = views("Source");

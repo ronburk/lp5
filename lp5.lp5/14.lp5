@@ -161,7 +161,6 @@ body {
     min-width: 0;
     min-height: 0;
     overflow: hidden;
-    padding-top: 0.65rem;
 }
 
 .LP5-PaneView {
