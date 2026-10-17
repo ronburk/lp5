@@ -3,7 +3,7 @@
     <keywords><li>view</li><li>rendering</li><li>articles</li></keywords>
     <section data-lp5-kind="explanation">
         <p>The Source Pane is a presentation of model XML, not an editing copy of it. Explanation markup is parsed as HTML through <a href="https://developer.mozilla.org/en-US/docs/Web/API/Element/innerHTML"><code>Element.innerHTML</code></a> so paragraphs and SVG illustrations retain their browser presentation. Literal code and LP references are displayed as text, preventing source code from becoming live page elements. An article without a nonblank heading has no generated heading.</p>
-        <p>A <a href="#32.lp5">model load</a> replaces the entire article display in document order. Building the replacement offscreen keeps the old display intact until the new one is ready, and rendering never moves nodes out of the model. The view subscribes during startup, before the first project can be selected. The <a href="#40.lp5">TOC</a> is built from the same records and installed alongside the source, so both panes change together. <a href="#42.lp5">Output</a> is rebuilt from the same records after Source and TOC are installed. Reference buttons preserve literal source text while providing navigation into expansions. In an explanation, link to another loaded article with its filename as a fragment, for example <code>&lt;a href="#30.lp5"&gt;...&lt;/a&gt;</code>. The view intercepts that link to select and scroll the target article without changing the browser URL.</p>
+        <p>A <a href="#32.lp5">model load</a> replaces the entire article display in document order. Building the replacement offscreen keeps the old display intact until the new one is ready, and rendering never moves nodes out of the model. The view subscribes during startup, before the first project can be selected. The <a href="#40.lp5">TOC</a> is built from the same records and installed alongside the source, so both panes change together. <a href="#42.lp5">Output</a> is rebuilt from the same records after Source and TOC are installed. Reference buttons preserve literal source text while providing navigation into expansions. The Source context menu carries the article filename into the <a href="#37.lp5">EditArticle command</a>. In an explanation, link to another loaded article with its filename as a fragment, for example <code>&lt;a href="#30.lp5"&gt;...&lt;/a&gt;</code>. The view intercepts that link to select and scroll the target article without changing the browser URL.</p>
     </section>
     <section data-lp5-kind="code">
         <name>View article rendering</name>
@@ -144,7 +144,11 @@ function initializeSourceContextMenu(pane) {
         item.focus();
     });
 
-    item.addEventListener("click", () => { menu.hidden = true; });
+    item.addEventListener("click", () => {
+        const filename = menu.dataset.lp5Filename;
+        menu.hidden = true;
+        controller.dispatch({ name: "EditArticle", filename });
+    });
     document.addEventListener("click", event => {
         if (!menu.hidden && !menu.contains(event.target)) menu.hidden = true;
     });

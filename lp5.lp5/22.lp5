@@ -33,7 +33,7 @@
     <section id="LP5-Output" aria-label="Output"></section>
 </main>
 <div id="LP5-SourceContextMenu" role="menu" aria-label="Article operations" hidden>
-    <button type="button" role="menuitem">Close menu</button>
+    <button type="button" role="menuitem">Edit Article</button>
 </div>
 <div id="LP5-Status" role="status">Ready</div>
 ]]></code>

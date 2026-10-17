@@ -13,14 +13,14 @@
     <section data-lp5-kind="explanation">
         <p>The view subscribes to model load notifications during startup, so any <a href="#32.lp5">successful load or reload</a> refreshes all three panes without requiring its caller to know how articles are displayed. Rendering is private to the view; the operation still owns dialog cleanup and command-state changes.</p>
         <p>Pane dragging belongs to the view because it changes presentation only. <a href="https://developer.mozilla.org/en-US/docs/Web/API/Pointer_events#pointer_capture">Pointer capture</a> keeps a drag active outside the narrow divider; release, cancellation, or lost capture restores text selection. Only the adjacent panes exchange width, with a 100-pixel minimum where space permits. Flex weights preserve their proportions when the window changes size.</p>
-        <p>Mounting a dialog and deciding which commands it accepts are separate responsibilities. The view owns its DOM lifetime; the operation owns the interaction's state and decides when to close it. <code>showModalDialog(dialogName)</code> therefore returns immediately; <code>closeModalDialog(dialogName)</code> ends that mount when the operation decides it is finished.</p>
+        <p>Mounting a dialog and deciding which commands it accepts are separate responsibilities. The view owns its DOM lifetime; the operation owns the interaction's state and decides when to close it. <code>showModalDialog(dialogName, context?)</code> therefore returns immediately; the optional context is passed to the template initializer. The article editor uses it to supply the filename and XML draft. <code>closeModalDialog(dialogName)</code> ends that mount when the operation decides it is finished.</p>
         <p>A <a href="#23.lp5">dialog template</a> must provide a style immediately before its dialog, and its initialization script must return the mounted <a href="https://developer.mozilla.org/en-US/docs/Web/API/HTMLDialogElement"><code>HTMLDialogElement</code></a>. Shared modal styles are inserted before the dialog-specific styles so the latter can override them. The view tracks all three nodes as one mounted resource; closing removes the dialog and both style clones so repeated use leaves no styles behind.</p>
     </section>
     <section data-lp5-kind="code">
         <name>JavaScript units</name>
         <code><![CDATA[let view = (() => {
     const dialogs = new Map();
-    function showModalDialog(dialogName) {
+    function showModalDialog(dialogName, context) {
         const templates = document.getElementById("LP5-Dialog-Templates");
         if (!(templates instanceof HTMLTemplateElement))
             throw new Error("Missing LP5-Dialog-Templates template");
@@ -33,7 +33,7 @@
         if (!(sharedStyle instanceof HTMLStyleElement))
             throw new Error("Missing shared dialog styles");
 
-        const dialog = util.mountTemplate(template, document.body);
+        const dialog = util.mountTemplate(template, document.body, context);
         if (!(dialog instanceof HTMLDialogElement))
             throw new Error(`Dialog template script did not return a dialog: ${dialogName}`);
 
@@ -45,6 +45,29 @@
         dialogStyle.before(mountedSharedStyle);
         dialog.showModal();
         dialogs.set(dialogName, { dialog, dialogStyle, mountedSharedStyle });
+    }
+
+    function showArticleEditor(filename) {
+        const article = model.getArticle(filename);
+        if (!article) throw new Error(`Unknown article: ${filename}`);
+        const source = new XMLSerializer().serializeToString(article.document);
+        showModalDialog("EditArticle", { filename, source });
+    }
+
+    function showArticleEditorError(message) {
+        const dialog = document.getElementById("EditArticle-dialog");
+        const source = document.getElementById("EditArticle-source");
+        const save = document.getElementById("EditArticle-save");
+        const cancel = document.getElementById("EditArticle-cancel");
+        const error = document.getElementById("EditArticle-error");
+        if (!dialog || !source || !save || !cancel || !error)
+            throw new Error("Edit Article dialog is not mounted");
+        error.textContent = message;
+        error.hidden = false;
+        source.disabled = false;
+        cancel.disabled = false;
+        save.disabled = source.value === source.defaultValue;
+        source.focus();
     }
 
     function closeModalDialog(dialogName) {
@@ -128,7 +151,7 @@
         });
     }
 
-    return { startup, showModalDialog, closeModalDialog };
+    return { startup, showModalDialog, showArticleEditor, showArticleEditorError, closeModalDialog };
 })();
 ]]></code>
     </section>

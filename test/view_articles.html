@@ -45,7 +45,16 @@ button.addEventListener("click", async () => {
         };
         window.displayFixture = {kind: "directory", name: "fixture.lp5", async getFileHandle(filename) {
             if (!(filename in files)) throw new Error("Missing " + filename);
-            return {async getFile() { return new File([files[filename]], filename); }};
+            return {
+                async getFile() { return new File([files[filename]], filename); },
+                async createWritable() {
+                    return {
+                        async write(text) { files[filename] = text; },
+                        async close() {},
+                        async abort() {}
+                    };
+                }
+            };
         }};
         const response = await fetch("/lp5.lp5/lp5.out");
         check(response.ok, "Generated output served");
@@ -122,12 +131,54 @@ button.addEventListener("click", async () => {
         check(sourceMenu.dataset.lp5Filename === "fixture.lp5"
             && sourceMenu.style.left === "120px" && sourceMenu.style.top === "90px",
             "Context menu records its article and opens at the pointer");
+        const editMenuItem = sourceMenu.querySelector('[role="menuitem"]');
+        check(editMenuItem.textContent === "Edit Article", "Context menu offers Edit Article");
+        editMenuItem.click();
+        check(sourceMenu.hidden, "Selecting Edit Article dismisses the context menu");
+        await until(() => doc.getElementById("EditArticle-dialog")?.open);
+        let editor = doc.getElementById("EditArticle-dialog");
+        let sourceEditor = doc.getElementById("EditArticle-source");
+        check(doc.getElementById("EditArticle-filename").textContent === "fixture.lp5"
+            && sourceEditor.value.includes("<heading>Root &amp; &lt;display&gt;</heading>"),
+            "Editor opens with the selected filename and serialized article XML");
+        check(doc.getElementById("EditArticle-save").disabled, "Save starts disabled for an unchanged article");
+        doc.getElementById("EditArticle-cancel").click();
+        await until(() => !editor.isConnected);
+        check(files["fixture.lp5"] === originalRoot, "Cancel leaves stored article unchanged");
+
+        openSourceMenu(pane.children[0]);
         sourceMenu.querySelector('[role="menuitem"]').click();
-        check(sourceMenu.hidden, "Selecting a menu item dismisses the context menu");
-        openSourceMenu(articles[1]);
+        await until(() => doc.getElementById("EditArticle-dialog")?.open);
+        editor = doc.getElementById("EditArticle-dialog");
+        sourceEditor = doc.getElementById("EditArticle-source");
+        sourceEditor.value = "not XML";
+        sourceEditor.dispatchEvent(new win.Event("input", {bubbles: true}));
+        doc.getElementById("EditArticle-save").click();
+        await until(() => !doc.getElementById("EditArticle-error").hidden);
+        check(doc.getElementById("EditArticle-error").textContent.includes("Invalid XML")
+            && !sourceEditor.disabled, "Invalid XML stays in the editor and is not stored");
+        check(files["fixture.lp5"] === originalRoot, "Rejected XML does not overwrite the stored article");
+
+        sourceEditor.value = originalRoot.replace('<li id="1.lp5"/>', '<li id="2.lp5"/>');
+        sourceEditor.dispatchEvent(new win.Event("input", {bubbles: true}));
+        doc.getElementById("EditArticle-save").click();
+        await until(() => doc.getElementById("EditArticle-error").textContent.includes("cannot change child links"));
+        check(files["fixture.lp5"] === originalRoot, "Editor refuses child-link changes before storing");
+
+        sourceEditor.value = originalRoot.replace("Root &amp; &lt;display&gt;", "Edited root");
+        sourceEditor.dispatchEvent(new win.Event("input", {bubbles: true}));
+        check(!doc.getElementById("EditArticle-save").disabled, "Changing valid source enables Save");
+        doc.getElementById("EditArticle-save").click();
+        await until(() => !doc.getElementById("EditArticle-dialog")
+            && pane.querySelector("h2")?.firstChild.textContent === "Edited root");
+        check(files["fixture.lp5"].includes("<heading>Edited root</heading>"), "Successful save persists edited XML");
+        check(pane.children.length === 3 && doc.getElementById("LP5-Toc").textContent.includes("Edited root"),
+            "Successful save reloads Source and TOC from the model");
+
+        openSourceMenu(pane.children[1]);
         doc.body.dispatchEvent(new win.MouseEvent("click", {bubbles: true}));
         check(sourceMenu.hidden, "Clicking outside the menu dismisses it");
-        const pre = articles[2].querySelector("pre");
+        const pre = pane.children[2].querySelector("pre");
         check(pre.textContent === longCode, "Long multiline code preserved");
         check(!["auto", "scroll"].includes(win.getComputedStyle(pre).overflowY), "Code block has no vertical scroll container");
         check(pane.scrollHeight > pane.clientHeight, "Source pane owns vertical scrolling");

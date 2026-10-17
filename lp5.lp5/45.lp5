@@ -1,0 +1,21 @@
+<template>
+    <heading>Article editing async work</heading>
+    <keywords><li>article editing</li><li>save</li><li>validation</li></keywords>
+    <section data-lp5-kind="explanation">
+        <p>The editor sends complete article XML with its filename. Validate and store that text through the model, which owns the selected storage object; then reload the model so every pane reflects the saved article. Child links are structural project operations, so this editor preserves the article's existing child list.</p>
+        <p>Expected validation or storage failures return as <code>ArticleSaveFailed</code>, allowing the edit dialog to remain open with an error. A successful store and reload returns <code>ArticleSaved</code>. Both are controller commands for the active save operation.</p>
+    </section>
+    <section data-lp5-kind="code">
+        <name>Article editing async work</name>
+        <code><![CDATA[async function asyncSaveArticle(request) {
+    try {
+        await model.saveArticle(request.filename, request.text);
+    } catch (error) {
+        controller.dispatch({ name: "ArticleSaveFailed", message: error.message });
+        return;
+    }
+    controller.dispatch({ name: "ArticleSaved" });
+}
+]]></code>
+    </section>
+</template>

@@ -1,0 +1,67 @@
+<template>
+    <heading>Edit Article Dialog</heading>
+    <keywords><li>article editor</li><li>dialog</li><li>save</li></keywords>
+    <section data-lp5-kind="explanation">
+        <p>The editor presents the selected article as XML source. The draft stays in the dialog until Save; Cancel or Escape discards it. Save is enabled only after a change. Model validation errors are shown in the dialog so the user can correct the draft without overwriting the stored article.</p>
+        <p>This first editor does not change the article's child links. Reordering or creating project-tree links needs its own operation.</p>
+    </section>
+    <section data-lp5-kind="code">
+        <name>EditArticle</name>
+        <code><![CDATA[
+<template id="EditArticle">
+    <style>
+        .EditArticle:modal { max-width: min(80vw, 64rem); }
+        .EditArticle h2 { margin: 0 0 0.75rem; font-size: 1.25rem; }
+        .EditArticle h2 code { font-size: 0.9rem; font-weight: normal; }
+        .EditArticle textarea {
+            box-sizing: border-box; width: min(75vw, 60rem); height: min(65vh, 42rem);
+            font: 0.9rem/1.4 ui-monospace, monospace; white-space: pre; tab-size: 4;
+        }
+        .EditArticle [role="alert"] { color: #a00; white-space: pre-wrap; }
+        .EditArticle .dialog-buttons {
+            display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 0.75rem;
+        }
+    </style>
+    <dialog id="EditArticle-dialog" class="EditArticle" aria-labelledby="EditArticle-title">
+        <h2 id="EditArticle-title">Edit Article <code id="EditArticle-filename"></code></h2>
+        <label for="EditArticle-source">Article XML source</label>
+        <textarea id="EditArticle-source" spellcheck="false" wrap="off" aria-describedby="EditArticle-error"></textarea>
+        <p id="EditArticle-error" role="alert" hidden></p>
+        <div class="dialog-buttons">
+            <button id="EditArticle-cancel" type="button">Cancel</button>
+            <button id="EditArticle-save" type="button" disabled>Save</button>
+        </div>
+        <script>
+            const filename = ctx.filename;
+            const source = elementByID["EditArticle-source"];
+            const save = elementByID["EditArticle-save"];
+            const cancel = elementByID["EditArticle-cancel"];
+            elementByID["EditArticle-filename"].textContent = filename;
+            source.value = ctx.source;
+            source.defaultValue = ctx.source;
+            source.addEventListener("input", () => {
+                save.disabled = source.value === ctx.source;
+                elementByID["EditArticle-error"].hidden = true;
+            });
+            save.addEventListener("click", () => {
+                save.disabled = true;
+                source.disabled = true;
+                cancel.disabled = true;
+                window.LP5.controller.dispatch({
+                    name: "SaveArticle", filename, text: source.value
+                });
+            });
+            cancel.addEventListener("click", () =>
+                window.LP5.controller.dispatch({ name: "CancelEditArticle" }));
+            const dialog = elementByID["EditArticle-dialog"];
+            dialog.addEventListener("cancel", event => {
+                event.preventDefault();
+                window.LP5.controller.dispatch({ name: "CancelEditArticle" });
+            });
+            return dialog;
+        </script>
+    </dialog>
+</template>
+]]></code>
+    </section>
+</template>
