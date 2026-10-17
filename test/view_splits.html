@@ -65,6 +65,18 @@ run.addEventListener("click", async () => {
         split("Source");
         const sourceViews = views("Source");
         check(sourceViews.length === 2, "Source splits into two views");
+        const sourceSplitter = host("Source").querySelector(".LP5-ViewSplitter");
+        const joinButton = sourceSplitter.querySelector(".LP5-JoinViews");
+        check(sourceSplitter.getBoundingClientRect().height <= 1.5,
+            "Docked split divider consumes only one pixel of vertical space");
+        check(win.getComputedStyle(joinButton).opacity === "0" &&
+            win.getComputedStyle(joinButton).pointerEvents === "none",
+            "Join control stays hidden until the divider is hovered or focused");
+        joinButton.focus();
+        check(win.getComputedStyle(joinButton).opacity === "1" &&
+            win.getComputedStyle(joinButton).pointerEvents === "auto",
+            "Keyboard focus reveals the Join control");
+        joinButton.blur();
         check(sourceViews[0].scrollTop === 48 && sourceViews[1].scrollTop === 48,
             "Both Source views start at the original scroll position");
         sourceViews[0].scrollTop = 10;
