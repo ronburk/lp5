@@ -170,11 +170,19 @@ button.addEventListener("click", async () => {
         check(sourceMenu.hidden, "Selecting Edit Article dismisses the context menu");
         await until(() => doc.getElementById("EditArticle-dialog")?.open);
         let editor = doc.getElementById("EditArticle-dialog");
-        let sourceEditor = doc.getElementById("EditArticle-source");
+        let headingEditor = doc.getElementById("EditArticle-heading");
+        let explanationEditor = doc.getElementById("EditArticle-explanation");
+        let keywordsEditor = doc.getElementById("EditArticle-keywords");
+        let codeEditor = doc.getElementById("EditArticle-code");
         check(doc.getElementById("EditArticle-filename").textContent === "fixture.lp5"
-            && sourceEditor.value.includes("<heading>Root &amp; &lt;display&gt;</heading>"),
-            "Editor opens with the selected filename and serialized article XML");
-        check(doc.getElementById("EditArticle-save").disabled, "Save starts disabled for an unchanged article");
+            && headingEditor.value === "Root &amp; &lt;display&gt;"
+            && explanationEditor.value.includes("<p>Read <strong>this</strong>.</p>")
+            && keywordsEditor.value === "", "Editor opens structured fields for the selected article");
+        check(codeEditor.value.includes("⟦LP5-REF: Shared⟧")
+            && doc.getElementById("EditArticle-dialog").querySelector('[data-id="divider"][role="separator"]'),
+            "Code references have readable markers and the panes have an accessible divider");
+        check(doc.getElementById("EditArticle-save").disabled,
+            "Save starts disabled for an unchanged article");
         doc.getElementById("EditArticle-cancel").click();
         await until(() => !editor.isConnected);
         check(files["fixture.lp5"] === originalRoot, "Cancel leaves stored article unchanged");
@@ -183,31 +191,39 @@ button.addEventListener("click", async () => {
         sourceMenu.querySelector('[role="menuitem"]').click();
         await until(() => doc.getElementById("EditArticle-dialog")?.open);
         editor = doc.getElementById("EditArticle-dialog");
-        sourceEditor = doc.getElementById("EditArticle-source");
-        sourceEditor.value = "not XML";
-        sourceEditor.dispatchEvent(new win.Event("input", {bubbles: true}));
-        doc.getElementById("EditArticle-save").click();
-        await until(() => !doc.getElementById("EditArticle-error").hidden);
-        check(doc.getElementById("EditArticle-error").textContent.includes("Invalid XML")
-            && !sourceEditor.disabled, "Invalid XML stays in the editor and is not stored");
-        check(files["fixture.lp5"] === originalRoot, "Rejected XML does not overwrite the stored article");
+        headingEditor = doc.getElementById("EditArticle-heading");
+        explanationEditor = doc.getElementById("EditArticle-explanation");
+        keywordsEditor = doc.getElementById("EditArticle-keywords");
+        codeEditor = doc.getElementById("EditArticle-code");
+        const save = doc.getElementById("EditArticle-save");
+        const error = doc.getElementById("EditArticle-error");
+        headingEditor.value = "Broken <strong>";
+        headingEditor.dispatchEvent(new win.Event("input", {bubbles: true}));
+        save.click();
+        check(!error.hidden && error.textContent.includes("well-formed XML markup"),
+            "Malformed field markup is reported in the editor");
+        check(files["fixture.lp5"] === originalRoot, "Malformed field markup is not stored");
 
-        sourceEditor.value = originalRoot.replace('<li id="1.lp5"/>', '<li id="2.lp5"/>');
-        sourceEditor.dispatchEvent(new win.Event("input", {bubbles: true}));
-        doc.getElementById("EditArticle-save").click();
-        await until(() => doc.getElementById("EditArticle-error").textContent.includes("cannot change child links"));
-        check(files["fixture.lp5"] === originalRoot, "Editor refuses child-link changes before storing");
-
-        sourceEditor.value = originalRoot.replace("Root &amp; &lt;display&gt;", "Edited root");
-        sourceEditor.dispatchEvent(new win.Event("input", {bubbles: true}));
-        check(!doc.getElementById("EditArticle-save").disabled, "Changing valid source enables Save");
-        doc.getElementById("EditArticle-save").click();
+        headingEditor.value = "Edited root";
+        explanationEditor.value = "<p>Updated <em>explanation</em>.</p>";
+        keywordsEditor.value = "new keyword\narticle editing";
+        codeEditor.value = sourceCode + "⟦LP5-REF: Shared⟧\nchanged";
+        doc.getElementById("EditArticle-code-name").value = "Renamed code";
+        for (const field of [headingEditor, explanationEditor, keywordsEditor, codeEditor,
+                             doc.getElementById("EditArticle-code-name")])
+            field.dispatchEvent(new win.Event("input", {bubbles: true}));
+        check(!save.disabled, "Editing article and code fields enables Save");
+        save.click();
         await until(() => !doc.getElementById("EditArticle-dialog")
             && pane.querySelector("h2")?.firstChild.textContent === "Edited root");
-        check(files["fixture.lp5"].includes("<heading>Edited root</heading>"), "Successful save persists edited XML");
+        const savedArticle = model.getArticle("fixture.lp5").document;
+        check(savedArticle.querySelector("heading").textContent === "Edited root"
+            && savedArticle.querySelector("em").textContent === "explanation"
+            && [...savedArticle.querySelector("keywords").children].some(li => li.textContent === "new keyword")
+            && savedArticle.querySelector('lp5-[ref="Shared"]'),
+            "Save serializes structured fields and restores the bundle reference element");
         check(pane.children.length === 3 && doc.getElementById("LP5-Toc").textContent.includes("Edited root"),
             "Successful save reloads Source and TOC from the model");
-
         openSourceMenu(pane.children[1]);
         doc.body.dispatchEvent(new win.MouseEvent("click", {bubbles: true}));
         check(sourceMenu.hidden, "Clicking outside the menu dismisses it");
@@ -235,8 +251,8 @@ button.addEventListener("click", async () => {
         pane.style.flex = "";
 
         const originalDocument = model.getArticle("fixture.lp5").document;
-        articles[0].querySelector("strong").textContent = "Edited display";
-        check(originalDocument.querySelector("strong").textContent === "this", "Rendered markup is independent of model XML");
+        pane.children[0].querySelector("em").textContent = "Edited display";
+        check(originalDocument.querySelector("em").textContent === "explanation", "Rendered markup is independent of model XML");
         check(originalDocument.querySelector("code").childNodes.length === 3, "Rendering leaves source CDATA and reference nodes intact");
         pane.scrollTop = 100;
         files["fixture.lp5"] = '<template><heading>Reloaded</heading><section data-lp5-kind="code"><name/><code>' + literal("replacement") + '</code></section></template>';
@@ -261,7 +277,7 @@ button.addEventListener("click", async () => {
         files["fixture.lp5"] = originalRoot;
         await model.selectProject(storage.local.open(window.displayFixture));
         await model.loadProject();
-        report.textContent = `PASS: ${checks} assertions; pane-scoped find, startup rendering, source fidelity, SVG, scrolling, and reload replacement.`;
+        report.textContent = `PASS: ${checks} assertions; pane-scoped find, default pane selection, structured editing, source fidelity, SVG, scrolling, and reload replacement.`;
     } catch (error) {
         report.textContent = "FAIL: " + error.stack;
     } finally {
