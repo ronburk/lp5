@@ -69,6 +69,10 @@ run.addEventListener("click", async () => {
         const sourceViewsContainer = host("Source").querySelector(":scope > .LP5-PaneViews");
         check(Math.abs(source.getBoundingClientRect().top - sourceViewsContainer.getBoundingClientRect().top) < 1,
             "Pane content starts at the top edge without a reserved grip gap");
+        const articleStyle = win.getComputedStyle(source.querySelector(".LP5-Article"));
+        check(articleStyle.borderTopWidth === "0px" && articleStyle.borderRightWidth === "0px" &&
+            articleStyle.borderBottomWidth === "0px",
+            "Source articles have no enclosing box");
         source.scrollTop = 48;
         split("Source");
         const sourceViews = views("Source");
@@ -97,6 +101,11 @@ run.addEventListener("click", async () => {
         sourceViews[0].scrollTop = 13;
         sourceViews[1].scrollTop = 3;
         sourceViews[1].focus();
+        check(host("Source").classList.contains("LP5-PaneSelected") &&
+            ["Toc", "Output"].every(id => !host(id).classList.contains("LP5-PaneSelected") &&
+                win.getComputedStyle(host(id).querySelector(".LP5-PaneViewActive")).boxShadow === "none" &&
+                win.getComputedStyle(host(id)).borderTopColor === "rgba(0, 0, 0, 0)"),
+            "Unselected panes show no top-edge selection indicator");
         doc.dispatchEvent(new win.KeyboardEvent("keydown", {key:"f", ctrlKey:true, bubbles:true, cancelable:true}));
         const input = doc.getElementById("LP5-FindInput");
         input.value = "tail-marker";
