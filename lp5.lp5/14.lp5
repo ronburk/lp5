@@ -202,37 +202,55 @@ body {
 
 .LP5-ViewSplitter {
     position: relative;
-    z-index: 1;
+    z-index: 3;
     display: flex;
-    flex: 0 0 10px;
+    flex: 0 0 1px;
     align-items: center;
     justify-content: center;
     cursor: row-resize;
     touch-action: none;
-    background: #edf2f7;
+    background: transparent;
+}
+
+.LP5-ViewSplitter::before {
+    content: "";
+    position: absolute;
+    z-index: 0;
+    top: -5px;
+    right: 0;
+    bottom: -5px;
+    left: 0;
+    cursor: row-resize;
 }
 
 .LP5-ViewSplitter::after {
     content: "";
     position: absolute;
+    z-index: 1;
     left: 0;
     right: 0;
-    top: 4px;
-    height: 2px;
-    background: #8293a6;
+    top: 0;
+    height: 1px;
+    background: #aab6c2;
+    pointer-events: none;
 }
 
-.LP5-ViewSplitter:hover::after {
-    top: 3px;
-    height: 4px;
+.LP5-ViewSplitter:hover::after,
+.LP5-ViewSplitter:focus-within::after,
+.LP5-ViewSplitter.LP5-ViewResizing::after {
+    top: -1px;
+    height: 3px;
     background: #526174;
 }
 
 .LP5-JoinViews {
-    position: relative;
+    position: absolute;
     z-index: 2;
+    left: 50%;
+    top: 50%;
     width: 1.4rem;
     height: 1.2rem;
+    transform: translate(-50%, -50%);
     padding: 0;
     border: 1px solid #8293a6;
     border-radius: 3px;
@@ -240,6 +258,19 @@ body {
     color: #17283a;
     line-height: 1;
     cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.LP5-ViewSplitter:hover .LP5-JoinViews,
+.LP5-ViewSplitter:focus-within .LP5-JoinViews {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.LP5-JoinViews:focus-visible {
+    outline: 2px solid #155f63;
+    outline-offset: 2px;
 }
 
 .LP5-ViewSplitPreview {

@@ -13,8 +13,10 @@ Output copy, and joining a split keeps the active view.
 Also verify the pointer interaction in the application: drag the grip at the
 top of an unsplit pane downward and confirm the preview line tracks the pointer.
 Release to create a split at that position. Drag the horizontal divider to
-resize the views, then activate **Join views**. Pointer cancellation must clear
-the resizing cursor without creating or resizing a split.
+resize the views. When docked, the divider should use a one-pixel rule; hovering
+or focusing it reveals the resize and **Join views** controls. The Join control
+must be keyboard reachable and stay out of the layout. Pointer cancellation
+must clear the resizing cursor without creating or resizing a split.
 
 Split state lasts for the current page session. Reloading the project rebuilds
 both copies and resets their scroll positions; the split arrangement itself
