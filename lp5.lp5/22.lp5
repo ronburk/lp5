@@ -26,12 +26,20 @@
     </div>
 </header>
 <main id="LP5-Main">
-    <nav id="LP5-Toc" aria-label="Table of contents"></nav>
+    <nav id="LP5-Toc" aria-label="Table of contents" tabindex="-1"></nav>
     <div class="LP5-PaneSplitter" role="separator" aria-orientation="vertical"></div>
-    <section id="LP5-Source" aria-label="Source"></section>
+    <section id="LP5-Source" aria-label="Source" tabindex="-1"></section>
     <div class="LP5-PaneSplitter" role="separator" aria-orientation="vertical"></div>
-    <section id="LP5-Output" aria-label="Output"></section>
+    <section id="LP5-Output" aria-label="Output" tabindex="-1"></section>
 </main>
+<div id="LP5-FindBar" role="search" aria-label="Find in selected pane" hidden>
+    <label id="LP5-FindScope" for="LP5-FindInput">Find in Source</label>
+    <input id="LP5-FindInput" type="search" autocomplete="off">
+    <span id="LP5-FindCount" aria-live="polite">0/0</span>
+    <button id="LP5-FindPrevious" type="button" aria-label="Previous match" title="Previous match">↑</button>
+    <button id="LP5-FindNext" type="button" aria-label="Next match" title="Next match">↓</button>
+    <button id="LP5-FindClose" type="button" aria-label="Close find" title="Close">×</button>
+</div>
 <div id="LP5-SourceContextMenu" role="menu" aria-label="Article operations" hidden>
     <button type="button" role="menuitem">Edit Article</button>
 </div>

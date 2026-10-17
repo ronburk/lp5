@@ -72,9 +72,38 @@ button.addEventListener("click", async () => {
             !doc.getElementById("LP5-Output").classList.contains("LP5-PaneSelected"),
             "Source is selected by default");
         check(pane.children.length === 0, "Source starts empty");
+        const findBar = doc.getElementById("LP5-FindBar");
+        const findInput = doc.getElementById("LP5-FindInput");
+        const findShortcut = new win.KeyboardEvent("keydown", {key: "f", ctrlKey: true, bubbles: true, cancelable: true});
+        doc.dispatchEvent(findShortcut);
+        check(findShortcut.defaultPrevented && !findBar.hidden, "Ctrl-F opens the in-app find bar");
+        check(doc.getElementById("LP5-FindScope").textContent === "Find in Source", "Find scope names the selected pane");
+        findInput.dispatchEvent(new win.KeyboardEvent("keydown", {key: "Escape", bubbles: true, cancelable: true}));
+        check(findBar.hidden, "Escape closes the find bar");
         doc.getElementById("SelectCreateProject-Select").click();
         await until(() => !doc.getElementById("SelectCreateProject-dialog") || doc.querySelector('dialog[role="alertdialog"]'));
         check(!doc.querySelector('dialog[role="alertdialog"]'), "Selection and rendering succeed");
+        doc.dispatchEvent(new win.KeyboardEvent("keydown", {key: "f", ctrlKey: true, bubbles: true, cancelable: true}));
+        check(!findBar.hidden, "Ctrl-F reopens find after content loads");
+        findInput.value = "Child explanation";
+        findInput.dispatchEvent(new win.Event("input", {bubbles: true}));
+        check(doc.getElementById("LP5-FindCount").textContent === "1/1" &&
+            win.getSelection().toString() === "Child explanation", "Find selects a match in Source");
+        findInput.value = "line";
+        findInput.dispatchEvent(new win.Event("input", {bubbles: true}));
+        check(doc.getElementById("LP5-FindCount").textContent === "1/81", "Find counts matches in the current pane");
+        doc.getElementById("LP5-FindNext").click();
+        check(doc.getElementById("LP5-FindCount").textContent === "2/81", "Next advances to the following match");
+        findInput.dispatchEvent(new win.KeyboardEvent("keydown", {key: "Enter", shiftKey: true, bubbles: true, cancelable: true}));
+        check(doc.getElementById("LP5-FindCount").textContent === "1/81", "Shift-Enter returns to the previous match");
+        doc.getElementById("LP5-Output").focus();
+        check(doc.getElementById("LP5-FindScope").textContent === "Find in Output" &&
+            doc.getElementById("LP5-FindCount").textContent === "0/0", "Changing panes changes the active search scope");
+        findInput.value = "No unnamed code";
+        findInput.dispatchEvent(new win.Event("input", {bubbles: true}));
+        check(doc.getElementById("LP5-FindCount").textContent === "1/1", "Find searches visible Output text");
+        doc.getElementById("LP5-FindClose").click();
+        check(findBar.hidden, "Find close button hides the bar");
         const articles = [...pane.children];
         check(articles.length === 3, "All reachable articles displayed");
         check(articles.map(a => a.dataset.lp5Filename).join() === "fixture.lp5,1.lp5,2.lp5", "Display follows model document order");
@@ -232,7 +261,7 @@ button.addEventListener("click", async () => {
         files["fixture.lp5"] = originalRoot;
         await model.selectProject(storage.local.open(window.displayFixture));
         await model.loadProject();
-        report.textContent = `PASS: ${checks} assertions; default pane selection, startup rendering, source fidelity, SVG, scrolling, and reload replacement.`;
+        report.textContent = `PASS: ${checks} assertions; pane-scoped find, startup rendering, source fidelity, SVG, scrolling, and reload replacement.`;
     } catch (error) {
         report.textContent = "FAIL: " + error.stack;
     } finally {
