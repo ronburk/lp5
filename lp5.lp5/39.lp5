@@ -7,7 +7,7 @@
     </section>
     <section data-lp5-kind="code">
         <name>View article rendering</name>
-        <code><![CDATA[function renderArticle(article) {
+        <code><![CDATA[function renderArticle(article, sourceView) {
     const source = article.document.documentElement;
     const sections = Array.from(source.children);
     const heading = sections.find(element => element.tagName === "heading");
@@ -18,7 +18,10 @@
     const rendered = document.createElement("article");
     rendered.className = "LP5-Article";
     rendered.dataset.lp5Filename = article.filename;
-    rendered.addEventListener("click", () => selectArticle(article.filename));
+    rendered.addEventListener("click", () => {
+        selectPaneView(sourceView);
+        selectArticle(article.filename);
+    });
 
     const titleText = heading?.textContent.trim();
     if (titleText) {
@@ -52,7 +55,7 @@
                 reference.addEventListener("click", event => {
                     event.preventDefault();
                     event.stopPropagation();
-                    showCodeReference(article.filename, part.sourceOffset, part.name);
+                    showCodeReference(article.filename, part.sourceOffset, part.name, sourceView);
                 });
                 text.append(reference);
             } else if (part.showSource) text.append(document.createTextNode(part.text));
@@ -63,42 +66,43 @@
     return rendered;
 }
 
-function renderProject(event) {
-    const pane = document.getElementById("LP5-Source");
-    const toc = document.getElementById("LP5-Toc");
-    if (!pane || !toc) throw new Error("Missing LP5-Source or LP5-Toc pane");
-    const selectionId = event.detail.selectionId;
-    const newSelection = selectionId !== displayedSelectionId;
-    if (newSelection) collapsedArticles.clear();
-    const articles = [...model.docOrder()];
+let displayedArticles = [];
+
+function renderSourcePane(pane, articles) {
     const content = document.createDocumentFragment();
     const elements = new Map();
     for (const article of articles) {
-        const element = renderArticle(article);
+        const element = renderArticle(article, pane);
         elements.set(article.filename, element);
         content.append(element);
     }
-    const navigation = renderTableOfContents(articles);
     pane.replaceChildren(content);
-    toc.replaceChildren(navigation.content);
-    articleElements = elements;
-    tocEntries = navigation.entries;
-    selectedFilename = null;
-    displayedSelectionId = selectionId;
-    document.getElementById("LP5-Reload").disabled = false;
     pane.scrollTop = 0;
-    initializeOutput(articles, newSelection);
+    articleElementsByView.set(pane, elements);
     initializeSourceContextMenu(pane);
     initializeExplanationLinks(pane);
 }
 
-function initializeExplanationLinks(pane) {
-    if (pane.dataset.explanationLinksReady) return;
-    pane.dataset.explanationLinksReady = "true";
+function renderProject(event) {
+    const sourceHost = document.getElementById("LP5-Source");
+    const tocHost = document.getElementById("LP5-Toc");
+    if (!sourceHost || !tocHost) throw new Error("Missing LP5-Source or LP5-Toc pane");
+    const selectionId = event.detail.selectionId;
+    const newSelection = selectionId !== displayedSelectionId;
+    if (newSelection) collapsedArticles.clear();
+    displayedArticles = [...model.docOrder()];
+    for (const pane of paneViews("LP5-Source")) renderSourcePane(pane, displayedArticles);
+    for (const pane of paneViews("LP5-Toc")) renderTocPane(pane, displayedArticles);
+    selectedFilename = null;
+    displayedSelectionId = selectionId;
+    document.getElementById("LP5-Reload").disabled = false;
+    initializeOutput(displayedArticles, newSelection);
+}
 
+function initializeExplanationLinks(pane) {
     for (const link of pane.querySelectorAll(".LP5-Explanation a[href]")) {
         const href = link.getAttribute("href");
-        if (href.startsWith("#") && articleElements.has(href.slice(1))) {
+        if (href.startsWith("#") && articleElementsByView.get(pane)?.has(href.slice(1))) {
             link.classList.add("LP5-InternalLink");
             continue;
         }
@@ -115,6 +119,8 @@ function initializeExplanationLinks(pane) {
         link.setAttribute("aria-label", `${link.textContent.trim() || "External link"} (opens in a new tab)`);
     }
 
+    if (pane.dataset.explanationLinksReady) return;
+    pane.dataset.explanationLinksReady = "true";
     pane.addEventListener("click", event => {
         if (!(event.target instanceof Element)) return;
         const link = event.target.closest(".LP5-Explanation a.LP5-InternalLink");
@@ -122,8 +128,9 @@ function initializeExplanationLinks(pane) {
         const filename = link.getAttribute("href").slice(1);
         event.preventDefault();
         event.stopPropagation();
+        selectPaneView(pane);
         selectArticle(filename);
-        scrollToArticle(filename);
+        scrollToArticle(filename, pane);
     }, true);
 }
 

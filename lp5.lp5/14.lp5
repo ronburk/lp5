@@ -109,9 +109,12 @@ body {
 #LP5-Toc,
 #LP5-Source,
 #LP5-Output {
+    position: relative;
+    display: flex;
+    flex-direction: column;
     min-width: 0;
     min-height: 0;
-    overflow: auto;
+    overflow: hidden;
     border-top: 2px solid transparent;
 }
 
@@ -148,6 +151,113 @@ body {
 #LP5-Source,
 #LP5-Output {
     flex: 1 1 0;
+}
+
+.LP5-PaneViews {
+    position: relative;
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    padding-top: 0.65rem;
+}
+
+.LP5-PaneView {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+}
+
+.LP5-PaneViewActive {
+    box-shadow: inset 0 2px #155f63;
+}
+
+.LP5-ViewSplitHandle {
+    position: absolute;
+    z-index: 2;
+    top: 0;
+    left: 50%;
+    width: 3rem;
+    height: 0.65rem;
+    transform: translateX(-50%);
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #526174;
+    opacity: 0.45;
+    cursor: row-resize;
+    touch-action: none;
+    line-height: 0.6rem;
+}
+
+.LP5-ViewSplitHandle:hover,
+.LP5-ViewSplitHandle:focus-visible,
+.LP5-ViewSplitHandle.LP5-SplitDragging {
+    opacity: 1;
+    background: #dce8f5;
+}
+
+.LP5-ViewSplitter {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex: 0 0 10px;
+    align-items: center;
+    justify-content: center;
+    cursor: row-resize;
+    touch-action: none;
+    background: #edf2f7;
+}
+
+.LP5-ViewSplitter::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 4px;
+    height: 2px;
+    background: #8293a6;
+}
+
+.LP5-ViewSplitter:hover::after {
+    top: 3px;
+    height: 4px;
+    background: #526174;
+}
+
+.LP5-JoinViews {
+    position: relative;
+    z-index: 2;
+    width: 1.4rem;
+    height: 1.2rem;
+    padding: 0;
+    border: 1px solid #8293a6;
+    border-radius: 3px;
+    background: white;
+    color: #17283a;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.LP5-ViewSplitPreview {
+    position: absolute;
+    z-index: 3;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: #155f63;
+    pointer-events: none;
+}
+
+.LP5-ViewSplitPreview[hidden] { display: none; }
+
+#LP5-Main.LP5-ViewResizing,
+#LP5-Main.LP5-ViewResizing * {
+    cursor: row-resize;
+    user-select: none;
 }
 
 .LP5-PaneSplitter {
@@ -189,7 +299,7 @@ body {
     border-top: 1px solid #7890aa;
 }
 
-#LP5-Source > .LP5-Article {
+.LP5-SourceView > .LP5-Article {
     margin: 0.5rem;
     border: 1px solid #c8c3af;
 }
@@ -253,7 +363,7 @@ body {
     margin: 0;
 }
 
-#LP5-Toc > ul {
+.LP5-TocView > ul {
     padding: 0.5rem 0.25rem;
 }
 
@@ -292,7 +402,7 @@ body {
     border-left: 3px solid transparent;
 }
 
-#LP5-Source > .LP5-Article.LP5-Selected {
+.LP5-SourceView > .LP5-Article.LP5-Selected {
     border-left-color: #17283a;
 }
 

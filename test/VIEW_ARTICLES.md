@@ -30,3 +30,5 @@ expansion and cross-pane navigation.
 The editor panes are separately scrollable and their divider supports pointer
 dragging and arrow-key adjustment. Manually resize the editor and verify the
 fields remain usable at narrower and wider sizes.
+
+The Source Pane, TOC, and Output rebuild together. `test/VIEW_SPLITS.md` covers two-view split behavior, independent scroll positions, and shared data state. `test/VIEW_TOC.md` covers hierarchy and navigation; `test/VIEW_OUTPUT.md` covers expansion and cross-pane navigation.

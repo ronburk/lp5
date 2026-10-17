@@ -39,7 +39,9 @@ run.addEventListener("click", async () => {
         doc.getElementById("SelectCreateProject-Select").click();
         await until(() => !doc.getElementById("SelectCreateProject-dialog") || doc.querySelector('dialog[role="alertdialog"]'));
         check(!doc.querySelector('dialog[role="alertdialog"]'), "Expansion succeeds");
-        const output = doc.getElementById("LP5-Output"), source = doc.getElementById("LP5-Source"), toc = doc.getElementById("LP5-Toc");
+        const output = doc.querySelector("#LP5-Output .LP5-OutputView");
+        const source = doc.querySelector("#LP5-Source .LP5-SourceView");
+        const toc = doc.querySelector("#LP5-Toc .LP5-TocView");
         const code = () => output.querySelector("pre code");
         const articleSpans = filename => [...output.querySelectorAll(".LP5-OutputArticle")].filter(el => el.dataset.lp5Filename === filename);
         const sourceArticle = filename => [...source.children].find(el => el.dataset.lp5Filename === filename);

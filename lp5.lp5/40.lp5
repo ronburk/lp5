@@ -9,30 +9,54 @@
         <name>View table of contents</name>
         <code><![CDATA[let displayedSelectionId;
 const collapsedArticles = new Set();
-let articleElements = new Map();
-let tocEntries = new Map();
+const articleElementsByView = new Map();
+const tocEntriesByView = new Map();
 let selectedFilename = null;
 
 function selectArticle(filename) {
-    if (selectedFilename !== null) {
-        articleElements.get(selectedFilename)?.classList.remove("LP5-Selected");
-        tocEntries.get(selectedFilename)?.removeAttribute("aria-current");
-    }
     selectedFilename = filename;
-    const article = articleElements.get(filename);
-    article.classList.add("LP5-Selected");
-    tocEntries.get(filename)?.setAttribute("aria-current", "true");
+    for (const entries of articleElementsByView.values())
+        for (const [articleFilename, element] of entries)
+            element.classList.toggle("LP5-Selected", articleFilename === filename);
+    for (const entries of tocEntriesByView.values())
+        for (const [articleFilename, element] of entries) {
+            if (articleFilename === filename) element.setAttribute("aria-current", "true");
+            else element.removeAttribute("aria-current");
+        }
     highlightOutputArticle();
 }
 
-function scrollToArticle(filename) {
-    const article = articleElements.get(filename);
-    const pane = document.getElementById("LP5-Source");
+function scrollToArticle(filename, pane = activePaneView("LP5-Source")) {
+    const article = pane && articleElementsByView.get(pane)?.get(filename);
+    if (!article) return;
     pane.scrollTop += article.getBoundingClientRect().top -
         pane.getBoundingClientRect().top - pane.clientTop;
 }
 
-function renderTableOfContents(articles) {
+function renderTocPane(pane, articles) {
+    const navigation = renderTableOfContents(articles, pane);
+    pane.replaceChildren(navigation.content);
+    pane.scrollTop = 0;
+    pane.scrollLeft = 0;
+    tocEntriesByView.set(pane, navigation.entries);
+}
+
+function updateTocExpansion(filename, title) {
+    for (const pane of paneViews("LP5-Toc")) {
+        const parent = [...pane.querySelectorAll("li[data-lp5-filename]")]
+            .find(element => element.dataset.lp5Filename === filename);
+        const nested = parent?.querySelector(":scope > ul");
+        const toggle = parent?.querySelector(":scope > .LP5-TocRow > .LP5-TocToggle");
+        if (!nested || !toggle) continue;
+        const open = !collapsedArticles.has(filename);
+        nested.hidden = !open;
+        toggle.textContent = open ? "▾" : "▸";
+        toggle.setAttribute("aria-expanded", String(open));
+        toggle.setAttribute("aria-label", (open ? "Collapse " : "Expand ") + title);
+    }
+}
+
+function renderTableOfContents(articles, pane) {
     const children = new Map();
     for (const article of articles) {
         if (!children.has(article.parentFilename))
@@ -61,6 +85,7 @@ function renderTableOfContents(articles) {
             button.title = article.filename;
             button.className = "LP5-TocEntry";
             button.addEventListener("click", () => {
+                selectPaneView(pane);
                 selectArticle(article.filename);
                 scrollToArticle(article.filename);
             });
@@ -70,21 +95,19 @@ function renderTableOfContents(articles) {
                 const toggle = document.createElement("button");
                 toggle.type = "button";
                 toggle.className = "LP5-TocToggle";
-                function showExpansion() {
-                    const open = !collapsedArticles.has(article.filename);
-                    nested.hidden = !open;
-                    toggle.textContent = open ? "▾" : "▸";
-                    toggle.setAttribute("aria-expanded", String(open));
-                    toggle.setAttribute("aria-label", (open ? "Collapse " : "Expand ") + title);
-                }
                 toggle.addEventListener("click", () => {
+                    selectPaneView(pane);
                     if (collapsedArticles.has(article.filename))
                         collapsedArticles.delete(article.filename);
                     else
                         collapsedArticles.add(article.filename);
-                    showExpansion();
+                    updateTocExpansion(article.filename, title);
                 });
-                showExpansion();
+                const open = !collapsedArticles.has(article.filename);
+                nested.hidden = !open;
+                toggle.textContent = open ? "▾" : "▸";
+                toggle.setAttribute("aria-expanded", String(open));
+                toggle.setAttribute("aria-label", (open ? "Collapse " : "Expand ") + title);
                 row.append(toggle, button);
                 li.append(nested);
             } else {

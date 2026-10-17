@@ -63,14 +63,16 @@ run.addEventListener("click", async () => {
         const doc = frame.contentDocument, win = frame.contentWindow;
         const {model, storage} = win.LP5;
         const reload = doc.getElementById("LP5-Reload");
-        check(!doc.getElementById("LP5-Toc").children.length, "TOC starts empty");
+        check(!doc.querySelector("#LP5-Toc .LP5-TocView").children.length, "TOC starts empty");
         check(reload.disabled, "Reload starts disabled without a loaded project");
         doc.getElementById("SelectCreateProject-Select").click();
         await until(() => !doc.getElementById("SelectCreateProject-dialog") || doc.querySelector('dialog[role="alertdialog"]'));
         check(!doc.querySelector('dialog[role="alertdialog"]'), "Project display succeeds");
         check(!reload.disabled && window.tocFixture.pickerCalls === 1,
             "Reload enables after project load and selection used the picker once");
-        const toc = doc.getElementById("LP5-Toc"), source = doc.getElementById("LP5-Source"), output = doc.getElementById("LP5-Output");
+        const toc = doc.querySelector("#LP5-Toc .LP5-TocView");
+        const source = doc.querySelector("#LP5-Source .LP5-SourceView");
+        const output = doc.querySelector("#LP5-Output .LP5-OutputView");
         const item = filename => [...toc.querySelectorAll("li")].find(li => li.dataset.lp5Filename === filename);
         const entry = filename => item(filename)?.firstElementChild.querySelector(".LP5-TocEntry");
         const toggle = filename => item(filename).firstElementChild.querySelector(".LP5-TocToggle");

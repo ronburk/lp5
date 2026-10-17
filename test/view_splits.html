@@ -1,0 +1,151 @@
+<!doctype html>
+<!-- Tests duplicated pane views, shared data state, and independent scrolling. -->
+<meta charset="utf-8">
+<title>LP5 split view tests</title>
+<button id="run">Test split views</button>
+<pre id="results">Choose the test.</pre>
+<iframe id="app" title="Generated LP5 application" style="width:100%;height:560px"></iframe>
+<script type="module">
+const frame = document.getElementById("app"), report = document.getElementById("results"), run = document.getElementById("run");
+let checks;
+function check(condition, message) {
+    if (!condition) throw new Error(message);
+    checks++;
+}
+async function until(predicate) {
+    for (let i = 0; i < 100; i++) {
+        if (predicate()) return;
+        await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    throw new Error("Timed out waiting for split-view fixture");
+}
+function article(title, children = [], code = "") {
+    return '<template>' + (title ? '<heading>' + title + '</heading>' : '') +
+        (children.length ? '<children>' + children.map(id => '<li id="' + id + '"/>').join('') + '</children>' : '') +
+        (code ? '<section data-lp5-kind="code"><name>' + code.name + '</name><code><![CDATA[' + code.text + ']]></code></section>' : '') +
+        '</template>';
+}
+run.addEventListener("click", async () => {
+    checks = 0;
+    run.disabled = true;
+    try {
+        const children = Array.from({length: 60}, (_, i) => i + ".lp5");
+        const longCode = Array.from({length: 140}, (_, i) =>
+            "line " + i + (i === 139 ? " tail-marker" : "")).join("\n");
+        const files = {
+            "fixture.lp5": '<template><children>' + children.map(id => '<li id="' + id + '"/>').join('') +
+                '</children><heading>Root</heading><section data-lp5-kind="code"><name>Main</name><code>' +
+                '<![CDATA[root();\n]]><lp5- ref="Shared"/><![CDATA[\n]]></code></section></template>', 
+            "0.lp5": article("Shared", [], {name: "Shared", text: longCode})
+        };
+        for (let i = 1; i < children.length; i++)
+            files[i + ".lp5"] = article("Child " + i, [], {name: i === 1 ? "&lt;other.js&gt;" : "", text: "child " + i + "\n"});
+        window.splitFixture = {kind: "directory", name: "fixture.lp5", async getFileHandle(filename) {
+            if (!(filename in files)) throw new Error("Missing " + filename);
+            return {async getFile() { return new File([files[filename]], filename); }};
+        }};
+        const response = await fetch("/lp5.lp5/lp5.out");
+        check(response.ok, "Generated application served");
+        const html = await response.text();
+        const bootstrap = '<script>window.showDirectoryPicker = async () => parent.splitFixture;' +
+            'window.LP5.util.indexedDB.addHandle = async () => {};<\/script>';
+        const loaded = new Promise(resolve => frame.addEventListener("load", resolve, {once:true}));
+        frame.srcdoc = html.replace('<script type="module">', bootstrap + '<script type="module">');
+        await loaded;
+        const doc = frame.contentDocument, win = frame.contentWindow;
+        const {model} = win.LP5;
+        doc.getElementById("SelectCreateProject-Select").click();
+        await until(() => !doc.getElementById("SelectCreateProject-dialog") || doc.querySelector('dialog[role="alertdialog"]'));
+        check(!doc.querySelector('dialog[role="alertdialog"]'), "Fixture project loads");
+        const host = id => doc.getElementById("LP5-" + id);
+        const views = id => [...host(id).querySelectorAll(":scope > .LP5-PaneViews > .LP5-PaneView")];
+        const split = id => host(id).querySelector(":scope > .LP5-ViewSplitHandle").click();
+        const source = views("Source")[0];
+        source.scrollTop = 48;
+        split("Source");
+        const sourceViews = views("Source");
+        check(sourceViews.length === 2, "Source splits into two views");
+        check(sourceViews[0].scrollTop === 48 && sourceViews[1].scrollTop === 48,
+            "Both Source views start at the original scroll position");
+        sourceViews[0].scrollTop = 10;
+        sourceViews[1].scrollTop = 90;
+        check(sourceViews[0].scrollTop === 10 && sourceViews[1].scrollTop === 90,
+            "Source views scroll independently");
+        sourceViews[1].querySelector('[data-lp5-filename="1.lp5"]').click();
+        check(sourceViews.every(view => view.querySelector('[data-lp5-filename="1.lp5"]').classList.contains("LP5-Selected")),
+            "Article selection is shared between Source views");
+        sourceViews[0].scrollTop = 13;
+        sourceViews[1].scrollTop = 3;
+        sourceViews[1].focus();
+        doc.dispatchEvent(new win.KeyboardEvent("keydown", {key:"f", ctrlKey:true, bubbles:true, cancelable:true}));
+        const input = doc.getElementById("LP5-FindInput");
+        input.value = "tail-marker";
+        input.dispatchEvent(new win.Event("input", {bubbles:true}));
+        check(sourceViews[0].scrollTop === 13 && sourceViews[1].scrollTop > 3,
+            "Find scrolls only the active Source view");
+        doc.getElementById("LP5-FindClose").click();
+
+        const toc = views("Toc")[0];
+        toc.scrollTop = 36;
+        split("Toc");
+        const tocViews = views("Toc");
+        check(tocViews.length === 2 && tocViews[0].scrollTop === 36 && tocViews[1].scrollTop === 36,
+            "TOC split begins at the current scroll position");
+        tocViews[0].scrollTop = 7;
+        tocViews[1].scrollTop = 70;
+        check(tocViews[0].scrollTop === 7 && tocViews[1].scrollTop === 70, "TOC views scroll independently");
+        const toggle = tocViews[0].querySelector('li[data-lp5-filename="fixture.lp5"] .LP5-TocToggle');
+        toggle.click();
+        check(tocViews.every(view => view.querySelector('li[data-lp5-filename="fixture.lp5"] .LP5-TocToggle')
+            .getAttribute("aria-expanded") === "false"), "TOC collapse state is shared between views");
+
+        const output = views("Output")[0];
+        output.scrollTop = 42;
+        split("Output");
+        const outputViews = views("Output");
+        check(outputViews.length === 2 && outputViews[0].scrollTop === 42 && outputViews[1].scrollTop === 42,
+            "Output split begins at the current scroll position");
+        outputViews[0].scrollTop = 5;
+        outputViews[1].scrollTop = 105;
+        check(outputViews[0].scrollTop === 5 && outputViews[1].scrollTop === 105,
+            "Output views scroll independently");
+        const firstOutputArticle = outputViews[0].querySelector(".LP5-OutputArticle");
+        firstOutputArticle.dispatchEvent(new win.MouseEvent("click", {bubbles:true, ctrlKey:true, cancelable:true}));
+        const occurrence = firstOutputArticle.dataset.occurrence;
+        check(outputViews.every(view => [...view.querySelectorAll(".LP5-OutputArticle")]
+            .find(article => article.dataset.occurrence === occurrence).classList.contains("LP5-OutputFolded")),
+            "Output fold state is shared between views");
+        const sourceReference = sourceViews[0].querySelector(".LP5-CodeReference");
+        outputViews[1].focus();
+        const outputTop = outputViews[0].scrollTop;
+        sourceReference.click();
+        check(outputViews[0].scrollTop === outputTop && outputViews[1].querySelector(".LP5-ReferenceTarget"),
+            "Source-reference navigation targets the active Output view only");
+
+        tocViews[0].querySelector('li[data-lp5-filename="fixture.lp5"] .LP5-TocToggle').click();
+        tocViews[0].scrollTop = 10;
+        tocViews[1].scrollTop = 20;
+        sourceViews[0].scrollTop = 30;
+        sourceViews[1].scrollTop = 40;
+        outputViews[0].scrollTop = 50;
+        outputViews[1].scrollTop = 60;
+        await model.loadProject();
+        check(["Toc", "Source", "Output"].every(id => views(id).length === 2),
+            "Project reload keeps the split arrangement");
+        const reloadedScrolls = ["Toc", "Source", "Output"].flatMap(id => views(id).map(view => view.scrollTop));
+        check(reloadedScrolls.every(scrollTop => scrollTop === 0),
+            "Project reload resets scroll independently in every copy: " + reloadedScrolls.join(","));
+
+        const join = host("Output").querySelector(".LP5-JoinViews");
+        join.click();
+        check(views("Output").length === 1 && views("Output")[0] === outputViews[1],
+            "Joining views keeps the active copy");
+        report.textContent = `PASS: ${checks} assertions; starting positions, independent scrolling, shared data, Find scope, navigation, reload, and join.`;
+    } catch (error) {
+        report.textContent = "FAIL: " + error.stack;
+    } finally {
+        run.disabled = false;
+        delete window.splitFixture;
+    }
+});
+</script>
