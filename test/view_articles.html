@@ -110,6 +110,9 @@ button.addEventListener("click", async () => {
         check(articles.map(a => a.dataset.lp5Filename).join() === "fixture.lp5,1.lp5,2.lp5", "Display follows model document order");
         check(articles[0].querySelector("h2").firstChild.textContent === "Root & <display>", "Heading is literal text");
         check(articles[0].querySelector("h2 small").textContent === "fixture.lp5", "Title includes filename");
+        const titleGap = articles[0].querySelector(".LP5-Explanation").firstElementChild.getBoundingClientRect().top -
+            articles[0].querySelector("h2").getBoundingClientRect().bottom;
+        check(titleGap <= 12, "Explanation begins close to its article title");
         check(!articles[1].querySelector("h2"), "Untitled article has no generated heading");
         check(articles[1].querySelector(".LP5-Explanation p").textContent === "Child explanation", "Untitled article explanation still renders");
         check(articles[0].querySelector(".LP5-Explanation strong").textContent === "this", "Explanation markup rendered");

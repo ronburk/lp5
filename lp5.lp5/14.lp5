@@ -354,6 +354,10 @@ body {
     overflow-wrap: anywhere;
 }
 
+.LP5-Explanation > :first-child {
+    margin-block-start: 0;
+}
+
 .LP5-Explanation a.LP5-InternalLink {
     color: #155f63;
     text-decoration-style: dotted;

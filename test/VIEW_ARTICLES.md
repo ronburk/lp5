@@ -2,9 +2,13 @@
 
 Build with `./lp5 lp5 tangle`, start `sites-preview start "$PWD"`, and open
 `/test/view_articles.html` at the returned host. Click **Test article display**.
-Expect PASS with 68 assertions, including Source as the initial selected pane.
+Expect PASS with 80 assertions, including tighter title spacing, Source as the
+initial selected pane, and Ctrl-F search confined to the selected pane.
 
-The test runs the complete generated application, including startup hooks,
+The find-bar checks cover shortcut capture, match counting and navigation, and
+scope changes when the selected pane changes. The article layout check keeps the
+first explanation line close to its title. The test runs the complete generated
+application, including startup hooks,
 command routing, model loading, and the view's private model subscription. It
 selects a controlled local fixture, then checks article order, headings,
 explanation HTML and SVG, literal code and references, internal explanation
