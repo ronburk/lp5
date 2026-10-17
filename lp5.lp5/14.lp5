@@ -109,10 +109,16 @@ body {
 #LP5-Toc,
 #LP5-Source,
 #LP5-Output {
-    border-top: 2px solid transparent;
     min-width: 0;
     min-height: 0;
     overflow: auto;
+    border-top: 2px solid transparent;
+}
+
+#LP5-Toc.LP5-PaneSelected,
+#LP5-Source.LP5-PaneSelected,
+#LP5-Output.LP5-PaneSelected {
+    border-top-color: #155f63;
 }
 
 #LP5-Toc {
@@ -122,12 +128,6 @@ body {
 #LP5-Source,
 #LP5-Output {
     flex: 1 1 0;
-}
-
-#LP5-Toc.LP5-PaneSelected,
-#LP5-Source.LP5-PaneSelected,
-#LP5-Output.LP5-PaneSelected {
-    border-top-color: #155f63;
 }
 
 .LP5-PaneSplitter {

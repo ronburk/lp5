@@ -3,6 +3,7 @@
         <li id="37.lp5"/>
         <li id="36.lp5"/>
         <li id="28.lp5"/>
+        <li id="45.lp5"/>
     </children>
     <heading>Operations</heading>
     <keywords>
@@ -22,7 +23,7 @@
             <li><code>return</code> resumes the caller with the child's completion command. The returned JavaScript value is ignored; without a caller, dispatch ends.</li>
         </ol>
         <p>Compilation belongs to <code>startup()</code> so syntax failures use the same <a href="#25.lp5">fatal-error reporting</a> as runtime failures. Defining the unit earlier must not start command handling. The <a href="#36.lp5">compiler</a> and machine stay private because callers need to send commands, not manipulate state factories.</p>
-        <p>The <a href="#37.lp5">command state machine</a> and <a href="#28.lp5">async selection work</a> are explained in their own articles. The production controller currently supports calls, waits, and returns; the compiler's replacing transitions remain experimental and are exercised only by separate test drivers.</p>
+        <p>The <a href="#37.lp5">command state machine</a> and <a href="#28.lp5">async selection work</a> are explained in their own articles. The production controller currently supports calls, waits, and returns; the compiler's replacing transitions remain experimental and are exercised only by separate test drivers. The <a href="#45.lp5">article save helper</a> reports save success or failure as commands for the active edit operation.</p>
     </section>
     <section data-lp5-kind="code">
         <name>JavaScript units</name>
@@ -32,13 +33,15 @@ let operations = (() => {
 
     ]]><lp5- ref="SelectProject async work"/><![CDATA[
 
+    ]]><lp5- ref="Article editing async work"/><![CDATA[
+
     ]]><lp5- ref="Command state machine"/><![CDATA[
 
     let stateMachine;
     function startup() {
         const code = compileStateMachine(stateMachineSource);
-        const define = util.scriptToFunction(code, "command-state-machine", "view", "asyncSelectProject", "asyncReloadProject");
-        stateMachine = define(view, asyncSelectProject, asyncReloadProject);
+        const define = util.scriptToFunction(code, "command-state-machine", "view", "asyncSelectProject", "asyncReloadProject", "asyncSaveArticle");
+        stateMachine = define(view, asyncSelectProject, asyncReloadProject, asyncSaveArticle);
         controller.init(stateMachine.states[stateMachine.initialState]());
     }
 
