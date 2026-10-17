@@ -183,8 +183,9 @@ button.addEventListener("click", async () => {
             && explanationEditor.value.includes("<p>Read <strong>this</strong>.</p>")
             && keywordsEditor.value === "", "Editor opens structured fields for the selected article");
         check(codeEditor.value.includes("⟦LP5-REF: Shared⟧")
-            && doc.getElementById("EditArticle-dialog").querySelector('[data-id="divider"][role="separator"]'),
-            "Code references have readable markers and the panes have an accessible divider");
+            && doc.getElementById("EditArticle-dialog").querySelector('[data-id="divider"][role="separator"]')
+            && !doc.querySelector('[data-id="hasCode"]'),
+            "Code references use readable markers, the panes have an accessible divider, and no redundant section toggle appears");
         check(doc.getElementById("EditArticle-save").disabled,
             "Save starts disabled for an unchanged article");
         doc.getElementById("EditArticle-cancel").click();
@@ -228,6 +229,31 @@ button.addEventListener("click", async () => {
             "Save serializes structured fields and restores the bundle reference element");
         check(pane.children.length === 3 && doc.getElementById("LP5-Toc").textContent.includes("Edited root"),
             "Successful save reloads Source and TOC from the model");
+
+        openSourceMenu(pane.children[1]);
+        sourceMenu.querySelector('[role="menuitem"]').click();
+        await until(() => doc.getElementById("EditArticle-dialog")?.open);
+        doc.getElementById("EditArticle-code-name").value = "Temporary bundle";
+        doc.getElementById("EditArticle-code").value = "const temporary = true;";
+        for (const field of [doc.getElementById("EditArticle-code-name"), doc.getElementById("EditArticle-code")])
+            field.dispatchEvent(new win.Event("input", {bubbles: true}));
+        doc.getElementById("EditArticle-save").click();
+        await until(() => model.getArticle("1.lp5").document.querySelector('[data-lp5-kind="code"]'));
+        check(model.getArticle("1.lp5").document.querySelector("code").textContent === "const temporary = true;",
+            "Typing code creates a code section");
+
+        openSourceMenu(pane.children[1]);
+        sourceMenu.querySelector('[role="menuitem"]').click();
+        await until(() => doc.getElementById("EditArticle-dialog")?.open);
+        doc.getElementById("EditArticle-code-name").value = "";
+        doc.getElementById("EditArticle-code").value = "";
+        for (const field of [doc.getElementById("EditArticle-code-name"), doc.getElementById("EditArticle-code")])
+            field.dispatchEvent(new win.Event("input", {bubbles: true}));
+        doc.getElementById("EditArticle-save").click();
+        await until(() => !model.getArticle("1.lp5").document.querySelector('[data-lp5-kind="code"]'));
+        check(!model.getArticle("1.lp5").document.querySelector('[data-lp5-kind="code"]'),
+            "Clearing both code fields removes the code section");
+
         openSourceMenu(pane.children[1]);
         doc.body.dispatchEvent(new win.MouseEvent("click", {bubbles: true}));
         check(sourceMenu.hidden, "Clicking outside the menu dismisses it");
