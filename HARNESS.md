@@ -63,6 +63,22 @@ running `tangle.xsl` or `weave.xsl` directly with ordinary `xsltproc` fails with
 an unregistered-function error. `tangle` builds program output. `weave` creates
 the source index; it does not build the program.
 
+## MCP stdio server
+
+`lp5mcp.c` builds a separate `lp5mcp` executable. It accepts one project name
+and serves MCP JSON-RPC messages as newline-delimited JSON on standard input
+and output:
+
+```sh
+gcc -std=c99 -Wall -Wextra -pedantic -o lp5mcp lp5mcp.c
+./lp5mcp lp5
+```
+
+The server currently exposes `check`, `show_article`, `show_bundle`, `weave`,
+and `tangle`. It invokes the ordinary `lp5` executable; set `LP5_EXECUTABLE`
+when that executable is elsewhere. Run `python3 test/lp5mcp.py ./lp5mcp` for
+the protocol smoke test.
+
 ## Project naming and generated index
 
 Every command takes the project name first: `./lp5 <project-name> <command>
