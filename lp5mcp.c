@@ -1,12 +1,16 @@
 /* A small MCP-over-stdio front end for the lp5 command line harness. */
 #define _POSIX_C_SOURCE 200809L
+#define _XOPEN_SOURCE 700
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/wait.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
-static const char *project;
-static const char *lp5_program = "./lp5";
+static char *executable_directory;
+static char *project_name;
+static char *project_working_directory;
+static const char *lp5_program;
 
 static void print_json_string(const char *s)
 {
@@ -81,12 +85,13 @@ static char *quote_arg(const char *s)
 
 static char *run_command(const char *command, const char *a, const char *b)
 {
-    char *q0 = quote_arg(lp5_program), *q1 = quote_arg(project);
+    char *q0 = quote_arg(lp5_program), *q1 = quote_arg(project_name);
     char *q2 = quote_arg(command), *q3 = a ? quote_arg(a) : NULL;
-    char *q4 = b ? quote_arg(b) : NULL; char line[8192]; FILE *pipe;
+    char *q4 = b ? quote_arg(b) : NULL; char *qcwd = quote_arg(project_working_directory);
+    char line[8192]; FILE *pipe;
     size_t size = 1, used = 0; char *result = malloc(1);
-    if (!q0 || !q1 || !q2 || (a && !q3) || (b && !q4) || !result) return NULL;
-    snprintf(line, sizeof line, "%s %s %s%s%s%s%s 2>&1", q0, q1, q2,
+    if (!q0 || !q1 || !q2 || !qcwd || (a && !q3) || (b && !q4) || !result) return NULL;
+    snprintf(line, sizeof line, "cd %s && %s %s %s%s%s%s%s 2>&1", qcwd, q0, q1, q2,
         q3 ? " " : "", q3 ? q3 : "", q4 ? " " : "", q4 ? q4 : "");
     pipe = popen(line, "r");
     if (!pipe) { free(result); result = NULL; }
@@ -96,7 +101,7 @@ static char *run_command(const char *command, const char *a, const char *b)
         if (result) { memcpy(result + used, line, n); used += n; result[used] = 0; }
     }
     if (pipe) pclose(pipe);
-    free(q0); free(q1); free(q2); free(q3); free(q4);
+    free(q0); free(q1); free(q2); free(q3); free(q4); free(qcwd);
     return result;
 }
 
@@ -114,7 +119,34 @@ static void error_response(const char *id, int code, const char *message)
 
 static void tools_list(const char *id)
 {
-    response(id, "{\"tools\":[{\"name\":\"check\",\"description\":\"Validate an LP5 article.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"article\":{\"type\":\"string\"}},\"required\":[\"article\"]}},{\"name\":\"show_article\",\"description\":\"Display an LP5 article.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"article\":{\"type\":\"string\"}}}},{\"name\":\"show_bundle\",\"description\":\"Display a code bundle.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"}}}},{\"name\":\"weave\",\"description\":\"Refresh the project index.\",\"inputSchema\":{\"type\":\"object\"}},{\"name\":\"tangle\",\"description\":\"Generate project output.\",\"inputSchema\":{\"type\":\"object\"}}]}");
+    response(id, "{\"tools\":[{\"name\":\"select_project\",\"description\":\"Select an LP5 project. A relative path is resolved relative to the directory containing the lp5mcp executable; the project directory must be <path>.lp5.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\",\"description\":\"Project path, relative to the lp5mcp executable or absolute.\"}},\"required\":[\"path\"]}},{\"name\":\"check\",\"description\":\"Validate an LP5 article in the selected project.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"article\":{\"type\":\"string\"}},\"required\":[\"article\"]}},{\"name\":\"show_article\",\"description\":\"Display an article from the selected project.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"article\":{\"type\":\"string\"}}}},{\"name\":\"show_bundle\",\"description\":\"Display a code bundle from the selected project.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"}}}},{\"name\":\"weave\",\"description\":\"Refresh the selected project index.\",\"inputSchema\":{\"type\":\"object\"}},{\"name\":\"tangle\",\"description\":\"Generate output for the selected project.\",\"inputSchema\":{\"type\":\"object\"}}]}");
+}
+
+static char *join_path(const char *left, const char *right)
+{
+    size_t n = strlen(left) + strlen(right) + 2; char *result = malloc(n);
+    if (result) snprintf(result, n, "%s/%s", left, right);
+    return result;
+}
+
+static int select_project(const char *path, char **message)
+{
+    char *full = path[0] == '/' ? strdup(path) : join_path(executable_directory, path);
+    char *slash; char *root; struct stat info;
+    if (!full) return 1;
+    slash = strrchr(full, '/');
+    if (!slash || slash == full || slash[1] == 0) { free(full); return 1; }
+    root = malloc(strlen(full) + 6);
+    if (!root) { free(full); return 1; }
+    sprintf(root, "%s.lp5", full);
+    if (stat(root, &info) != 0 || !S_ISDIR(info.st_mode)) {
+        free(root); free(full); *message = strdup("project directory does not exist"); return 1;
+    }
+    free(project_name); project_name = strdup(slash + 1);
+    free(project_working_directory); *slash = 0; project_working_directory = strdup(full);
+    free(full); free(root);
+    if (!project_name || !project_working_directory) return 1;
+    *message = strdup("project selected"); return *message ? 0 : 1;
 }
 
 static void tool_call(const char *id, const char *json)
@@ -124,6 +156,15 @@ static void tool_call(const char *id, const char *json)
     char *output = NULL;
     if (!name_value) { error_response(id, -32602, "tools/call requires a tool name"); return; }
     snprintf(name, sizeof name, "%s", name_value);
+    if (strcmp(name, "select_project") == 0) {
+        char *message = NULL; const char *path = json_string(json, "path");
+        if (!path) { error_response(id, -32602, "select_project requires path"); return; }
+        if (select_project(path, &message) != 0) { error_response(id, -32000, message ? message : "could not select project"); free(message); return; }
+        fputs("{\"jsonrpc\":\"2.0\",\"id\":", stdout); fputs(id, stdout);
+        fputs(",\"result\":{\"content\":[{\"type\":\"text\",\"text\":", stdout); print_json_string(message);
+        fputs("}],\"isError\":false}}\n", stdout); fflush(stdout); free(message); return;
+    }
+    if (!project_name) { error_response(id, -32000, "no project is selected; call select_project first"); return; }
     arg = json_string(json, "article");
     if (strcmp(name, "check") == 0) output = run_command("check", arg, NULL);
     else if (strcmp(name, "show_article") == 0) output = run_command("show-article", arg, NULL);
@@ -141,17 +182,30 @@ static void tool_call(const char *id, const char *json)
 int main(int argc, char **argv)
 {
     char line[65536];
-    if (argc != 2) { fprintf(stderr, "usage: lp5mcp PROJECT\n"); return 2; }
-    project = argv[1];
-    { const char *configured = getenv("LP5_EXECUTABLE"); if (configured) lp5_program = configured; }
+    char *resolved_executable;
+    if (argc != 1) { fprintf(stderr, "usage: lp5mcp\n"); return 2; }
+    resolved_executable = realpath(argv[0], NULL);
+    if (!resolved_executable) return 2;
+    executable_directory = strdup(resolved_executable);
+    { char *slash = strrchr(executable_directory, '/'); if (slash) *slash = 0; }
+    free(resolved_executable);
+    { const char *configured = getenv("LP5_EXECUTABLE");
+        lp5_program = configured ? configured : "";
+        if (!configured) {
+            static char sibling[4096];
+            snprintf(sibling, sizeof sibling, "%s/lp5", executable_directory);
+            lp5_program = sibling;
+        }
+    }
     while (fgets(line, sizeof line, stdin)) {
         const char *id = json_id(line); const char *method = json_string(line, "method");
         if (!method) { error_response(id ? id : "", -32600, "invalid JSON-RPC request"); continue; }
         if (!id) continue;
-        if (strcmp(method, "initialize") == 0) response(id, "{\"protocolVersion\":\"2025-03-26\",\"capabilities\":{\"tools\":{}},\"serverInfo\":{\"name\":\"lp5\",\"version\":\"1.0\"}}");
+        if (strcmp(method, "initialize") == 0) response(id, "{\"protocolVersion\":\"2025-03-26\",\"capabilities\":{\"tools\":{}},\"serverInfo\":{\"name\":\"lp5\",\"version\":\"1.0\"},\"instructions\":\"No project is selected initially. Call select_project with a relative or absolute project path before using project tools.\"}");
         else if (strcmp(method, "tools/list") == 0) tools_list(id);
         else if (strcmp(method, "tools/call") == 0) tool_call(id, line);
         else error_response(id, -32601, "method not found");
     }
+    free(executable_directory); free(project_name); free(project_working_directory);
     return 0;
 }

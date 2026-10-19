@@ -65,19 +65,23 @@ the source index; it does not build the program.
 
 ## MCP stdio server
 
-`lp5mcp.c` builds a separate `lp5mcp` executable. It accepts one project name
-and serves MCP JSON-RPC messages as newline-delimited JSON on standard input
+`lp5mcp.c` builds a separate `lp5mcp` executable. It starts without a project
+argument and serves MCP JSON-RPC messages as newline-delimited JSON on standard input
 and output:
 
 ```sh
 gcc -std=c99 -Wall -Wextra -pedantic -o lp5mcp lp5mcp.c
-./lp5mcp lp5
+./lp5mcp
 ```
 
-The server currently exposes `check`, `show_article`, `show_bundle`, `weave`,
-and `tangle`. It invokes the ordinary `lp5` executable; set `LP5_EXECUTABLE`
-when that executable is elsewhere. Run `python3 test/lp5mcp.py ./lp5mcp` for
-the protocol smoke test.
+The server initially has no project selected. Call `select_project` with a
+relative or absolute path; relative paths are resolved beside the `lp5mcp`
+executable and must name a project directory by its stem (for example,
+`lp5` selects `<executable-directory>/lp5.lp5`). The server then exposes
+`check`, `show_article`, `show_bundle`, `weave`, and `tangle` for that project.
+It invokes the ordinary `lp5` executable; set `LP5_EXECUTABLE` when that
+executable is elsewhere. Run `python3 test/lp5mcp.py ./lp5mcp` for the protocol
+smoke test.
 
 ## Project naming and generated index
 
