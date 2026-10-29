@@ -38,6 +38,18 @@ apt-get -o APT::Sandbox::User=root \
 
 ## Build the launcher and project output
 
+With [Blud](https://github.com/ronburk/blud) installed, run `blud` in the
+repository root to build both `lp5` and `lp5mcp`. The bludfile uses GCC,
+`xslt-config`, and `curl-config`; install the dependencies above plus
+`libcurl4-openssl-dev` on Debian/Ubuntu. It targets a POSIX shell environment.
+
+Use `blud lp5` or `blud lp5mcp` to build just one program, or `blud -B` to
+force a rebuild after changing compiler flags or installed libraries. Both
+executables stay in the repository root so the MCP server can find `lp5`
+beside itself. Source changes rebuild the affected program; changing the
+bludfile rebuilds both. The direct compiler commands below remain usable
+without Blud.
+
 Reuse `./lp5` if it was built from the current `lp5.c` and still runs. Build it
 in the repository root if missing, if `lp5.c` changed, or if an environment
 change made it unusable:
