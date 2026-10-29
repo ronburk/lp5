@@ -7,11 +7,13 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <stdint.h>
+#include <errno.h>
 #include <curl/curl.h>
 
 static const char *server_url;
 
 static char *executable_directory;
+static char *local_project_directory;
 static char *project_name;
 static char *project_working_directory;
 static const char *lp5_program;
@@ -214,7 +216,7 @@ static void tools_list(const char *id)
         response(id, "{\"tools\":[{\"name\":\"select_project\",\"description\":\"Select a server-side project identifier; no local path is accessed.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"]}},{\"name\":\"check\",\"description\":\"Validate an article using the configured HTTPS server.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"article\":{\"type\":\"string\"}},\"required\":[\"article\"]}}]}");
         return;
     }
-    response(id, "{\"tools\":[{\"name\":\"select_project\",\"description\":\"Select an LP5 project. A relative path is resolved relative to the directory containing the lp5mcp executable; the project directory must be <path>.lp5.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\",\"description\":\"Project path, relative to the lp5mcp executable or absolute.\"}},\"required\":[\"path\"]}},{\"name\":\"check\",\"description\":\"Validate an LP5 article in the selected project.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"article\":{\"type\":\"string\"}},\"required\":[\"article\"]}},{\"name\":\"show_article\",\"description\":\"Display an article from the selected project.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"article\":{\"type\":\"string\"}}}},{\"name\":\"show_bundle\",\"description\":\"Display a code bundle from the selected project.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"}}}},{\"name\":\"weave\",\"description\":\"Refresh the selected project index.\",\"inputSchema\":{\"type\":\"object\"}},{\"name\":\"tangle\",\"description\":\"Generate output for the selected project.\",\"inputSchema\":{\"type\":\"object\"}}]}");
+    response(id, "{\"tools\":[{\"name\":\"select_project\",\"description\":\"Select an LP5 project. A relative path is resolved relative to the startup local project directory; the project directory must be <path>.lp5.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\",\"description\":\"Project path, relative to the startup local project directory or absolute.\"}},\"required\":[\"path\"]}},{\"name\":\"check\",\"description\":\"Validate an LP5 article in the selected project.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"article\":{\"type\":\"string\"}},\"required\":[\"article\"]}},{\"name\":\"show_article\",\"description\":\"Display an article from the selected project.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"article\":{\"type\":\"string\"}}}},{\"name\":\"show_bundle\",\"description\":\"Display a code bundle from the selected project.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"}}}},{\"name\":\"weave\",\"description\":\"Refresh the selected project index.\",\"inputSchema\":{\"type\":\"object\"}},{\"name\":\"tangle\",\"description\":\"Generate output for the selected project.\",\"inputSchema\":{\"type\":\"object\"}}]}");
 }
 
 static char *join_path(const char *left, const char *right)
@@ -222,6 +224,60 @@ static char *join_path(const char *left, const char *right)
     size_t n = strlen(left) + strlen(right) + 2; char *result = malloc(n);
     if (result) snprintf(result, n, "%s/%s", left, right);
     return result;
+}
+
+/* This directory is local even when the operation backend is remote. It may
+ * not exist yet; checkout creation is a separate operation. */
+static int set_local_directory(const char *path)
+{
+    struct stat info;
+    char *cwd, *full;
+    size_t length;
+    if (!*path) { fprintf(stderr, "project directory must not be empty\n"); return 1; }
+    if (strstr(path, "://")) {
+        fprintf(stderr, "project directory must be a local path, not a URL\n"); return 1;
+    }
+    if (stat(path, &info) == 0) {
+        if (!S_ISDIR(info.st_mode)) {
+            fprintf(stderr, "project path is not a directory: %s\n", path); return 1;
+        }
+        full = realpath(path, NULL);
+    } else {
+        if (errno != ENOENT) { perror(path); return 1; }
+        cwd = getcwd(NULL, 0);
+        if (!cwd) return 1;
+        full = path[0] == '/' ? strdup(path) : join_path(cwd, path);
+        free(cwd);
+    }
+    if (!full) return 1;
+    length = strlen(full);
+    while (length > 1 && full[length - 1] == '/') full[--length] = 0;
+    local_project_directory = full;
+    if (!server_url) {
+        char *slash = strrchr(full, '/');
+        size_t name_length = strlen(slash + 1);
+        if (name_length > 4 && strcmp(full + length - 4, ".lp5") == 0) {
+            project_name = strndup(slash + 1, name_length - 4);
+            project_working_directory = slash == full ? strdup("/") :
+                strndup(full, (size_t)(slash - full));
+            if (!project_name || !project_working_directory) return 1;
+        }
+    }
+    return 0;
+}
+
+static void usage(FILE *stream)
+{
+    fputs("usage: lp5mcp [--] LOCAL_PROJECT_DIRECTORY\n"
+          "       lp5mcp --help\n\n"
+          "The local directory may exist or be a future checkout location.\n"
+          "Relative paths are resolved from the current working directory.\n"
+          "A NAME.lp5 directory selects that project in local mode.\n"
+          "Other directories require select_project before local operations.\n"
+          "Remote mode requires select_project with a server-side identifier.\n\n"
+          "Environment:\n"
+          "  LP5_SERVER_URL  HTTPS endpoint; unset for local operations.\n"
+          "  LP5_EXECUTABLE  Local launcher path; defaults to sibling lp5.\n", stream);
 }
 
 static int select_project(const char *path, char **message)
@@ -236,7 +292,7 @@ static int select_project(const char *path, char **message)
         *message = strdup("project selected");
         return *message ? 0 : 1;
     }
-    char *full = path[0] == '/' ? strdup(path) : join_path(executable_directory, path);
+    char *full = path[0] == '/' ? strdup(path) : join_path(local_project_directory, path);
     char *slash; char *root; struct stat info;
     if (!full) return 1;
     slash = strrchr(full, '/');
@@ -296,7 +352,14 @@ int main(int argc, char **argv)
 {
     char line[65536];
     char *resolved_executable;
-    if (argc != 1) { fprintf(stderr, "usage: lp5mcp\n"); return 2; }
+    const char *local_path;
+    if (argc == 2 && (strcmp(argv[1], "--help") == 0 ||
+                     strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "-?") == 0)) {
+        usage(stdout); return 0;
+    }
+    if (argc == 3 && strcmp(argv[1], "--") == 0) local_path = argv[2];
+    else if (argc == 2 && argv[1][0] != '-') local_path = argv[1];
+    else { usage(stderr); return 2; }
     server_url = getenv("LP5_SERVER_URL");
     if (server_url && !*server_url) server_url = NULL;
     if (server_url) {
@@ -305,6 +368,7 @@ int main(int argc, char **argv)
         }
         if (curl_global_init(CURL_GLOBAL_DEFAULT) != CURLE_OK) return 2;
     }
+    if (set_local_directory(local_path) != 0) return 2;
     resolved_executable = realpath(argv[0], NULL);
     if (!resolved_executable) return 2;
     executable_directory = strdup(resolved_executable);
@@ -322,12 +386,12 @@ int main(int argc, char **argv)
         const char *id = json_id(line); const char *method = json_string(line, "method");
         if (!method) { error_response(id ? id : "", -32600, "invalid JSON-RPC request"); continue; }
         if (!id) continue;
-        if (strcmp(method, "initialize") == 0) response(id, "{\"protocolVersion\":\"2025-03-26\",\"capabilities\":{\"tools\":{}},\"serverInfo\":{\"name\":\"lp5\",\"version\":\"1.0\"},\"instructions\":\"No project is selected initially. Call select_project with a relative or absolute project path before using project tools.\"}");
+        if (strcmp(method, "initialize") == 0) response(id, "{\"protocolVersion\":\"2025-03-26\",\"capabilities\":{\"tools\":{}},\"serverInfo\":{\"name\":\"lp5\",\"version\":\"1.0\"},\"instructions\":\"A local project directory was supplied at startup. In local mode NAME.lp5 selects the project immediately; otherwise call select_project with a project stem relative to that directory or an absolute stem. In remote mode call select_project with a server-side identifier; the local directory is separate.\"}");
         else if (strcmp(method, "tools/list") == 0) tools_list(id);
         else if (strcmp(method, "tools/call") == 0) tool_call(id, line);
         else error_response(id, -32601, "method not found");
     }
-    free(executable_directory); free(project_name); free(project_working_directory);
+    free(local_project_directory); free(executable_directory); free(project_name); free(project_working_directory);
     if (server_url) curl_global_cleanup();
     return 0;
 }

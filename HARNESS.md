@@ -77,23 +77,30 @@ the source index; it does not build the program.
 
 ## MCP stdio server
 
-`lp5mcp.c` builds a separate `lp5mcp` executable. It starts without a project
-argument and serves MCP JSON-RPC messages as newline-delimited JSON on standard input
-and output:
+`lp5mcp.c` builds a separate `lp5mcp` executable. It requires a local project
+or future checkout directory and serves newline-delimited MCP JSON-RPC on stdio:
 
 ```sh
-gcc -std=c99 -Wall -Wextra -pedantic -o lp5mcp lp5mcp.c $(curl-config --cflags --libs)
-./lp5mcp
+blud lp5mcp
+./lp5mcp ./lp5.lp5
+./lp5mcp --help
 ```
 
-The server initially has no project selected. Call `select_project` with a
-relative or absolute path; relative paths are resolved beside the `lp5mcp`
-executable and must name a project directory by its stem (for example,
-`lp5` selects `<executable-directory>/lp5.lp5`). The server then exposes
-`check`, `show_article`, `show_bundle`, `weave`, and `tangle` for that project.
-It invokes the ordinary `lp5` executable; set `LP5_EXECUTABLE` when that
-executable is elsewhere. Run `python3 test/lp5mcp.py ./lp5mcp` for the protocol
-smoke test.
+The positional argument is the actual local directory, including `.lp5` when
+applicable. Relative paths are resolved from the caller's working directory.
+Missing directories (including missing parents) are accepted without creating
+them. Existing non-directories, empty paths, and URLs are rejected. Use `--`
+before a path beginning with `-`. Help is available via `--help`, `-h`, or `-?`.
+
+In local mode, a `NAME.lp5` directory selects project `NAME` immediately. If
+another directory is supplied, use `select_project` before project operations.
+That tool still takes a project stem: `demo` selects `demo.lp5` beneath the
+startup directory; absolute stems are also accepted. It can switch projects.
+The available operations are `check`, `show_article`, `show_bundle`, `weave`,
+and `tangle`. They invoke the ordinary `lp5` executable beside `lp5mcp`; set
+`LP5_EXECUTABLE` when it is elsewhere. A missing checkout can start the server,
+but local operations need the actual project files before they can succeed.
+Run `python3 test/lp5mcp.py ./lp5mcp` for startup and protocol checks.
 
 ### Optional HTTPS backend
 
@@ -102,12 +109,14 @@ Building lp5mcp now requires libcurl development files (on Debian/Ubuntu,
 made unless `LP5_SERVER_URL` is set to a nonempty HTTPS endpoint URL.
 
 ```
-LP5_SERVER_URL=https://your-server.example/lp5 ./lp5mcp
+LP5_SERVER_URL=https://your-server.example/lp5 ./lp5mcp ./checkout
 ```
 
 In this first increment remote mode advertises only `select_project` and
 `check`. The existing `path` argument to `select_project` is an opaque
 server-side project identifier in this mode, not a local filesystem path.
+The required startup directory remains local and is never used as the remote
+project identifier. Remote mode starts without a server-side project selected.
 Selection stores the identifier; the server validates it on the first check.
 There is no silent fallback to local operations on network failure.
 
