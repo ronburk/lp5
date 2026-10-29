@@ -1,0 +1,13 @@
+-- Build both programs beside the stylesheets and project directories.
+CC = gcc
+CFLAGS = -std=c99 -Wall -Wextra -pedantic
+XSLT_CONFIG = xslt-config
+CURL_CONFIG = curl-config
+
+all: lp5 lp5mcp
+
+lp5: lp5.c bludfile
+    $(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $< $(LDFLAGS) `$(XSLT_CONFIG) --cflags --libs` -lexslt $(LDLIBS)
+
+lp5mcp: lp5mcp.c bludfile
+    $(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $< $(LDFLAGS) `$(CURL_CONFIG) --cflags --libs` $(LDLIBS)
