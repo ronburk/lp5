@@ -70,7 +70,7 @@ argument and serves MCP JSON-RPC messages as newline-delimited JSON on standard 
 and output:
 
 ```sh
-gcc -std=c99 -Wall -Wextra -pedantic -o lp5mcp lp5mcp.c
+gcc -std=c99 -Wall -Wextra -pedantic -o lp5mcp lp5mcp.c $(curl-config --cflags --libs)
 ./lp5mcp
 ```
 
@@ -82,6 +82,39 @@ executable and must name a project directory by its stem (for example,
 It invokes the ordinary `lp5` executable; set `LP5_EXECUTABLE` when that
 executable is elsewhere. Run `python3 test/lp5mcp.py ./lp5mcp` for the protocol
 smoke test.
+
+### Optional HTTPS backend
+
+Building lp5mcp now requires libcurl development files (on Debian/Ubuntu,
+`libcurl4-openssl-dev`). Local mode remains the default; no HTTP request is
+made unless `LP5_SERVER_URL` is set to a nonempty HTTPS endpoint URL.
+
+```
+LP5_SERVER_URL=https://your-server.example/lp5 ./lp5mcp
+```
+
+In this first increment remote mode advertises only `select_project` and
+`check`. The existing `path` argument to `select_project` is an opaque
+server-side project identifier in this mode, not a local filesystem path.
+Selection stores the identifier; the server validates it on the first check.
+There is no silent fallback to local operations on network failure.
+
+`check` POSTs JSON to the exact configured endpoint:
+
+```json
+{"op":"check","project":"demo","article":"12"}
+```
+
+The application endpoint need not speak MCP. It returns UTF-8 plain text
+with a 2xx status on success; non-2xx statuses and transport failures become
+MCP errors, with diagnostics on stderr. Responses are limited to 1 MiB and
+must not contain NUL bytes. This small first version does not parse JSON
+responses or configure authentication; a corresponding server is not included.
+
+libcurl verifies the TLS certificate and hostname using its configured trust
+store. Connection timeout is 10 seconds and total timeout is 30 seconds.
+Redirects are not followed, and there is no insecure TLS switch or automatic
+retry. Unset `LP5_SERVER_URL` to restore the original local harness behavior.
 
 ## Project naming and generated index
 
