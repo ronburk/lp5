@@ -6,25 +6,34 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <stdint.h>
+#include <curl/curl.h>
+
+static const char *server_url;
 
 static char *executable_directory;
 static char *project_name;
 static char *project_working_directory;
 static const char *lp5_program;
 
-static void print_json_string(const char *s)
+static void write_json_string(FILE *stream, const char *s)
 {
-    putchar('"');
+    fputc('"', stream);
     for (; *s; ++s) {
         unsigned char c = (unsigned char)*s;
-        if (c == '"' || c == '\\') printf("\\%c", c);
-        else if (c == '\n') fputs("\\n", stdout);
-        else if (c == '\r') fputs("\\r", stdout);
-        else if (c == '\t') fputs("\\t", stdout);
-        else if (c < 32) printf("\\u%04x", c);
-        else putchar(c);
+        if (c == '"' || c == '\\') fprintf(stream, "\\%c", c);
+        else if (c == '\n') fputs("\\n", stream);
+        else if (c == '\r') fputs("\\r", stream);
+        else if (c == '\t') fputs("\\t", stream);
+        else if (c < 32) fprintf(stream, "\\u%04x", c);
+        else fputc(c, stream);
     }
-    putchar('"');
+    fputc('"', stream);
+}
+
+static void print_json_string(const char *s)
+{
+    write_json_string(stdout, s);
 }
 
 static const char *json_string(const char *json, const char *key)
@@ -105,6 +114,88 @@ static char *run_command(const char *command, const char *a, const char *b)
     return result;
 }
 
+
+/* Responses never go directly to stdout: it belongs to the MCP transport. */
+struct http_body { char *data; size_t size; };
+
+static size_t receive_body(char *data, size_t size, size_t count, void *context)
+{
+    struct http_body *body = context;
+    size_t n;
+    char *grown;
+    if (size && count > SIZE_MAX / size) return 0;
+    n = size * count;
+    if (n > 1024 * 1024 - body->size || memchr(data, 0, n)) return 0;
+    grown = realloc(body->data, body->size + n + 1);
+    if (!grown) return 0;
+    body->data = grown;
+    memcpy(body->data + body->size, data, n);
+    body->size += n;
+    body->data[body->size] = 0;
+    return n;
+}
+
+/* The first remote operation uses JSON requests and a text result. HTTP status
+ * carries success/failure, avoiding a second JSON parser in this small client. */
+static char *remote_check(const char *article)
+{
+    CURL *curl = NULL;
+    struct curl_slist *headers = NULL;
+    struct http_body body = {NULL, 0};
+    char *request = NULL;
+    size_t length = 0;
+    FILE *stream = open_memstream(&request, &length);
+    CURLcode status;
+    long http_status = 0;
+    if (!stream) return NULL;
+    fputs("{\"op\":\"check\",\"project\":", stream);
+    write_json_string(stream, project_name);
+    fputs(",\"article\":", stream);
+    write_json_string(stream, article);
+    fputc('}', stream);
+    if (fclose(stream) != 0) { free(request); return NULL; }
+    curl = curl_easy_init();
+    headers = curl_slist_append(NULL, "Content-Type: application/json");
+    body.data = calloc(1, 1);
+    if (!curl || !headers || !body.data) goto failed;
+#define SET_OPTION(option, value) \
+    do { if (curl_easy_setopt(curl, option, value) != CURLE_OK) goto failed; } while (0)
+    SET_OPTION(CURLOPT_URL, server_url);
+    SET_OPTION(CURLOPT_POSTFIELDS, request);
+    SET_OPTION(CURLOPT_HTTPHEADER, headers);
+    SET_OPTION(CURLOPT_WRITEFUNCTION, receive_body);
+    SET_OPTION(CURLOPT_WRITEDATA, &body);
+    SET_OPTION(CURLOPT_CONNECTTIMEOUT, 10L);
+    SET_OPTION(CURLOPT_TIMEOUT, 30L);
+    SET_OPTION(CURLOPT_NOSIGNAL, 1L);
+    SET_OPTION(CURLOPT_SSL_VERIFYPEER, 1L);
+    SET_OPTION(CURLOPT_SSL_VERIFYHOST, 2L);
+    /* No redirects: do not silently send project data to another destination. */
+    SET_OPTION(CURLOPT_FOLLOWLOCATION, 0L);
+#undef SET_OPTION
+    status = curl_easy_perform(curl);
+    if (status != CURLE_OK) {
+        fprintf(stderr, "HTTPS request failed: %s\n", curl_easy_strerror(status));
+        goto failed;
+    }
+    if (curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_status) != CURLE_OK)
+        goto failed;
+    if (http_status < 200 || http_status >= 300) {
+        fprintf(stderr, "HTTPS server returned status %ld\n", http_status);
+        goto failed;
+    }
+    curl_easy_cleanup(curl);
+    curl_slist_free_all(headers);
+    free(request);
+    return body.data;
+failed:
+    if (curl) curl_easy_cleanup(curl);
+    curl_slist_free_all(headers);
+    free(request);
+    free(body.data);
+    return NULL;
+}
+
 static void response(const char *id, const char *result)
 {
     fputs("{\"jsonrpc\":\"2.0\",\"id\":", stdout); fputs(id, stdout);
@@ -119,6 +210,10 @@ static void error_response(const char *id, int code, const char *message)
 
 static void tools_list(const char *id)
 {
+    if (server_url) {
+        response(id, "{\"tools\":[{\"name\":\"select_project\",\"description\":\"Select a server-side project identifier; no local path is accessed.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"]}},{\"name\":\"check\",\"description\":\"Validate an article using the configured HTTPS server.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"article\":{\"type\":\"string\"}},\"required\":[\"article\"]}}]}");
+        return;
+    }
     response(id, "{\"tools\":[{\"name\":\"select_project\",\"description\":\"Select an LP5 project. A relative path is resolved relative to the directory containing the lp5mcp executable; the project directory must be <path>.lp5.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\",\"description\":\"Project path, relative to the lp5mcp executable or absolute.\"}},\"required\":[\"path\"]}},{\"name\":\"check\",\"description\":\"Validate an LP5 article in the selected project.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"article\":{\"type\":\"string\"}},\"required\":[\"article\"]}},{\"name\":\"show_article\",\"description\":\"Display an article from the selected project.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"article\":{\"type\":\"string\"}}}},{\"name\":\"show_bundle\",\"description\":\"Display a code bundle from the selected project.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"}}}},{\"name\":\"weave\",\"description\":\"Refresh the selected project index.\",\"inputSchema\":{\"type\":\"object\"}},{\"name\":\"tangle\",\"description\":\"Generate output for the selected project.\",\"inputSchema\":{\"type\":\"object\"}}]}");
 }
 
@@ -131,6 +226,16 @@ static char *join_path(const char *left, const char *right)
 
 static int select_project(const char *path, char **message)
 {
+    if (server_url) {
+        char *selected;
+        if (!*path) { *message = strdup("project identifier must not be empty"); return 1; }
+        selected = strdup(path);
+        if (!selected) return 1;
+        free(project_name);
+        project_name = selected;
+        *message = strdup("project selected");
+        return *message ? 0 : 1;
+    }
     char *full = path[0] == '/' ? strdup(path) : join_path(executable_directory, path);
     char *slash; char *root; struct stat info;
     if (!full) return 1;
@@ -166,7 +271,15 @@ static void tool_call(const char *id, const char *json)
     }
     if (!project_name) { error_response(id, -32000, "no project is selected; call select_project first"); return; }
     arg = json_string(json, "article");
-    if (strcmp(name, "check") == 0) output = run_command("check", arg, NULL);
+    if (server_url) {
+        if (strcmp(name, "check") != 0) {
+            error_response(id, -32601, "remote mode currently supports only check"); return;
+        }
+        if (!arg) { error_response(id, -32602, "check requires article"); return; }
+        output = remote_check(arg);
+        if (!output) { error_response(id, -32000, "HTTPS check failed; see stderr"); return; }
+    }
+    else if (strcmp(name, "check") == 0) output = run_command("check", arg, NULL);
     else if (strcmp(name, "show_article") == 0) output = run_command("show-article", arg, NULL);
     else if (strcmp(name, "show_bundle") == 0) output = run_command("show-bundle", json_string(json, "name"), NULL);
     else if (strcmp(name, "weave") == 0) output = run_command("weave", NULL, NULL);
@@ -184,6 +297,14 @@ int main(int argc, char **argv)
     char line[65536];
     char *resolved_executable;
     if (argc != 1) { fprintf(stderr, "usage: lp5mcp\n"); return 2; }
+    server_url = getenv("LP5_SERVER_URL");
+    if (server_url && !*server_url) server_url = NULL;
+    if (server_url) {
+        if (strncmp(server_url, "https://", 8) != 0) {
+            fprintf(stderr, "LP5_SERVER_URL must be an https:// endpoint\n"); return 2;
+        }
+        if (curl_global_init(CURL_GLOBAL_DEFAULT) != CURLE_OK) return 2;
+    }
     resolved_executable = realpath(argv[0], NULL);
     if (!resolved_executable) return 2;
     executable_directory = strdup(resolved_executable);
@@ -207,5 +328,6 @@ int main(int argc, char **argv)
         else error_response(id, -32601, "method not found");
     }
     free(executable_directory); free(project_name); free(project_working_directory);
+    if (server_url) curl_global_cleanup();
     return 0;
 }
